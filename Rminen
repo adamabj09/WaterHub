@@ -1,20 +1,39 @@
--- [[ WATER HUB V4.1 - FIX GUI & ZOOM ]] --
+-- [[ WATER HUB V5 - AUTO-SAVE & FAST LOAD ]] --
 local H = game:GetService("HttpService")
 local P = game.Players.LocalPlayer
 local pG = P:WaitForChild("PlayerGui")
 local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
 
+local FileName = "WaterHub_Config.json"
+
+-- ==========================================
+-- FUNCIONES DE ARCHIVOS (AUTO-SAVE)
+-- ==========================================
+local function GuardarKey(key)
+    local data = {SavedKey = key}
+    writefile(FileName, H:JSONEncode(data))
+end
+
+local function LeerKeyGuardada()
+    if isfile(FileName) then
+        local data = H:JSONDecode(readfile(FileName))
+        return data.SavedKey
+    end
+    return nil
+end
+
 -- ==========================================
 -- 2. MENÚ PRINCIPAL (ZOOM ANIMATION)
 -- ==========================================
 local function AbrirMenuPrincipal()
+    if pG:FindFirstChild("WaterHubMain") then pG.WaterHubMain:Destroy() end
     local mainSg = Instance.new("ScreenGui", pG)
     mainSg.Name = "WaterHubMain"
     mainSg.ResetOnSpawn = false
 
     local frame = Instance.new("Frame", mainSg)
     frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    frame.Size = UDim2.new(0, 0, 0, 0) -- Empieza en 0 para el Zoom
+    frame.Size = UDim2.new(0, 0, 0, 0)
     frame.Position = UDim2.new(0.5, 0, 0.5, 0)
     frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     frame.BorderSizePixel = 0
@@ -22,7 +41,6 @@ local function AbrirMenuPrincipal()
     frame.Draggable = true
     Instance.new("UICorner", frame)
 
-    -- ANIMACIÓN ZOOM (Aparece hacia afuera)
     frame:TweenSize(UDim2.new(0, 240, 0, 320), "Out", "Back", 0.5, true)
 
     local title = Instance.new("TextLabel", frame)
@@ -70,14 +88,17 @@ local function AbrirMenuPrincipal()
             b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         end
     end)
+    
+    createHack("🗑️ Borrar Key Guardada", 260, function()
+        if isfile(FileName) then delfile(FileName) end
+        mainSg:Destroy()
+    end)
 end
 
 -- ==========================================
 -- 1. INTERFAZ DE LOGIN
 -- ==========================================
 local function CrearLogin()
-    if pG:FindFirstChild("WaterHubLogin") then pG.WaterHubLogin:Destroy() end
-    
     local sg = Instance.new("ScreenGui", pG)
     sg.Name = "WaterHubLogin"
     
@@ -91,7 +112,7 @@ local function CrearLogin()
     local input = Instance.new("TextBox", f)
     input.Size = UDim2.new(0, 240, 0, 45)
     input.Position = UDim2.new(0.5, -120, 0.3, 0)
-    input.PlaceholderText = "KEY AQUÍ..."
+    input.PlaceholderText = "INGRESA TU KEY"
     input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     input.TextColor3 = Color3.new(1, 1, 1)
     Instance.new("UICorner", input)
@@ -99,7 +120,7 @@ local function CrearLogin()
     local btn = Instance.new("TextButton", f)
     btn.Size = UDim2.new(0, 200, 0, 50)
     btn.Position = UDim2.new(0.5, -100, 0.65, 0)
-    btn.Text = "CONECTAR"
+    btn.Text = "VERIFICAR"
     btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.GothamBold
@@ -107,29 +128,32 @@ local function CrearLogin()
 
     btn.MouseButton1Click:Connect(function()
         local k = input.Text:gsub("%s+", ""):upper()
-        local req = (request or http_request or (syn and syn.request)) -- REQ DEFINIDO AQUÍ
-        
+        local req = (request or http_request or (syn and syn.request))
         btn.Text = "CONECTANDO..."
         
         task.spawn(function()
-            -- Conexión rápida
-            pcall(function()
-                req({Url = url, Method = "POST", Body = H:JSONEncode({key = k})})
-            end)
-            
+            pcall(function() req({Url = url, Method = "POST", Body = H:JSONEncode({key = k})}) end)
+            GuardarKey(k) -- GUARDAMOS LA KEY EN EL CELULAR/PC
             btn.Text = "¡LISTO!"
-            btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
             task.wait(0.4)
-            
-            -- Zoom Out del Login
             f:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Back", 0.4, true)
             task.wait(0.4)
             sg:Destroy()
-            
-            -- ESTO ES LO QUE NO SALÍA:
             AbrirMenuPrincipal()
         end)
     end)
 end
 
-CrearLogin()
+-- ==========================================
+-- LÓGICA DE INICIO (AUTO-LOAD)
+-- ==========================================
+local KeyGuardada = LeerKeyGuardada()
+
+if KeyGuardada then
+    -- Si hay key, saltamos el login y vamos al menú
+    print("Key encontrada: " .. KeyGuardada)
+    AbrirMenuPrincipal()
+else
+    -- Si no hay key, mostramos el login
+    CrearLogin()
+end
