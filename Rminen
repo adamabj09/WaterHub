@@ -6,7 +6,7 @@ local P = game.Players.LocalPlayer
 local pG = P:WaitForChild("PlayerGui", 10)
 
 local H = game:GetService("HttpService")
-local url = "https://script.google.com/macros/s/AKfycbxU6FuiQoX02Ma-c6OcO43sehBe5yDW_sRwz6tI2kjGgjB9ocMihjhVzZM-JWFSb1rf2g/exec"
+local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
 
 -- Función de Verificación
 local function verificar(k)
