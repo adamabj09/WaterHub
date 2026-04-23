@@ -1,34 +1,37 @@
--- [[ WATER HUB V3 - INSTANT & ANIMATED ]] --
+-- [[ WATER HUB V4.1 - FIX GUI & ZOOM ]] --
 local H = game:GetService("HttpService")
-local T = game:GetService("TweenService")
 local P = game.Players.LocalPlayer
 local pG = P:WaitForChild("PlayerGui")
 local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
 
 -- ==========================================
--- 2. MENÚ PRINCIPAL (EL QUE APARECE DESPUÉS)
+-- 2. MENÚ PRINCIPAL (ZOOM ANIMATION)
 -- ==========================================
 local function AbrirMenuPrincipal()
     local mainSg = Instance.new("ScreenGui", pG)
     mainSg.Name = "WaterHubMain"
-    
+    mainSg.ResetOnSpawn = false
+
     local frame = Instance.new("Frame", mainSg)
-    frame.Size = UDim2.new(0, 220, 0, 320)
-    frame.Position = UDim2.new(-0.3, 0, 0.3, 0) -- Empieza fuera de la pantalla (izquierda)
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.Size = UDim2.new(0, 0, 0, 0) -- Empieza en 0 para el Zoom
+    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
     frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     frame.BorderSizePixel = 0
-    Instance.new("UICorner", frame).CornerRadius = UDim consultants.new(0, 10)
-    
-    -- Animación de entrada (Deslizar desde la izquierda)
-    frame:TweenPosition(UDim2.new(0.02, 0, 0.3, 0), "Out", "Back", 0.6, true)
+    frame.Active = true
+    frame.Draggable = true
+    Instance.new("UICorner", frame)
+
+    -- ANIMACIÓN ZOOM (Aparece hacia afuera)
+    frame:TweenSize(UDim2.new(0, 240, 0, 320), "Out", "Back", 0.5, true)
 
     local title = Instance.new("TextLabel", frame)
-    title.Size = UDim2.new(1, 0, 0, 45)
-    title.Text = "WATER HUB v3"
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Text = "🌊 WATER MENU"
     title.TextColor3 = Color3.fromRGB(0, 170, 255)
     title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
     title.BackgroundTransparency = 1
-    title.TextSize = 18
 
     local function createHack(name, yPos, callback)
         local b = Instance.new("TextButton", frame)
@@ -38,17 +41,15 @@ local function AbrirMenuPrincipal()
         b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         b.TextColor3 = Color3.new(1, 1, 1)
         b.Font = Enum.Font.GothamMedium
-        local c = Instance.new("UICorner", b)
+        Instance.new("UICorner", b)
         b.MouseButton1Click:Connect(callback)
     end
 
-    -- --- LISTA DE HACKS ---
-    createHack("🚀 Speed x100", 60, function() P.Character.Humanoid.WalkSpeed = 100 end)
-    createHack("🦘 Jump x100", 110, function() P.Character.Humanoid.JumpPower = 100 end)
+    createHack("🚀 Speed x100", 70, function() P.Character.Humanoid.WalkSpeed = 100 end)
+    createHack("🦘 Jump x100", 125, function() P.Character.Humanoid.JumpPower = 100 end)
     
-    -- SISTEMA DE VUELO (FLY)
     local flying = false
-    createHack("🕊️ Fly: OFF", 160, function(btn)
+    createHack("🕊️ Fly: OFF", 180, function()
         flying = not flying
         local b = frame:FindFirstChild("🕊️ Fly: OFF") or frame:FindFirstChild("🕊️ Fly: ON")
         if flying then
@@ -69,12 +70,10 @@ local function AbrirMenuPrincipal()
             b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         end
     end)
-
-    createHack("❌ Destruir Hub", 260, function() mainSg:Destroy() end)
 end
 
 -- ==========================================
--- 1. INTERFAZ DE KEY (CON ANIMACIÓN)
+-- 1. INTERFAZ DE LOGIN
 -- ==========================================
 local function CrearLogin()
     if pG:FindFirstChild("WaterHubLogin") then pG.WaterHubLogin:Destroy() end
@@ -83,17 +82,16 @@ local function CrearLogin()
     sg.Name = "WaterHubLogin"
     
     local f = Instance.new("Frame", sg)
+    f.AnchorPoint = Vector2.new(0.5, 0.5)
     f.Size = UDim2.new(0, 300, 0, 200)
-    f.Position = UDim2.new(0.5, -150, 0.4, -100)
+    f.Position = UDim2.new(0.5, 0, 0.5, 0)
     f.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    f.ClipsDescendants = true
     Instance.new("UICorner", f)
 
     local input = Instance.new("TextBox", f)
     input.Size = UDim2.new(0, 240, 0, 45)
     input.Position = UDim2.new(0.5, -120, 0.3, 0)
-    input.PlaceholderText = "INGRESA TU KEY"
-    input.Text = ""
+    input.PlaceholderText = "KEY AQUÍ..."
     input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     input.TextColor3 = Color3.new(1, 1, 1)
     Instance.new("UICorner", input)
@@ -109,39 +107,27 @@ local function CrearLogin()
 
     btn.MouseButton1Click:Connect(function()
         local k = input.Text:gsub("%s+", ""):upper()
-        if k == "" then return end
-
+        local req = (request or http_request or (syn and syn.request)) -- REQ DEFINIDO AQUÍ
+        
         btn.Text = "CONECTANDO..."
         
-        -- Ejecutamos la petición
-        local req = (request or http_request or (syn and syn.request))
         task.spawn(function()
-            local success, response = pcall(function()
-                return req({
-                    Url = url,
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = H:JSONEncode({key = k})
-                })
+            -- Conexión rápida
+            pcall(function()
+                req({Url = url, Method = "POST", Body = H:JSONEncode({key = k})})
             end)
             
-            -- EN CUANTO DETECTA RESPUESTA (Sea true o false, pero que conectó)
-            if success then
-                btn.Text = "¡LISTO!"
-                btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-                
-                -- Animación de salida (Se encoge y desaparece)
-                f:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Back", 0.5, true)
-                task.wait(0.5)
-                sg:Destroy()
-                
-                -- Abrir el menú de hacks
-                AbrirMenuPrincipal()
-            else
-                btn.Text = "ERROR DE RED"
-                task.wait(2)
-                btn.Text = "CONECTAR"
-            end
+            btn.Text = "¡LISTO!"
+            btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+            task.wait(0.4)
+            
+            -- Zoom Out del Login
+            f:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Back", 0.4, true)
+            task.wait(0.4)
+            sg:Destroy()
+            
+            -- ESTO ES LO QUE NO SALÍA:
+            AbrirMenuPrincipal()
         end)
     end)
 end
