@@ -1,16 +1,16 @@
--- [[ WATER HUB V2 - VERSIÓN FINAL REPARADA ]] --
-
--- Asegurar que el juego y el HUD carguen
+-- [[ WATER HUB - VERSIÓN FINAL CORREGIDA ]] --
 if not game:IsLoaded() then game.Loaded:Wait() end
-local P = game.Players.LocalPlayer
-local pG = P:WaitForChild("PlayerGui", 10)
 
 local H = game:GetService("HttpService")
+local P = game.Players.LocalPlayer
+local pG = P:WaitForChild("PlayerGui")
+
+-- TU URL DE GOOGLE (Verificada por ti)
 local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
 
--- Función de Verificación
+-- FUNCIÓN DE VERIFICACIÓN
 local function verificar(k)
-    local req = request or http_request or (syn and syn.request) or (http and http.request)
+    local req = (request or http_request or (syn and syn.request))
     if not req then return false end
     
     local success, response = pcall(function()
@@ -21,128 +21,118 @@ local function verificar(k)
             Body = H:JSONEncode({key = k})
         })
     end)
-    
+
     if success and response and response.StatusCode == 200 then
         local ok, result = pcall(function() return H:JSONDecode(response.Body) end)
-        if ok and result and result.success then
-            return true
-        end
+        return ok and result and result.success
     end
     return false
 end
 
--- --- LIMPIEZA PREVIA ---
-if pG:FindFirstChild("WaterHubLogin") then pG.WaterHubLogin:Destroy() end
-
--- --- CREACIÓN DE INTERFAZ ---
-local sg = Instance.new("ScreenGui")
-sg.Name = "WaterHubLogin"
-sg.Parent = pG -- Parent al final para evitar lag de Delta
-sg.ResetOnSpawn = false
-sg.IgnoreGuiInset = true -- Esto ayuda en móviles
-
-local frame = Instance.new("Frame")
-frame.Name = "Main"
-frame.Parent = sg
-frame.Size = UDim2.new(0, 260, 0, 160)
-frame.Position = UDim2.new(0.5, -130, 0.4, -80)
-frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-frame.Active = true
-frame.Draggable = true 
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Parent = frame
-title.Size = UDim2.new(1, 0, 0, 45)
-title.Text = "🌊 WATER HUB"
-title.TextColor3 = Color3.fromRGB(0, 180, 255)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-
--- Contenedor LOGIN
-local loginF = Instance.new("Frame")
-loginF.Name = "LoginFrame"
-loginF.Parent = frame
-loginF.Size = UDim2.new(1, 0, 1, -45)
-loginF.Position = UDim2.new(0, 0, 0, 45)
-loginF.BackgroundTransparency = 1
-
-local input = Instance.new("TextBox")
-input.Parent = loginF
-input.Size = UDim2.new(0, 200, 0, 35)
-input.Position = UDim2.new(0.5, -100, 0.15, 0)
-input.PlaceholderText = "Pega tu Key aquí..."
-input.Text = ""
-input.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-input.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
-
-local btn = Instance.new("TextButton")
-btn.Parent = loginF
-btn.Size = UDim2.new(0, 140, 0, 35)
-btn.Position = UDim2.new(0.5, -70, 0.6, 0)
-btn.Text = "ACTIVAR"
-btn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-
--- Contenedor CHEATS
-local cheatF = Instance.new("Frame")
-cheatF.Name = "CheatFrame"
-cheatF.Parent = frame
-cheatF.Size = UDim2.new(1, 0, 1, -45)
-cheatF.Position = UDim2.new(0, 0, 0, 45)
-cheatF.BackgroundTransparency = 1
-cheatF.Visible = false
-
-local speedB = Instance.new("TextButton")
-speedB.Parent = cheatF
-speedB.Size = UDim2.new(0, 200, 0, 40)
-speedB.Position = UDim2.new(0.5, -100, 0.25, 0)
-speedB.Text = "SPEED: 16 (OFF)"
-speedB.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedB.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", speedB).CornerRadius = UDim.new(0, 6)
-
--- Lógica Speed
-speedB.MouseButton1Click:Connect(function()
-    local char = P.Character or P.CharacterAdded:Wait()
-    local h = char:FindFirstChild("Humanoid")
-    if h then
-        if h.WalkSpeed <= 16 then
-            h.WalkSpeed = 65
-            speedB.Text = "SPEED: 65 (ON)"
-            speedB.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
-        else
-            h.WalkSpeed = 16
-            speedB.Text = "SPEED: 16 (OFF)"
-            speedB.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        end
-    end
-end)
-
--- Lógica Login
-btn.MouseButton1Click:Connect(function()
-    local keyLimpia = input.Text:gsub("%s+", ""):upper()
-    if keyLimpia == "" then return end
+-- --- FUNCIÓN DEL MENÚ DE CHEATS (Se abre tras la Key) ---
+local function AbrirMenuPrincipal()
+    local mainSg = Instance.new("ScreenGui", pG)
+    mainSg.Name = "WaterHubMain"
     
-    btn.Text = "VERIFICANDO..."
-    if verificar(keyLimpia) then
-        btn.Text = "¡LISTO!"
-        task.wait(0.5)
-        loginF.Visible = false
-        cheatF.Visible = true
-        frame.Size = UDim2.new(0, 260, 0, 120)
+    local frame = Instance.new("Frame", mainSg)
+    frame.Size = UDim2.new(0, 200, 0, 250)
+    frame.Position = UDim2.new(0.1, 0, 0.4, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.Active = true
+    frame.Draggable = true
+    Instance.new("UICorner", frame)
+
+    local t = Instance.new("TextLabel", frame)
+    t.Size = UDim2.new(1, 0, 0, 40)
+    t.Text = "WATER HUB"
+    t.TextColor3 = Color3.new(1,1,1)
+    t.Font = Enum.Font.GothamBold
+    t.BackgroundTransparency = 1
+
+    local function createButton(name, pos, callback)
+        local b = Instance.new("TextButton", frame)
+        b.Size = UDim2.new(0, 160, 0, 35)
+        b.Position = pos
+        b.Text = name
+        b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        b.TextColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", b)
+        b.MouseButton1Click:Connect(callback)
+    end
+
+    -- BOTÓN VELOCIDAD
+    createButton("Velocidad (100)", UDim2.new(0.5, -80, 0.2, 0), function()
+        P.Character.Humanoid.WalkSpeed = 100
+    end)
+
+    -- BOTÓN SALTO
+    createButton("Salto (100)", UDim2.new(0.5, -80, 0.4, 0), function()
+        P.Character.Humanoid.JumpPower = 100
+    end)
+
+    -- BOTÓN VOLAR (FLY)
+    local flying = false
+    createButton("Volar: OFF", UDim2.new(0.5, -80, 0.6, 0), function(btn)
+        flying = not flying
+        local btnObj = frame:FindFirstChild("Volar: OFF") or frame:FindFirstChild("Volar: ON")
+        if flying then
+            btnObj.Text = "Volar: ON"
+            local bv = Instance.new("BodyVelocity", P.Character.HumanoidRootPart)
+            bv.Velocity = Vector3.new(0,0,0)
+            bv.MaxForce = Vector3.new(4500, 4500, 4500)
+            bv.Name = "WaterFly"
+            spawn(function()
+                while flying do
+                    bv.Velocity = game.Workspace.CurrentCamera.CFrame.LookVector * 100
+                    wait()
+                end
+                bv:Destroy()
+            end)
+        else
+            btnObj.Text = "Volar: OFF"
+        end
+    end)
+end
+
+-- --- INTERFAZ DE LOGIN ---
+local sg = Instance.new("ScreenGui", pG)
+sg.Name = "WaterHubLogin"
+
+local loginF = Instance.new("Frame", sg)
+loginF.Size = UDim2.new(0, 260, 0, 160)
+loginF.Position = UDim2.new(0.5, -130, 0.4, -80)
+loginF.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Instance.new("UICorner", loginF)
+
+local input = Instance.new("TextBox", loginF)
+input.Size = UDim2.new(0, 200, 0, 35)
+input.Position = UDim2.new(0.5, -100, 0.35, 0)
+input.PlaceholderText = "Escribe tu Key..."
+input.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+input.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", input)
+
+local btn = Instance.new("TextButton", loginF)
+btn.Size = UDim2.new(0, 140, 0, 35)
+btn.Position = UDim2.new(0.5, -70, 0.7, 0)
+btn.Text = "ACTIVAR"
+btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+btn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", btn)
+
+btn.MouseButton1Click:Connect(function()
+    local key = input.Text:gsub("%s+", ""):upper()
+    if key == "" then return end
+    
+    btn.Text = "CONECTANDO..."
+    if verificar(key) then
+        btn.Text = "¡BIENVENIDO!"
+        wait(1)
+        sg:Destroy()
+        AbrirMenuPrincipal()
     else
-        btn.Text = "KEY MAL O USADA"
-        task.wait(2)
+        btn.Text = "KEY INCORRECTA"
+        wait(2)
         btn.Text = "ACTIVAR"
     end
 end)
-
-print("Water Hub V2: GUI Cargada Correctamente")
