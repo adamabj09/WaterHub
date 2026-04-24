@@ -1,9 +1,16 @@
--- [[ WATER HUB V5 - AUTO-SAVE & FAST LOAD ]] --
-local H = game:GetService("HttpService")
-local P = game.Players.LocalPlayer
-local pG = P:WaitForChild("PlayerGui")
-local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
+-- [[ WATER HUB V5 - By: ABJadam ]] --
+-- Key + GUI Animada + Auto-Save + Zoom Effect
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local H = game:GetService("HttpService")
+local T = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local pG = player:WaitForChild("PlayerGui")
+
+-- Configuración
+local url = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2pOmlLtQueCkFeYgVUFpdU96psg/exec"
 local FileName = "WaterHub_Config.json"
 
 -- ==========================================
@@ -16,14 +23,43 @@ end
 
 local function LeerKeyGuardada()
     if isfile(FileName) then
-        local data = H:JSONDecode(readfile(FileName))
-        return data.SavedKey
+        local success, data = pcall(function() return H:JSONDecode(readfile(FileName)) end)
+        if success then return data.SavedKey end
     end
     return nil
 end
 
 -- ==========================================
--- 2. MENÚ PRINCIPAL (ZOOM ANIMATION)
+-- STATUS LABEL (Indicador superior)
+-- ==========================================
+local function CrearStatusLabel()
+    if pG:FindFirstChild("WaterStealGUI") then pG.WaterStealGUI:Destroy() end
+    local sg = Instance.new("ScreenGui", pG)
+    sg.Name = "WaterStealGUI"
+    sg.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame", sg)
+    frame.Size = UDim2.new(0, 300, 0, 50)
+    frame.Position = UDim2.new(0.5, -150, 0.05, -100) -- Empieza arriba para animar
+    frame.BackgroundColor3 = Color3.fromRGB(8, 15, 35)
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", frame).Color = Color3.fromRGB(0, 220, 255)
+
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(0, 255, 200)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Text = "🌊 Water Hub: Activo"
+
+    -- Animación de entrada (Baja suavemente)
+    frame:TweenPosition(UDim2.new(0.5, -150, 0.05, 0), "Out", "Back", 0.5, true)
+end
+
+-- ==========================================
+-- MENÚ PRINCIPAL (CON ZOOM)
 -- ==========================================
 local function AbrirMenuPrincipal()
     if pG:FindFirstChild("WaterHubMain") then pG.WaterHubMain:Destroy() end
@@ -33,75 +69,49 @@ local function AbrirMenuPrincipal()
 
     local frame = Instance.new("Frame", mainSg)
     frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    frame.Size = UDim2.new(0, 0, 0, 0)
+    frame.Size = UDim2.new(0, 0, 0, 0) -- Empieza en 0 para el Zoom
     frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 18, 35)
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.Draggable = true
-    Instance.new("UICorner", frame)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
 
-    frame:TweenSize(UDim2.new(0, 240, 0, 320), "Out", "Back", 0.5, true)
+    -- Animación de Zoom In
+    frame:TweenSize(UDim2.new(0, 290, 0, 420), "Out", "Back", 0.5, true)
 
     local title = Instance.new("TextLabel", frame)
-    title.Size = UDim2.new(1, 0, 0, 50)
-    title.Text = "🌊 WATER MENU"
-    title.TextColor3 = Color3.fromRGB(0, 170, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
+    title.Size = UDim2.new(1, 0, 0, 60)
     title.BackgroundTransparency = 1
+    title.Text = "WATER HUB"
+    title.TextColor3 = Color3.fromRGB(0, 220, 255)
+    title.Font = Enum.Font.GothamBlack
+    title.TextSize = 24
 
-    local function createHack(name, yPos, callback)
-        local b = Instance.new("TextButton", frame)
-        b.Size = UDim2.new(0, 190, 0, 40)
-        b.Position = UDim2.new(0.5, -95, 0, yPos)
-        b.Text = name
-        b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        b.TextColor3 = Color3.new(1, 1, 1)
-        b.Font = Enum.Font.GothamMedium
-        Instance.new("UICorner", b)
-        b.MouseButton1Click:Connect(callback)
-    end
-
-    createHack("🚀 Speed x100", 70, function() P.Character.Humanoid.WalkSpeed = 100 end)
-    createHack("🦘 Jump x100", 125, function() P.Character.Humanoid.JumpPower = 100 end)
-    
-    local flying = false
-    createHack("🕊️ Fly: OFF", 180, function()
-        flying = not flying
-        local b = frame:FindFirstChild("🕊️ Fly: OFF") or frame:FindFirstChild("🕊️ Fly: ON")
-        if flying then
-            b.Text = "🕊️ Fly: ON"
-            b.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
-            local bv = Instance.new("BodyVelocity", P.Character.HumanoidRootPart)
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Name = "WaterFly"
-            task.spawn(function()
-                while flying do
-                    bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * 100
-                    task.wait()
-                end
-                bv:Destroy()
-            end)
-        else
-            b.Text = "🕊️ Fly: OFF"
-            b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        end
-    end)
-    
-    createHack("🗑️ Borrar Key Guardada", 260, function()
+    -- Botón para borrar el auto-save (opcional)
+    local btnDel = Instance.new("TextButton", frame)
+    btnDel.Size = UDim2.new(0, 150, 0, 30)
+    btnDel.Position = UDim2.new(0.5, -75, 0.9, 0)
+    btnDel.Text = "Borrar Key Guardada"
+    btnDel.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btnDel.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", btnDel)
+    btnDel.MouseButton1Click:Connect(function()
         if isfile(FileName) then delfile(FileName) end
         mainSg:Destroy()
     end)
+    
+    print("Water Hub cargado correctamente")
 end
 
 -- ==========================================
--- 1. INTERFAZ DE LOGIN
+-- LOGIN KEY (CON ZOOM)
 -- ==========================================
 local function CrearLogin()
+    if pG:FindFirstChild("WaterHubLogin") then pG.WaterHubLogin:Destroy() end
     local sg = Instance.new("ScreenGui", pG)
     sg.Name = "WaterHubLogin"
-    
+
     local f = Instance.new("Frame", sg)
     f.AnchorPoint = Vector2.new(0.5, 0.5)
     f.Size = UDim2.new(0, 300, 0, 200)
@@ -113,6 +123,7 @@ local function CrearLogin()
     input.Size = UDim2.new(0, 240, 0, 45)
     input.Position = UDim2.new(0.5, -120, 0.3, 0)
     input.PlaceholderText = "INGRESA TU KEY"
+    input.Text = ""
     input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     input.TextColor3 = Color3.new(1, 1, 1)
     Instance.new("UICorner", input)
@@ -128,32 +139,47 @@ local function CrearLogin()
 
     btn.MouseButton1Click:Connect(function()
         local k = input.Text:gsub("%s+", ""):upper()
-        local req = (request or http_request or (syn and syn.request))
-        btn.Text = "CONECTANDO..."
+        btn.Text = "VERIFICANDO..."
         
+        local req = (request or http_request or (syn and syn.request))
         task.spawn(function()
-            pcall(function() req({Url = url, Method = "POST", Body = H:JSONEncode({key = k})}) end)
-            GuardarKey(k) -- GUARDAMOS LA KEY EN EL CELULAR/PC
-            btn.Text = "¡LISTO!"
-            task.wait(0.4)
-            f:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Back", 0.4, true)
-            task.wait(0.4)
-            sg:Destroy()
-            AbrirMenuPrincipal()
+            local success, response = pcall(function()
+                return req({
+                    Url = url,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = H:JSONEncode({key = k})
+                })
+            end)
+
+            if success then
+                btn.Text = "¡LISTO!"
+                GuardarKey(k)
+                task.wait(0.3)
+                -- Animación Zoom Out
+                f:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Back", 0.4, true)
+                task.wait(0.4)
+                sg:Destroy()
+                CrearStatusLabel()
+                AbrirMenuPrincipal()
+            else
+                btn.Text = "ERROR DE CONEXIÓN"
+                task.wait(2)
+                btn.Text = "VERIFICAR"
+            end
         end)
     end)
 end
 
 -- ==========================================
--- LÓGICA DE INICIO (AUTO-LOAD)
+-- INICIO (LÓGICA DE CARGA)
 -- ==========================================
 local KeyGuardada = LeerKeyGuardada()
 
 if KeyGuardada then
-    -- Si hay key, saltamos el login y vamos al menú
-    print("Key encontrada: " .. KeyGuardada)
+    CrearStatusLabel()
     AbrirMenuPrincipal()
+    print("Auto-Load: Key cargada.")
 else
-    -- Si no hay key, mostramos el login
     CrearLogin()
 end
