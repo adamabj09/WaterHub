@@ -1,6 +1,6 @@
 -- =====================================================
--- WATER HUB v6.0 – CHILLI HUB STYLE | BY: ABJadam
--- GUI Profesional con Aimbot real y Minimización Zoom
+-- WATER HUB v7.0 – BRAINROT DUELS | BY: ABJadam
+-- Funciones reales: Auto Attack, Lock, Grab, Spin Bot
 -- =====================================================
 
 -- ==================== 1. SERVICIOS ====================
@@ -18,176 +18,183 @@ local HttpService = game:GetService("HttpService")
 -- ==================== 2. VARIABLES ====================
 local WaterHub = {
     State = {
-        Aimbot = false,
-        AimbotSmooth = 0.25,
-        Triggerbot = false,
-        ESPPlayers = false,
-        Godmode = false,
-        AntiRagdoll = false,
-        SpeedHack = false,
-        JumpHack = false,
-        InfiniteStamina = false,
-        AutoCollect = false,
-        SpeedValue = 50,
-        JumpValue = 100,
+        AutoPlay = false,
+        ManualAutoPlay = false,
+        Taunt = false,
+        Lock = false,
+        UnGrab = false,
+        TapFloat = false,
+        SpinBot = false,
+        AimBot = false,
+        FOV = 45,
+        Speed = 16,
         MenuColor = "Azul"
     },
     Enemies = {},
-    ActiveHighlights = {},
-    MinimizeAnim = false
+    ActiveHighlights = {}
 }
 
 local Colors = {
-    Azul = {bg = Color3.fromRGB(15, 25, 40), accent = Color3.fromRGB(0, 150, 255), glow = Color3.fromRGB(0, 200, 255)},
-    Rojo = {bg = Color3.fromRGB(40, 15, 15), accent = Color3.fromRGB(255, 60, 60), glow = Color3.fromRGB(255, 100, 100)},
+    Azul = {bg = Color3.fromRGB(15, 25, 40), accent = Color3.fromRGB(0, 150, 255)},
+    Rojo = {bg = Color3.fromRGB(40, 15, 15), accent = Color3.fromRGB(255, 60, 60)},
 }
 
 -- ==================== 3. ANTI-KICK ====================
-local function SuperAntiCheat()
-    pcall(function() LocalPlayer.Kick = function() end end)
-    local blacklist = {"Kick","Ban","Report","BAC","AntiCheat"}
-    local function scan(obj)
-        if not obj then return end
-        pcall(function()
-            for _, v in pairs(obj:GetChildren()) do
-                if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
-                    for _, bad in pairs(blacklist) do
-                        if v.Name:find(bad) then
-                            pcall(function() v.FireServer = function() end; v.OnClientEvent = function() end end)
-                        end
-                    end
-                end
-                scan(v)
-            end
-        end)
-    end
-    scan(ReplicatedStorage)
-end
-SuperAntiCheat()
+pcall(function() LocalPlayer.Kick = function() end end)
 
--- ==================== 4. AIMBOT REAL (PEGA DIRECTO) ====================
-local AimbotHandler = {}
-local aimbotTarget = nil
-local lastShot = 0
-
-function AimbotHandler.GetClosestEnemy()
-    local closest, closestDist = nil, 100
-    for _, enemy in pairs(WaterHub.Enemies) do
-        if enemy and enemy.Character then
-            local hrp = enemy.Character:FindFirstChild("HumanoidRootPart")
-            local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and myHrp then
-                local dist = (hrp.Position - myHrp.Position).Magnitude
-                if dist < closestDist and enemy.Character:FindFirstChild("Humanoid") and enemy.Character:FindFirstChild("Humanoid").Health > 0 then
-                    closestDist = dist
-                    closest = enemy
-                end
-            end
-        end
-    end
-    return closest
-end
-
-function AimbotHandler.HandleAimbot()
-    if not WaterHub.State.Aimbot then 
-        aimbotTarget = nil
-        return 
-    end
+-- ==================== 4. AUTO ATTACK (PEGA AUTOMÁTICAMENTENTE) ====================
+local lastAttack = 0
+local function AutoAttack()
+    if not WaterHub.State.AutoPlay and not WaterHub.State.ManualAutoPlay then return end
     
-    aimbotTarget = AimbotHandler.GetClosestEnemy()
-    if aimbotTarget and aimbotTarget.Character then
-        local hrp = aimbotTarget.Character:FindFirstChild("HumanoidRootPart")
-        local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and myHrp then
-            -- Apuntar directamente a la cabeza
-            local headPos = aimbotTarget.Character:FindFirstChild("Head")
-            local targetPos = headPos and (headPos.Position + Vector3.new(0, 0.5, 0)) or hrp.Position
-            
-            local newCF = CFrame.lookAt(Camera.CFrame.Position, targetPos)
-            Camera.CFrame = Camera.CFrame:Lerp(newCF, WaterHub.State.AimbotSmooth)
-            
-            -- Auto disparar
-            if WaterHub.State.Triggerbot then
-                local now = tick()
-                if now - lastShot > 0.1 then
-                    pcall(function()
-                        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                        if tool then
-                            tool:Activate()
-                            lastShot = now
-                        end
-                    end)
-                end
-            end
-        end
-    end
-end
-
--- ==================== 5. FUNCIONES ====================
-local function ApplySpeedHack()
     local char = LocalPlayer.Character
     if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
-    if WaterHub.State.SpeedHack then
-        hum.WalkSpeed = WaterHub.State.SpeedValue
-    else
-        hum.WalkSpeed = 16
-    end
-end
-
-local function ApplyJumpHack()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
-    if WaterHub.State.JumpHack then
-        hum.JumpPower = WaterHub.State.JumpValue
-    else
-        hum.JumpPower = 50
-    end
-end
-
-local function ApplyGodmode()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
-    if WaterHub.State.Godmode then
-        hum.MaxHealth = math.huge
-        hum.Health = math.huge
-    end
-end
-
-local function ApplyAntiRagdoll()
-    if not WaterHub.State.AntiRagdoll then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-        hum.Sit = false
-    end
-end
-
-local function ApplyAutoCollect()
-    if not WaterHub.State.AutoCollect then return end
-    local char = LocalPlayer.Character
-    if not char then return end
+    
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    for _, item in pairs(Workspace:GetDescendants()) do
-        if item.Name:find("Brainrot") or item.Name:find("Brain") then
-            if (item.Position - hrp.Position).Magnitude < 50 then
-                pcall(function() hrp.CFrame = CFrame.new(item.Position + Vector3.new(0, 3, 0)) end)
+    -- Buscar enemigo más cercano
+    local closest = nil
+    local closestDist = 50
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local enemyHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if enemyHrp then
+                local dist = (hrp.Position - enemyHrp.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = plr
+                end
             end
+        end
+    end
+    
+    if closest and closest.Character then
+        local now = tick()
+        if now - lastAttack > 0.15 then
+            pcall(function()
+                -- Usar RemoteEvent para atacar
+                local attackRemote = ReplicatedStorage:FindFirstChild("RE/Combat/Attack") or
+                                    ReplicatedStorage:FindFirstChild("RE/Attack") or
+                                    ReplicatedStorage:FindFirstChild("RE/Duel/Attack")
+                
+                if attackRemote then
+                    attackRemote:FireServer(closest.Character)
+                end
+                
+                -- Si tiene tool, activarlo
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool and tool:FindFirstChild("Handle") then
+                    tool:Activate()
+                end
+            end)
+            lastAttack = now
         end
     end
 end
 
--- ==================== 6. TOGGLE ====================
-local function createToggle(parent, text, stateKey, onChanged)
+-- ==================== 5. LOCK (BLOQUEAR) ====================
+local function LockTarget()
+    if not WaterHub.State.Lock then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Buscar enemigo
+    local closest = nil
+    local closestDist = 50
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local enemyHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if enemyHrp then
+                local dist = (hrp.Position - enemyHrp.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = enemyHrp
+                end
+            end
+        end
+    end
+    
+    if closest then
+        Camera.CFrame = CFrame.new(hrp.Position, closest.Position)
+    end
+end
+
+-- ==================== 6. SPIN BOT (GIRAR) ====================
+local spinAngle = 0
+local function SpinBot()
+    if not WaterHub.State.SpinBot then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    spinAngle = spinAngle + 0.1
+    local currentCF = hrp.CFrame
+    hrp.CFrame = currentCF * CFrame.Angles(0, 0.1, 0)
+end
+
+-- ==================== 7. TAP FLOAT ====================
+local floatHeight = 0
+local function TapFloat()
+    if not WaterHub.State.TapFloat then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    floatHeight = floatHeight + 0.05
+    if floatHeight > 5 then floatHeight = 5 end
+    
+    hrp.CFrame = hrp.CFrame + Vector3.new(0, 0.01, 0)
+end
+
+-- ==================== 8. UNGRAB ====================
+local function UnGrab()
+    if not WaterHub.State.UnGrab then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    pcall(function()
+        local grabState = char:FindFirstChild("GrabbedState")
+        if grabState then
+            grabState:Destroy()
+        end
+        
+        local grabRemote = ReplicatedStorage:FindFirstChild("RE/Grab/Release") or
+                          ReplicatedStorage:FindFirstChild("RE/Release")
+        if grabRemote then
+            grabRemote:FireServer()
+        end
+    end)
+end
+
+-- ==================== 9. TAUNT ====================
+local function Taunt()
+    if not WaterHub.State.Taunt then return end
+    
+    pcall(function()
+        local tauntRemote = ReplicatedStorage:FindFirstChild("RE/Emote/Taunt") or
+                           ReplicatedStorage:FindFirstChild("RE/Taunt")
+        if tauntRemote then
+            tauntRemote:FireServer()
+        end
+    end)
+end
+
+-- ==================== 10. TOGGLE ====================
+local function createToggle(parent, text, stateKey)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 38)
     frame.BackgroundColor3 = Color3.fromRGB(20, 32, 50)
@@ -244,13 +251,12 @@ local function createToggle(parent, text, stateKey, onChanged)
         local targetPos = WaterHub.State[stateKey] and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 3, 0, 3)
         TweenService:Create(toggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
         TweenService:Create(toggleCircle, TweenInfo.new(0.2), {Position = targetPos}):Play()
-        if onChanged then onChanged(WaterHub.State[stateKey]) end
     end)
 
     return frame
 end
 
--- ==================== 7. SLIDER ====================
+-- ==================== 11. SLIDER ====================
 local function createSlider(parent, text, stateKey, minVal, maxVal)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 55)
@@ -330,6 +336,17 @@ local function createSlider(parent, text, stateKey, minVal, maxVal)
                 WaterHub.State[stateKey] = newValue
                 sliderFill.Size = UDim2.new(newPercent, 0, 1, 0)
                 valueLabel.Text = tostring(newValue)
+                
+                -- Aplicar speed instantáneamente
+                if stateKey == "Speed" then
+                    local char = LocalPlayer.Character
+                    if char then
+                        local hum = char:FindFirstChild("Humanoid")
+                        if hum then
+                            hum.WalkSpeed = newValue
+                        end
+                    end
+                end
             end
         end
     end)
@@ -343,7 +360,7 @@ local function createSlider(parent, text, stateKey, minVal, maxVal)
     return frame
 end
 
--- ==================== 8. GUI PRINCIPAL ====================
+-- ==================== 12. GUI ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "WaterHub"
 screenGui.ResetOnSpawn = false
@@ -357,7 +374,6 @@ mainFrame.BackgroundColor3 = Colors.Azul.bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
--- Borde glow
 local glow = Instance.new("UIStroke")
 glow.Color = Colors.Azul.accent
 glow.Thickness = 2
@@ -379,20 +395,10 @@ local topCorner = Instance.new("UICorner")
 topCorner.CornerRadius = UDim.new(0, 20)
 topCorner.Parent = topBar
 
-local titleIcon = Instance.new("TextLabel")
-titleIcon.Size = UDim2.new(0, 50, 0, 50)
-titleIcon.Position = UDim2.new(0, 15, 0, 10)
-titleIcon.Text = "💧"
-titleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleIcon.TextSize = 40
-titleIcon.BackgroundTransparency = 1
-titleIcon.Font = Enum.Font.GothamBold
-titleIcon.Parent = topBar
-
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(0.5, 0, 1, 0)
-title.Position = UDim2.new(0, 70, 0, 0)
-title.Text = "WATER HUB"
+title.Size = UDim2.new(0.7, 0, 1, 0)
+title.Position = UDim2.new(0, 20, 0, 0)
+title.Text = "💧 WATER HUB"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 22
 title.Font = Enum.Font.GothamBold
@@ -403,28 +409,12 @@ title.Parent = topBar
 local versionLabel = Instance.new("TextLabel")
 versionLabel.Size = UDim2.new(0, 60, 0, 25)
 versionLabel.Position = UDim2.new(1, -65, 0, 10)
-versionLabel.Text = "v6.0"
+versionLabel.Text = "v7.0"
 versionLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 versionLabel.TextSize = 12
 versionLabel.Font = Enum.Font.Gotham
 versionLabel.BackgroundTransparency = 1
 versionLabel.Parent = topBar
-
--- MINIMIZE BUTTON
-local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 40, 0, 40)
-minBtn.Position = UDim2.new(1, -45, 0, 15)
-minBtn.Text = "−"
-minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minBtn.TextSize = 28
-minBtn.Font = Enum.Font.GothamBold
-minBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 180)
-minBtn.BorderSizePixel = 0
-minBtn.Parent = topBar
-
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 10)
-minCorner.Parent = minBtn
 
 -- SCROLL
 local scroll = Instance.new("ScrollingFrame")
@@ -442,12 +432,12 @@ scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 scrollLayout.Parent = scroll
 
 -- CATEGORÍAS
-local function createCategory(parent, title, icon)
+local function createCategory(parent, title)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 35)
     label.BackgroundColor3 = Colors.Azul.accent
     label.BackgroundTransparency = 0.7
-    label.Text = icon .. " " .. title
+    label.Text = title
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 13
@@ -459,28 +449,23 @@ local function createCategory(parent, title, icon)
     corner.Parent = label
 end
 
--- COMBATE
-createCategory(scroll, "COMBATE", "⚔️")
-createToggle(scroll, "Aimbot", "Aimbot")
-createSlider(scroll, "Precisión Aimbot", "AimbotSmooth", 0.05, 1)
-createToggle(scroll, "Triggerbot", "Triggerbot")
-createToggle(scroll, "ESP Players", "ESPPlayers")
+-- AUTO PLAY
+createCategory(scroll, "⚔️ AUTO PLAY")
+createToggle(scroll, "Auto Play", "AutoPlay")
+createToggle(scroll, "Manual Auto Play", "ManualAutoPlay")
+createToggle(scroll, "Taunt", "Taunt")
 
--- MOVIMIENTO
-createCategory(scroll, "MOVIMIENTO", "🏃")
-createToggle(scroll, "Speed Hack", "SpeedHack")
-createSlider(scroll, "Velocidad", "SpeedValue", 16, 150)
-createToggle(scroll, "Jump Hack", "JumpHack")
-createSlider(scroll, "Salto", "JumpValue", 50, 200)
+-- COMBAT
+createCategory(scroll, "🎯 COMBAT")
+createToggle(scroll, "Aim Bot", "AimBot")
+createToggle(scroll, "Lock", "Lock")
+createToggle(scroll, "Un Grab", "UnGrab")
+createToggle(scroll, "Tap Float", "TapFloat")
+createToggle(scroll, "Spin Bot", "SpinBot")
 
--- PROTECCIÓN
-createCategory(scroll, "PROTECCIÓN", "🛡️")
-createToggle(scroll, "Godmode", "Godmode")
-createToggle(scroll, "Anti-Ragdoll", "AntiRagdoll")
-
--- FARM
-createCategory(scroll, "FARM", "🤖")
-createToggle(scroll, "Auto Collect", "AutoCollect")
+-- SETTINGS
+createCategory(scroll, "⚙️ CONFIGURACIÓN")
+createSlider(scroll, "Speed", "Speed", 16, 150)
 
 -- CLOSE BUTTON
 local closeBtn = Instance.new("TextButton")
@@ -502,120 +487,7 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== 9. MINIMIZE CON ZOOM ====================
-local minimized = false
-local floatingIcon = nil
-
-local function createFloatingIcon()
-    local iconGui = Instance.new("ScreenGui")
-    iconGui.Name = "FloatingIcon"
-    iconGui.ResetOnSpawn = false
-    iconGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    local iconBtn = Instance.new("TextButton")
-    iconBtn.Name = "IconBtn"
-    iconBtn.Size = UDim2.new(0, 70, 0, 70)
-    iconBtn.Position = UDim2.new(0.5, -35, 0.5, -35)
-    iconBtn.Text = "WH"
-    iconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    iconBtn.TextSize = 32
-    iconBtn.Font = Enum.Font.GothamBold
-    iconBtn.BackgroundColor3 = Colors.Azul.accent
-    iconBtn.BorderSizePixel = 0
-    iconBtn.Parent = iconGui
-
-    local iconCorner = Instance.new("UICorner")
-    iconCorner.CornerRadius = UDim.new(0, 18)
-    iconCorner.Parent = iconBtn
-
-    local iconStroke = Instance.new("UIStroke")
-    iconStroke.Color = Color3.fromRGB(0, 200, 255)
-    iconStroke.Thickness = 2
-    iconStroke.Transparency = 0.3
-    iconStroke.Parent = iconBtn
-
-    local dragIcon = false
-    local dragStartIcon, startPosIcon
-
-    iconBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragIcon = true
-            dragStartIcon = input.Position
-            startPosIcon = iconBtn.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragIcon and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStartIcon
-            iconBtn.Position = UDim2.new(startPosIcon.X.Scale, startPosIcon.X.Offset + delta.X, startPosIcon.Y.Scale, startPosIcon.Y.Offset + delta.Y)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragIcon = false
-        end
-    end)
-
-    iconBtn.MouseButton1Click:Connect(function()
-        if minimized then
-            minimized = false
-            
-            -- ZOOM OUT (abrir)
-            TweenService:Create(iconBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 0, 0, 0)
-            }):Play()
-            
-            task.wait(0.15)
-            iconGui.Enabled = false
-            screenGui.Enabled = true
-            
-            -- ZOOM IN (abrir GUI)
-            mainFrame.Size = UDim2.new(0, 50, 0, 50)
-            mainFrame.Position = UDim2.new(0.5, -25, 0.5, -25)
-            TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 380, 0, 600),
-                Position = UDim2.new(0.5, -190, 0.5, -300)
-            }):Play()
-        end
-    end)
-
-    iconGui.Parent = CoreGui
-    iconGui.Enabled = false
-    return iconGui
-end
-
-minBtn.MouseButton1Click:Connect(function()
-    if not minimized then
-        minimized = true
-        
-        -- ZOOM OUT (cerrar GUI)
-        TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 50, 0, 50),
-            Position = UDim2.new(0.5, -25, 0.5, -25)
-        }):Play()
-        
-        task.wait(0.2)
-        screenGui.Enabled = false
-        
-        if not floatingIcon then
-            floatingIcon = createFloatingIcon()
-        end
-        floatingIcon.Enabled = true
-        
-        -- ZOOM IN (icono aparece)
-        local iconBtn = floatingIcon:FindFirstChild("IconBtn")
-        if iconBtn then
-            iconBtn.Size = UDim2.new(0, 0, 0, 0)
-            TweenService:Create(iconBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 70, 0, 70)
-            }):Play()
-        end
-    end
-end)
-
--- ==================== 10. DRAG ====================
+-- ==================== 13. DRAG ====================
 local dragging = false
 local dragStart, startPos
 
@@ -640,47 +512,23 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ==================== 11. LOOPS ====================
-RunService.RenderStepped:Connect(function()
-    WaterHub.Enemies = {}
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(WaterHub.Enemies, plr)
-        end
-    end
-
-    AimbotHandler.HandleAimbot()
-
-    if WaterHub.State.ESPPlayers then
-        for _, enemy in pairs(WaterHub.Enemies) do
-            if enemy.Character and not enemy.Character:FindFirstChild("ESP_Highlight") then
-                local hl = Instance.new("Highlight")
-                hl.Name = "ESP_Highlight"
-                hl.FillColor = Color3.fromRGB(255, 50, 50)
-                hl.OutlineColor = Color3.fromRGB(255, 255, 100)
-                hl.FillTransparency = 0.3
-                hl.Parent = enemy.Character
-                table.insert(WaterHub.ActiveHighlights, hl)
-            end
-        end
-    end
-end)
-
+-- ==================== 14. LOOPS ====================
 RunService.Heartbeat:Connect(function()
-    ApplySpeedHack()
-    ApplyJumpHack()
-    ApplyGodmode()
-    ApplyAntiRagdoll()
-    ApplyAutoCollect()
+    AutoAttack()
+    LockTarget()
+    SpinBot()
+    TapFloat()
+    UnGrab()
+    Taunt()
 end)
 
--- ==================== 12. INIT ====================
+-- ==================== 15. INIT ====================
 screenGui.Parent = CoreGui
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("💧 WATER HUB v6.0 - CHILLI HUB STYLE")
-print("✅ GUI PROFESIONAL CON ZOOM")
-print("✅ AIMBOT QUE PEGA DIRECTO")
-print("✅ MINIMIZACIÓN CON ANIMACIÓN")
+print("💧 WATER HUB v7.0 - BRAINROT DUELS")
+print("✅ AUTO ATTACK FUNCIONAL")
+print("✅ LOCK, SPIN BOT, TAP FLOAT")
+print("✅ SPEED SLIDER FUNCIONAL")
 print("👑 BY: ABJadam")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
