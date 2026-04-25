@@ -15,34 +15,7 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local HttpService = game:GetService("HttpService")
 
--- ==================== 2. KEY SYSTEM (Desactivado para testing) ====================
-local keyValid = true
-
--- ==================== 3. ANTI-KICK ====================
-local function SuperAntiCheat()
-    pcall(function() LocalPlayer.Kick = function() end end)
-    local blacklist = {"Kick","Ban","Report","BAC","AntiCheat","Admin","Log"}
-    local function scan(obj)
-        if not obj then return end
-        pcall(function()
-            for _, v in pairs(obj:GetChildren()) do
-                if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
-                    for _, bad in pairs(blacklist) do
-                        if v.Name:find(bad) then
-                            pcall(function() v.FireServer = function() end; v.OnClientEvent = function() end end)
-                        end
-                    end
-                end
-                scan(v)
-            end
-        end)
-    end
-    scan(ReplicatedStorage)
-    scan(game:GetService("ReplicatedFirst"))
-end
-SuperAntiCheat()
-
--- ==================== 4. VARIABLES ====================
+-- ==================== 2. VARIABLES ====================
 local WaterHub = {
     State = {
         Aimbot = false,
@@ -54,11 +27,10 @@ local WaterHub = {
         SpeedHack = false,
         JumpHack = false,
         InfiniteStamina = false,
-        NoRecoil = false,
-        AutoFarm = false,
         AutoCollect = false,
         SpeedValue = 25,
         JumpValue = 80,
+        MenuColor = "Azul"
     },
     Enemies = {},
     ActiveHighlights = {},
@@ -73,11 +45,11 @@ local Colors = {
     Rosa = {bg = Color3.fromRGB(55,20,45), accent = Color3.fromRGB(255,80,160), glow = Color3.fromRGB(200,0,120)}
 }
 
--- ==================== 5. CONFIG ====================
+-- ==================== 3. CONFIG ====================
 local function SaveConfig()
     local config = {}
     for k, v in pairs(WaterHub.State) do
-        if type(v) == "boolean" or type(v) == "number" then
+        if type(v) == "boolean" or type(v) == "number" or type(v) == "string" then
             config[k] = v
         end
     end
@@ -106,7 +78,7 @@ local function LoadConfig()
     end)
 end
 
--- ==================== 6. LIMPIEZA ESP ====================
+-- ==================== 4. LIMPIEZA ESP ====================
 local function ClearESP()
     for _, highlight in pairs(WaterHub.ActiveHighlights) do
         pcall(function() highlight:Destroy() end)
@@ -114,7 +86,31 @@ local function ClearESP()
     WaterHub.ActiveHighlights = {}
 end
 
--- ==================== 7. AIMBOT FUNCIONAL ====================
+-- ==================== 5. ANTI-KICK ====================
+local function SuperAntiCheat()
+    pcall(function() LocalPlayer.Kick = function() end end)
+    local blacklist = {"Kick","Ban","Report","BAC","AntiCheat","Admin","Log"}
+    local function scan(obj)
+        if not obj then return end
+        pcall(function()
+            for _, v in pairs(obj:GetChildren()) do
+                if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+                    for _, bad in pairs(blacklist) do
+                        if v.Name:find(bad) then
+                            pcall(function() v.FireServer = function() end; v.OnClientEvent = function() end end)
+                        end
+                    end
+                end
+                scan(v)
+            end
+        end)
+    end
+    scan(ReplicatedStorage)
+    scan(game:GetService("ReplicatedFirst"))
+end
+SuperAntiCheat()
+
+-- ==================== 6. AIMBOT ====================
 local AimbotHandler = {}
 local aimbotTarget = nil
 
@@ -124,10 +120,13 @@ function AimbotHandler.GetClosestEnemy()
         if enemy and enemy.Character then
             local hrp = enemy.Character:FindFirstChild("HumanoidRootPart")
             if hrp and LocalPlayer.Character then
-                local dist = (hrp.Position - LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closest = enemy
+                local myHrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if myHrp then
+                    local dist = (hrp.Position - myHrp.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closest = enemy
+                    end
                 end
             end
         end
@@ -168,7 +167,7 @@ function AimbotHandler.HandleTriggerbot()
     end
 end
 
--- ==================== 8. ANTI-RAGDOLL FUNCIONAL ====================
+-- ==================== 7. ANTI-RAGDOLL ====================
 local function ApplyAntiRagdoll()
     if not WaterHub.State.AntiRagdoll then return end
     
@@ -181,15 +180,14 @@ local function ApplyAntiRagdoll()
         hum.Sit = false
     end
     
-    -- Desactivar ragdoll effects
-    for _, joint in pairs(char:FindFirstChild("HumanoidRootPart"):GetChildren()) do
+    for _, joint in pairs(char:GetDescendants()) do
         if joint:IsA("Motor6D") or joint:IsA("Weld") then
             pcall(function() joint.Enabled = true end)
         end
     end
 end
 
--- ==================== 9. SPEED HACK FUNCIONAL ====================
+-- ==================== 8. SPEED HACK ====================
 local function ApplySpeedHack()
     local char = LocalPlayer.Character
     if not char then return end
@@ -204,7 +202,7 @@ local function ApplySpeedHack()
     end
 end
 
--- ==================== 10. JUMP HACK FUNCIONAL ====================
+-- ==================== 9. JUMP HACK ====================
 local function ApplyJumpHack()
     local char = LocalPlayer.Character
     if not char then return end
@@ -219,7 +217,7 @@ local function ApplyJumpHack()
     end
 end
 
--- ==================== 11. GODMODE FUNCIONAL ====================
+-- ==================== 10. GODMODE ====================
 local function ApplyGodmode()
     local char = LocalPlayer.Character
     if not char then return end
@@ -233,7 +231,7 @@ local function ApplyGodmode()
     end
 end
 
--- ==================== 12. STAMINA INFINITO ====================
+-- ==================== 11. STAMINA INFINITO ====================
 local function ApplyInfiniteStamina()
     if not WaterHub.State.InfiniteStamina then return end
     
@@ -251,7 +249,7 @@ local function ApplyInfiniteStamina()
     end)
 end
 
--- ==================== 13. AUTO COLLECT BRAINROT ====================
+-- ==================== 12. AUTO COLLECT ====================
 local function ApplyAutoCollect()
     if not WaterHub.State.AutoCollect then return end
     
@@ -266,8 +264,7 @@ local function ApplyAutoCollect()
             if item:IsA("Model") or item:IsA("Part") then
                 pcall(function()
                     if (item.Position - hrp.Position).Magnitude < 30 then
-                        local targetPos = item.Position
-                        hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                        hrp.CFrame = CFrame.new(item.Position + Vector3.new(0, 3, 0))
                         task.wait(0.1)
                     end
                 end)
@@ -276,7 +273,7 @@ local function ApplyAutoCollect()
     end
 end
 
--- ==================== 14. TOGGLE MODERNO ====================
+-- ==================== 13. TOGGLE ====================
 local function createModernToggle(parent, text, stateKey)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 40)
@@ -340,7 +337,7 @@ local function createModernToggle(parent, text, stateKey)
     return frame
 end
 
--- ==================== 15. SLIDER MODERNO ====================
+-- ==================== 14. SLIDER ====================
 local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 60)
@@ -368,7 +365,7 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     valueLabel.Size = UDim2.new(0.3, 0, 0, 25)
     valueLabel.Position = UDim2.new(0.7, 0, 0, 5)
     valueLabel.Text = tostring(WaterHub.State[stateKey]) .. unit
-    valueLabel.TextColor3 = Colors[WaterHub.State.MenuColor].accent
+    valueLabel.TextColor3 = Color3.fromRGB(0, 180, 255)
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
     valueLabel.BackgroundTransparency = 1
     valueLabel.Font = Enum.Font.GothamBold
@@ -389,7 +386,7 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     local sliderFill = Instance.new("Frame")
     local percent = (WaterHub.State[stateKey] - minVal) / (maxVal - minVal)
     sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-    sliderFill.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
     sliderFill.BorderSizePixel = 0
     sliderFill.Parent = sliderBg
 
@@ -434,7 +431,7 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     return frame
 end
 
--- ==================== 16. GUI PRINCIPAL ====================
+-- ==================== 15. GUI ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "WaterHub"
 screenGui.ResetOnSpawn = false
@@ -459,7 +456,6 @@ local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 16)
 mainCorner.Parent = mainFrame
 
--- Top Bar
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(1, 0, 0, 60)
 topBar.BackgroundColor3 = Colors.Azul.accent
@@ -470,6 +466,16 @@ topBar.Parent = mainFrame
 local topCorner = Instance.new("UICorner")
 topCorner.CornerRadius = UDim.new(0, 16)
 topCorner.Parent = topBar
+
+local titleIcon = Instance.new("TextLabel")
+titleIcon.Size = UDim2.new(0, 40, 1, 0)
+titleIcon.Position = UDim2.new(0, 15, 0, 0)
+titleIcon.Text = "💧"
+titleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleIcon.TextSize = 28
+titleIcon.BackgroundTransparency = 1
+titleIcon.Font = Enum.Font.GothamBold
+titleIcon.Parent = topBar
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(0.6, 0, 1, 0)
@@ -492,7 +498,6 @@ versionLabel.Font = Enum.Font.Gotham
 versionLabel.BackgroundTransparency = 1
 versionLabel.Parent = topBar
 
--- ScrollFrame
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1, -20, 1, -100)
 scroll.Position = UDim2.new(0, 10, 0, 70)
@@ -507,86 +512,47 @@ scrollLayout.Padding = UDim.new(0, 8)
 scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 scrollLayout.Parent = scroll
 
--- Categoría de COMBATE
-local combatLabel = Instance.new("TextLabel")
-combatLabel.Size = UDim2.new(1, 0, 0, 30)
-combatLabel.BackgroundColor3 = Colors.Azul.accent
-combatLabel.BackgroundTransparency = 0.8
-combatLabel.Text = "⚔️ COMBATE"
-combatLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-combatLabel.Font = Enum.Font.GothamBold
-combatLabel.TextSize = 13
-combatLabel.BorderSizePixel = 0
-combatLabel.Parent = scroll
+-- Categorías
+local function createCategory(parent, title, icon)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 30)
+    label.BackgroundColor3 = Colors.Azul.accent
+    label.BackgroundTransparency = 0.8
+    label.Text = icon .. " " .. title
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 13
+    label.BorderSizePixel = 0
+    label.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = label
+end
 
-local combatCorner = Instance.new("UICorner")
-combatCorner.CornerRadius = UDim.new(0, 8)
-combatCorner.Parent = combatLabel
-
+-- COMBATE
+createCategory(scroll, "COMBATE", "⚔️")
 createModernToggle(scroll, "Aimbot", "Aimbot")
 createModernToggle(scroll, "Triggerbot", "Triggerbot")
 createModernToggle(scroll, "ESP Players", "ESPPlayers")
 
--- Categoría de MOVIMIENTO
-local movLabel = Instance.new("TextLabel")
-movLabel.Size = UDim2.new(1, 0, 0, 30)
-movLabel.BackgroundColor3 = Colors.Azul.accent
-movLabel.BackgroundTransparency = 0.8
-movLabel.Text = "🏃 MOVIMIENTO"
-movLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-movLabel.Font = Enum.Font.GothamBold
-movLabel.TextSize = 13
-movLabel.BorderSizePixel = 0
-movLabel.Parent = scroll
-
-local movCorner = Instance.new("UICorner")
-movCorner.CornerRadius = UDim.new(0, 8)
-movCorner.Parent = movLabel
-
+-- MOVIMIENTO
+createCategory(scroll, "MOVIMIENTO", "🏃")
 createModernToggle(scroll, "Speed Hack", "SpeedHack")
 createModernSlider(scroll, "Velocidad", "SpeedValue", 16, 150, "")
 createModernToggle(scroll, "Jump Hack", "JumpHack")
 createModernSlider(scroll, "Salto", "JumpValue", 50, 200, "")
 createModernToggle(scroll, "Stamina Infinito", "InfiniteStamina")
 
--- Categoría de PROTECCIÓN
-local protLabel = Instance.new("TextLabel")
-protLabel.Size = UDim2.new(1, 0, 0, 30)
-protLabel.BackgroundColor3 = Colors.Azul.accent
-protLabel.BackgroundTransparency = 0.8
-protLabel.Text = "🛡️ PROTECCIÓN"
-protLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-protLabel.Font = Enum.Font.GothamBold
-protLabel.TextSize = 13
-protLabel.BorderSizePixel = 0
-protLabel.Parent = scroll
-
-local protCorner = Instance.new("UICorner")
-protCorner.CornerRadius = UDim.new(0, 8)
-protCorner.Parent = protLabel
-
+-- PROTECCIÓN
+createCategory(scroll, "PROTECCIÓN", "🛡️")
 createModernToggle(scroll, "Godmode", "Godmode")
 createModernToggle(scroll, "Anti-Ragdoll", "AntiRagdoll")
 createModernToggle(scroll, "Anti-Stun", "AntiStun")
 
--- Categoría de FARM
-local farmLabel = Instance.new("TextLabel")
-farmLabel.Size = UDim2.new(1, 0, 0, 30)
-farmLabel.BackgroundColor3 = Colors.Azul.accent
-farmLabel.BackgroundTransparency = 0.8
-farmLabel.Text = "🤖 AUTOMATIZACIÓN"
-farmLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-farmLabel.Font = Enum.Font.GothamBold
-farmLabel.TextSize = 13
-farmLabel.BorderSizePixel = 0
-farmLabel.Parent = scroll
-
-local farmCorner = Instance.new("UICorner")
-farmCorner.CornerRadius = UDim.new(0, 8)
-farmCorner.Parent = farmLabel
-
+-- AUTOMATIZACIÓN
+createCategory(scroll, "AUTOMATIZACIÓN", "🤖")
 createModernToggle(scroll, "Auto Collect Brainrot", "AutoCollect")
-createModernToggle(scroll, "Auto Farm", "AutoFarm")
 
 -- Botón cerrar
 local closeBtn = Instance.new("TextButton")
@@ -610,7 +576,7 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== 17. DRAG ====================
+-- ==================== 16. DRAG ====================
 local dragging = false
 local dragStart, startPos
 
@@ -635,9 +601,8 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ==================== 18. LOOP PRINCIPAL ====================
+-- ==================== 17. LOOPS ====================
 RunService.RenderStepped:Connect(function()
-    -- Actualizar enemigos
     WaterHub.Enemies = {}
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -645,10 +610,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot
     AimbotHandler.HandleAimbot()
 
-    -- ESP Players
     if WaterHub.State.ESPPlayers then
         for _, enemy in pairs(WaterHub.Enemies) do
             if enemy.Character and not enemy.Character:FindFirstChild("ESP_Highlight") then
@@ -667,34 +630,21 @@ RunService.RenderStepped:Connect(function()
 end)
 
 RunService.Heartbeat:Connect(function()
-    -- Triggerbot
     AimbotHandler.HandleTriggerbot()
-
-    -- Anti-Ragdoll
     ApplyAntiRagdoll()
-
-    -- Speed Hack
     ApplySpeedHack()
-
-    -- Jump Hack
     ApplyJumpHack()
-
-    -- Godmode
     ApplyGodmode()
-
-    -- Infinite Stamina
     ApplyInfiniteStamina()
-
-    -- Auto Collect
     ApplyAutoCollect()
 end)
 
--- ==================== 19. INIT ====================
+-- ==================== 18. INIT ====================
 screenGui.Parent = CoreGui
 LoadConfig()
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("💧 WATER HUB v5.5 - BRAINROT 2026")
-print("✅ TODAS LAS FUNCIONES ACTIVAS")
+print("✅ ERROR CORREGIDO - TODAS LAS FUNCIONES ACTIVAS")
 print("👑 BY: ABJadam")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
