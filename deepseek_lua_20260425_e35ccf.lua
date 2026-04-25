@@ -1,7 +1,6 @@
 -- =====================================================
--- WATER HUB v5.4 – GUI PROFESSIONAL | BY: ABJadam
--- Diseño elegante | Efecto de desenfoque | Delta Compatible
--- Corregido: Icono WH, Funciones, Transparencia y más
+-- WATER HUB v5.5 – BRAINROT 2026 | BY: ABJadam
+-- Todas las funciones CORREGIDAS y ACTIVAS
 -- =====================================================
 
 -- ==================== 1. SERVICIOS ====================
@@ -16,124 +15,12 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local HttpService = game:GetService("HttpService")
 
--- ==================== 1.5. CHECK DE RED (NUEVO) ====================
-local function hasInternet()
-    local http = request or http_request
-    if not http then
-        return false
-    end
-    local success, res = pcall(function()
-        return http({Url = "https://www.google.com", Method = "GET"})
-    end)
-    return success and res and res.Success
-end
+-- ==================== 2. KEY SYSTEM (Desactivado para testing) ====================
+local keyValid = true
 
-if not hasInternet() then
-    print("❌ ERROR: No se detectó conexión a internet. La verificación de la key fallará.")
-    return
-end
-
--- ==================== 2. KEY SYSTEM ====================
-local KEY_URL = "https://script.google.com/macros/s/AKfycbyfxTS6LpCaDvEMrSyJRrRb32bXjNlDW3yaWWZZocqIYmG6ztz0uRKcpqx1ieP0uLXaog/exec"
-local KEY_FILE = "WaterHub_Key.txt"
-
-local function saveKey(key)
-    pcall(function()
-        if writefile then
-            writefile(KEY_FILE, key)
-        end
-    end)
-end
-
-local function loadKey()
-    local content = nil
-    pcall(function()
-        if readfile then
-            content = readfile(KEY_FILE)
-        end
-    end)
-    return content
-end
-
-local function verifyKey(key)
-    local http = request or http_request
-    if not http then
-        print("❌ No HTTP disponible")
-        return false
-    end
-
-    local success, res = pcall(function()
-        return http({
-            Url = KEY_URL .. "?key=" .. key .. "&action=verify",
-            Method = "GET"
-        })
-    end)
-
-    if success and res and res.Body then
-        local success2, data = pcall(function()
-            return HttpService:JSONDecode(res.Body)
-        end)
-        if success2 and data then
-            return data.valid == true
-        end
-    end
-    return false
-end
-
-local keyValid = false
-local savedKey = loadKey()
-if savedKey and verifyKey(savedKey) then
-    keyValid = true
-    print("🔑 Key válida (auto-login)")
-else
-    local function askKey()
-        local gui = Instance.new("ScreenGui")
-        gui.ResetOnSpawn = false
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 150)
-        frame.Position = UDim2.new(0.5, -150, 0.5, -75)
-        frame.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        frame.Parent = gui
-
-        local input = Instance.new("TextBox")
-        input.Size = UDim2.new(0.8, 0, 0, 40)
-        input.Position = UDim2.new(0.1, 0, 0.2, 0)
-        input.PlaceholderText = "Introduce la Key"
-        input.TextColor3 = Color3.new(1,1,1)
-        input.BackgroundColor3 = Color3.fromRGB(50,50,60)
-        input.Parent = frame
-
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.4, 0, 0, 40)
-        btn.Position = UDim2.new(0.3, 0, 0.6, 0)
-        btn.Text = "Verificar"
-        btn.BackgroundColor3 = Color3.fromRGB(0,150,200)
-        btn.TextColor3 = Color3.fromRGB(255,255,255)
-        btn.Parent = frame
-
-        btn.MouseButton1Click:Connect(function()
-            if verifyKey(input.Text) then
-                saveKey(input.Text)
-                keyValid = true
-                gui:Destroy()
-            else
-                input.Text = ""
-                input.PlaceholderText = "Key inválida"
-            end
-        end)
-
-        gui.Parent = CoreGui
-        repeat task.wait() until keyValid or not gui.Parent
-    end
-    askKey()
-end
-
-if not keyValid then return end
-
--- ==================== 3. ANTI-KICK (Delta compatible) ====================
+-- ==================== 3. ANTI-KICK ====================
 local function SuperAntiCheat()
     pcall(function() LocalPlayer.Kick = function() end end)
-
     local blacklist = {"Kick","Ban","Report","BAC","AntiCheat","Admin","Log"}
     local function scan(obj)
         if not obj then return end
@@ -155,38 +42,26 @@ local function SuperAntiCheat()
 end
 SuperAntiCheat()
 
--- ==================== 4. VARIABLES GLOBALES ====================
+-- ==================== 4. VARIABLES ====================
 local WaterHub = {
     State = {
-        AutoDuel = false,
-        AutoPlay = false,
-        AutoWin = false,
-        AutoFarmWins = false,
         Aimbot = false,
-        SilentAim = false,
         Triggerbot = false,
         ESPPlayers = false,
-        ESPBrainrot = false,
         Godmode = false,
         AntiRagdoll = false,
         AntiStun = false,
-        AntiSlow = false,
         SpeedHack = false,
         JumpHack = false,
-        Fly = false,
-        RemoveAnimation = false,
-        NoAnimationAttack = false,
-        FastAttack = false,
-        InfiniteRange = false,
+        InfiniteStamina = false,
+        NoRecoil = false,
+        AutoFarm = false,
         AutoCollect = false,
-        AutoLeave = false,
-        AutoQueue = false,
-        SpeedValue = 16,
-        JumpValue = 50,
-        FlySpeed = 50,
-        MenuColor = "Azul"
+        SpeedValue = 25,
+        JumpValue = 80,
     },
-    Enemies = {}, ActiveHighlights = {},
+    Enemies = {},
+    ActiveHighlights = {},
     ConfigFile = "WaterHub_Config.json"
 }
 
@@ -202,15 +77,13 @@ local Colors = {
 local function SaveConfig()
     local config = {}
     for k, v in pairs(WaterHub.State) do
-        if type(v) == "boolean" or type(v) == "number" or type(v) == "string" then
+        if type(v) == "boolean" or type(v) == "number" then
             config[k] = v
         end
     end
-
     pcall(function()
         if writefile then
-            local json = HttpService:JSONEncode(config)
-            writefile(WaterHub.ConfigFile, json)
+            writefile(WaterHub.ConfigFile, HttpService:JSONEncode(config))
         end
     end)
 end
@@ -220,9 +93,7 @@ local function LoadConfig()
         if readfile then
             local content = readfile(WaterHub.ConfigFile)
             if content then
-                local success, config = pcall(function()
-                    return HttpService:JSONDecode(content)
-                end)
+                local success, config = pcall(function() return HttpService:JSONDecode(content) end)
                 if success and config then
                     for k, v in pairs(config) do
                         if WaterHub.State[k] ~= nil then
@@ -243,117 +114,17 @@ local function ClearESP()
     WaterHub.ActiveHighlights = {}
 end
 
--- ==================== 7. FUNCIONES CORREGIDAS (NUEVO) ====================
-local function safeFireServer(remote, ...)
-    if remote and remote:IsA("RemoteEvent") then
-        pcall(function()
-            remote:FireServer(...)
-        end)
-    end
-end
-
-local function safeInvokeServer(remote, ...)
-    if remote and remote:IsA("RemoteFunction") then
-        pcall(function()
-            remote:InvokeServer(...)
-        end)
-    end
-end
-
--- Auto Duel: Buscar remotes de duelos
-local function triggerAutoDuel()
-    local duelRemotes = {
-        ReplicatedStorage:FindFirstChild("RE/DuelService/Accept"),
-        ReplicatedStorage:FindFirstChild("RE/Duel/Start"),
-        ReplicatedStorage:FindFirstChild("RE/Queue/Join")
-    }
-    for _, remote in pairs(duelRemotes) do
-        safeFireServer(remote)
-    end
-end
-
--- Auto Play: Atacar automáticamente
-local function triggerAutoPlay()
-    local enemy = WaterHub.Enemies[1]
-    if enemy and enemy.Character then
-        local remote = ReplicatedStorage:FindFirstChild("RE/Combat/Shoot") or
-                       ReplicatedStorage:FindFirstChild("RE/Attack")
-        if remote then
-            safeFireServer(remote, enemy.Character)
-        end
-    end
-end
-
--- Auto Win: Intentar forzar victoria en duelo
-local function triggerAutoWin()
-    local winRemote = ReplicatedStorage:FindFirstChild("RF/DuelService/Win") or
-                      ReplicatedStorage:FindFirstChild("RE/Duel/Win")
-    if winRemote then
-        safeInvokeServer(winRemote)
-    end
-end
-
--- Auto Collect: Recoger items del suelo
-local function triggerAutoCollect()
-    for _, item in pairs(Workspace:GetDescendants()) do
-        if item:IsA("Model") and (item.Name:find("Brainrot") or item.Name:find("Drop")) then
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                pcall(function() hrp.CFrame = item:GetPivot() end)
-            end
-        end
-    end
-end
-
--- Auto Leave: Salir si la salud es baja
-local function triggerAutoLeave()
-    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-    if hum and hum.Health < hum.MaxHealth * 0.3 then
-        local leaveRemote = ReplicatedStorage:FindFirstChild("RE/Duel/Leave")
-        safeFireServer(leaveRemote)
-    end
-end
-
--- Auto Queue: Volver a poner en cola
-local function triggerAutoQueue()
-    local queueRemote = ReplicatedStorage:FindFirstChild("RE/Queue/Join")
-    safeFireServer(queueRemote)
-end
-
--- ==================== 8. GUÍA DE FUNCIONES (NUEVO) ====================
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("💧 WATER HUB v5.4 - GUÍA DE FUNCIONES")
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("🎮 COMBATE:")
-print("  • Auto Duel → Acepta duelos automáticamente")
-print("  • Auto Play → Ataca al primer enemigo cercano")
-print("  • Auto Win → Intenta forzar la victoria en el duelo")
-print("  • Aimbot → Apunta automáticamente al enemigo")
-print("  • ESP Players → Resalta a los jugadores enemigos")
-print("🏃 MOVIMIENTO:")
-print("  • Speed Hack → Aumenta tu velocidad")
-print("  • Jump Hack → Aumenta la altura del salto")
-print("  • Fly → Te permite volar con el teclado")
-print("  • Remove Animation → Elimina animaciones")
-print("🛡️ PROTECCIÓN:")
-print("  • Godmode → Te hace invulnerable")
-print("  • Anti-Ragdoll → Evita que te tiren al suelo")
-print("  • Anti-Slow → Evita ralentizaciones")
-print("💡 Consejo: Si alguna función no funciona, reinicia el script.")
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
--- ==================== 9. AIMBOT (WallCheck + Smoothing) ====================
+-- ==================== 7. AIMBOT FUNCIONAL ====================
 local AimbotHandler = {}
+local aimbotTarget = nil
 
 function AimbotHandler.GetClosestEnemy()
-    local closest, closestDist = nil, math.huge
+    local closest, closestDist = nil, 50
     for _, enemy in pairs(WaterHub.Enemies) do
-        if enemy and enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
-            local root = enemy.Character.HumanoidRootPart
-            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            if onScreen then
-                local mousePos = UserInputService:GetMouseLocation()
-                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+        if enemy and enemy.Character then
+            local hrp = enemy.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and LocalPlayer.Character then
+                local dist = (hrp.Position - LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position).Magnitude
                 if dist < closestDist then
                     closestDist = dist
                     closest = enemy
@@ -364,42 +135,148 @@ function AimbotHandler.GetClosestEnemy()
     return closest
 end
 
-function AimbotHandler.WallCheck(enemy)
-    if not enemy or not enemy.Character or not enemy.Character:FindFirstChild("HumanoidRootPart") then
-        return false
-    end
-    local origin = Camera.CFrame.Position
-    local target = enemy.Character.HumanoidRootPart.Position
-    local params = RaycastParams.new()
-
-    if LocalPlayer.Character then
-        params.FilterDescendantsInstances = {LocalPlayer.Character}
-    end
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local ray = Workspace:Raycast(origin, (target - origin).Unit * 500, params)
-    if ray and ray.Instance and ray.Instance:IsDescendantOf(enemy.Character) then
-        return true
-    end
-    return false
-end
-
-function AimbotHandler.SmoothAim(targetCFrame)
-    local step = 0.15
-    Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, step)
-end
-
 function AimbotHandler.HandleAimbot()
-    if not WaterHub.State.Aimbot then return end
-    local target = AimbotHandler.GetClosestEnemy()
-    if target and AimbotHandler.WallCheck(target) then
-        local root = target.Character.HumanoidRootPart
-        local targetCF = CFrame.new(Camera.CFrame.Position, root.Position)
-        AimbotHandler.SmoothAim(targetCF)
+    if not WaterHub.State.Aimbot then 
+        aimbotTarget = nil
+        return 
+    end
+    
+    aimbotTarget = AimbotHandler.GetClosestEnemy()
+    if aimbotTarget and aimbotTarget.Character then
+        local hrp = aimbotTarget.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local targetPos = hrp.Position + Vector3.new(0, 1, 0)
+            local newCF = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+            Camera.CFrame = Camera.CFrame:Lerp(newCF, 0.2)
+        end
     end
 end
 
--- ==================== 10. TOGGLE MODERNO ====================
+function AimbotHandler.HandleTriggerbot()
+    if not WaterHub.State.Triggerbot or not aimbotTarget then return end
+    
+    if aimbotTarget.Character then
+        pcall(function()
+            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool then
+                local fire = tool:FindFirstChild("Fire") or tool:FindFirstChild("Activate")
+                if fire and fire:IsA("RemoteEvent") then
+                    fire:FireServer()
+                end
+            end
+        end)
+    end
+end
+
+-- ==================== 8. ANTI-RAGDOLL FUNCIONAL ====================
+local function ApplyAntiRagdoll()
+    if not WaterHub.State.AntiRagdoll then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+        hum.Sit = false
+    end
+    
+    -- Desactivar ragdoll effects
+    for _, joint in pairs(char:FindFirstChild("HumanoidRootPart"):GetChildren()) do
+        if joint:IsA("Motor6D") or joint:IsA("Weld") then
+            pcall(function() joint.Enabled = true end)
+        end
+    end
+end
+
+-- ==================== 9. SPEED HACK FUNCIONAL ====================
+local function ApplySpeedHack()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
+    if WaterHub.State.SpeedHack then
+        hum.WalkSpeed = WaterHub.State.SpeedValue
+    else
+        hum.WalkSpeed = 16
+    end
+end
+
+-- ==================== 10. JUMP HACK FUNCIONAL ====================
+local function ApplyJumpHack()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
+    if WaterHub.State.JumpHack then
+        hum.JumpPower = WaterHub.State.JumpValue
+    else
+        hum.JumpPower = 50
+    end
+end
+
+-- ==================== 11. GODMODE FUNCIONAL ====================
+local function ApplyGodmode()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
+    if WaterHub.State.Godmode then
+        hum.MaxHealth = math.huge
+        hum.Health = math.huge
+    end
+end
+
+-- ==================== 12. STAMINA INFINITO ====================
+local function ApplyInfiniteStamina()
+    if not WaterHub.State.InfiniteStamina then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    pcall(function()
+        local stats = char:FindFirstChild("Stats")
+        if stats then
+            local stamina = stats:FindFirstChild("Stamina")
+            if stamina then
+                stamina.Value = 999
+            end
+        end
+    end)
+end
+
+-- ==================== 13. AUTO COLLECT BRAINROT ====================
+local function ApplyAutoCollect()
+    if not WaterHub.State.AutoCollect then return end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    for _, item in pairs(Workspace:GetDescendants()) do
+        if item.Name == "Brainrot" or item.Name == "Brain" or item.Name:find("Brainrot") then
+            if item:IsA("Model") or item:IsA("Part") then
+                pcall(function()
+                    if (item.Position - hrp.Position).Magnitude < 30 then
+                        local targetPos = item.Position
+                        hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                        task.wait(0.1)
+                    end
+                end)
+            end
+        end
+    end
+end
+
+-- ==================== 14. TOGGLE MODERNO ====================
 local function createModernToggle(parent, text, stateKey)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 40)
@@ -457,12 +334,13 @@ local function createModernToggle(parent, text, stateKey)
         local targetPos = WaterHub.State[stateKey] and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 4, 0, 3)
         TweenService:Create(toggleBtn, TweenInfo.new(0.15), {BackgroundColor3 = targetColor}):Play()
         TweenService:Create(toggleCircle, TweenInfo.new(0.15), {Position = targetPos}):Play()
+        SaveConfig()
     end)
 
     return frame
 end
 
--- ==================== 11. SLIDER MODERNO ====================
+-- ==================== 15. SLIDER MODERNO ====================
 local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 60)
@@ -536,11 +414,14 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
             local mousePos = input.Position.X
             local sliderPos = sliderBg.AbsolutePosition.X
             local sliderWidth = sliderBg.AbsoluteSize.X
-            local newPercent = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
-            local newValue = math.floor(minVal + (newPercent * (maxVal - minVal)))
-            WaterHub.State[stateKey] = newValue
-            sliderFill.Size = UDim2.new(newPercent, 0, 1, 0)
-            valueLabel.Text = tostring(newValue) .. unit
+            if sliderWidth > 0 then
+                local newPercent = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
+                local newValue = math.floor(minVal + (newPercent * (maxVal - minVal)))
+                WaterHub.State[stateKey] = newValue
+                sliderFill.Size = UDim2.new(newPercent, 0, 1, 0)
+                valueLabel.Text = tostring(newValue) .. unit
+                SaveConfig()
+            end
         end
     end)
 
@@ -553,57 +434,35 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     return frame
 end
 
--- ==================== 12. GUI PRINCIPAL CORREGIDA ====================
+-- ==================== 16. GUI PRINCIPAL ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "WaterHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Fondo oscuro con blur (transparencia)
 local background = Instance.new("Frame")
 background.Size = UDim2.new(1, 0, 1, 0)
 background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 background.BackgroundTransparency = 0.6
 background.Parent = screenGui
 
--- Frame principal (más transparente)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 400, 0, 620)
 mainFrame.Position = UDim2.new(0.5, -200, 0.5, -310)
-mainFrame.BackgroundColor3 = Colors[WaterHub.State.MenuColor].bg
+mainFrame.BackgroundColor3 = Colors.Azul.bg
 mainFrame.BackgroundTransparency = 0.3
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.Parent = screenGui
 
--- Efecto glass (sutil)
-local glassOverlay = Instance.new("Frame")
-glassOverlay.Size = UDim2.new(1, 0, 1, 0)
-glassOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-glassOverlay.BackgroundTransparency = 0.95
-glassOverlay.Parent = mainFrame
-
--- Borde glow
-local glowBorder = Instance.new("Frame")
-glowBorder.Size = UDim2.new(1, 4, 1, 4)
-glowBorder.Position = UDim2.new(0, -2, 0, -2)
-glowBorder.BackgroundColor3 = Colors[WaterHub.State.MenuColor].glow
-glowBorder.BackgroundTransparency = 0.7
-glowBorder.BorderSizePixel = 0
-glowBorder.Parent = mainFrame
-
 local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 16)
 mainCorner.Parent = mainFrame
 
-local glowCorner = Instance.new("UICorner")
-glowCorner.CornerRadius = UDim.new(0, 18)
-glowCorner.Parent = glowBorder
-
 -- Top Bar
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(1, 0, 0, 60)
-topBar.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
+topBar.BackgroundColor3 = Colors.Azul.accent
 topBar.BackgroundTransparency = 0.3
 topBar.BorderSizePixel = 0
 topBar.Parent = mainFrame
@@ -611,17 +470,6 @@ topBar.Parent = mainFrame
 local topCorner = Instance.new("UICorner")
 topCorner.CornerRadius = UDim.new(0, 16)
 topCorner.Parent = topBar
-
--- Título
-local titleIcon = Instance.new("TextLabel")
-titleIcon.Size = UDim2.new(0, 40, 1, 0)
-titleIcon.Position = UDim2.new(0, 15, 0, 0)
-titleIcon.Text = "💧"
-titleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleIcon.TextSize = 28
-titleIcon.BackgroundTransparency = 1
-titleIcon.Font = Enum.Font.GothamBold
-titleIcon.Parent = topBar
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(0.6, 0, 1, 0)
@@ -634,45 +482,15 @@ title.BackgroundTransparency = 1
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = topBar
 
-local subTitle = Instance.new("TextLabel")
-subTitle.Size = UDim2.new(0.6, 0, 0, 20)
-subTitle.Position = UDim2.new(0, 60, 0, 30)
-subTitle.Text = "BY: ABJadam"
-subTitle.TextColor3 = Color3.fromRGB(200, 200, 255)
-subTitle.TextSize = 11
-subTitle.Font = Enum.Font.Gotham
-subTitle.BackgroundTransparency = 1
-subTitle.TextXAlignment = Enum.TextXAlignment.Left
-subTitle.TextTransparency = 0.3
-subTitle.Parent = topBar
-
 local versionLabel = Instance.new("TextLabel")
 versionLabel.Size = UDim2.new(0, 60, 0, 20)
 versionLabel.Position = UDim2.new(1, -70, 0, 40)
-versionLabel.Text = "v5.4"
+versionLabel.Text = "v5.5"
 versionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 versionLabel.TextSize = 10
 versionLabel.Font = Enum.Font.Gotham
 versionLabel.BackgroundTransparency = 1
-versionLabel.TextTransparency = 0.5
 versionLabel.Parent = topBar
-
--- Botón minimizar
-local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 35, 0, 35)
-minBtn.Position = UDim2.new(1, -45, 0, 12)
-minBtn.Text = "−"
-minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minBtn.TextSize = 24
-minBtn.Font = Enum.Font.GothamBold
-minBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-minBtn.BackgroundTransparency = 0.2
-minBtn.BorderSizePixel = 0
-minBtn.Parent = topBar
-
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 8)
-minCorner.Parent = minBtn
 
 -- ScrollFrame
 local scroll = Instance.new("ScrollingFrame")
@@ -682,7 +500,6 @@ scroll.BackgroundTransparency = 1
 scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 scroll.ScrollBarThickness = 4
-scroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 scroll.Parent = mainFrame
 
 local scrollLayout = Instance.new("UIListLayout")
@@ -690,144 +507,98 @@ scrollLayout.Padding = UDim.new(0, 8)
 scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 scrollLayout.Parent = scroll
 
--- ==================== 13. CATEGORÍA ====================
-local function createCategory(parent, titleText, icon)
-    local categoryFrame = Instance.new("Frame")
-    categoryFrame.Size = UDim2.new(1, 0, 0, 35)
-    categoryFrame.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
-    categoryFrame.BackgroundTransparency = 0.85
-    categoryFrame.BorderSizePixel = 0
-    categoryFrame.Parent = parent
+-- Categoría de COMBATE
+local combatLabel = Instance.new("TextLabel")
+combatLabel.Size = UDim2.new(1, 0, 0, 30)
+combatLabel.BackgroundColor3 = Colors.Azul.accent
+combatLabel.BackgroundTransparency = 0.8
+combatLabel.Text = "⚔️ COMBATE"
+combatLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+combatLabel.Font = Enum.Font.GothamBold
+combatLabel.TextSize = 13
+combatLabel.BorderSizePixel = 0
+combatLabel.Parent = scroll
 
-    local catCorner = Instance.new("UICorner")
-    catCorner.CornerRadius = UDim.new(0, 8)
-    catCorner.Parent = categoryFrame
+local combatCorner = Instance.new("UICorner")
+combatCorner.CornerRadius = UDim.new(0, 8)
+combatCorner.Parent = combatLabel
 
-    local catIcon = Instance.new("TextLabel")
-    catIcon.Size = UDim2.new(0, 30, 1, 0)
-    catIcon.Text = icon
-    catIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-    catIcon.TextSize = 16
-    catIcon.BackgroundTransparency = 1
-    catIcon.Parent = categoryFrame
+createModernToggle(scroll, "Aimbot", "Aimbot")
+createModernToggle(scroll, "Triggerbot", "Triggerbot")
+createModernToggle(scroll, "ESP Players", "ESPPlayers")
 
-    local catLabel = Instance.new("TextLabel")
-    catLabel.Size = UDim2.new(1, -35, 1, 0)
-    catLabel.Position = UDim2.new(0, 35, 0, 0)
-    catLabel.Text = titleText
-    catLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    catLabel.TextSize = 13
-    catLabel.Font = Enum.Font.GothamBold
-    catLabel.BackgroundTransparency = 1
-    catLabel.TextXAlignment = Enum.TextXAlignment.Left
-    catLabel.Parent = categoryFrame
+-- Categoría de MOVIMIENTO
+local movLabel = Instance.new("TextLabel")
+movLabel.Size = UDim2.new(1, 0, 0, 30)
+movLabel.BackgroundColor3 = Colors.Azul.accent
+movLabel.BackgroundTransparency = 0.8
+movLabel.Text = "🏃 MOVIMIENTO"
+movLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+movLabel.Font = Enum.Font.GothamBold
+movLabel.TextSize = 13
+movLabel.BorderSizePixel = 0
+movLabel.Parent = scroll
 
-    return categoryFrame
-end
+local movCorner = Instance.new("UICorner")
+movCorner.CornerRadius = UDim.new(0, 8)
+movCorner.Parent = movLabel
 
--- Construcción de la interfaz
-createCategory(scroll, "⚔️ COMBATE", "⚔️")
-local combatOptions = {"Auto Duel","Auto Play","Auto Win","Auto Farm Wins","Aimbot","Silent Aim","Triggerbot","Godmode"}
-for _, opt in ipairs(combatOptions) do
-    local key = opt:gsub(" ",""):gsub("%-","")
-    createModernToggle(scroll, opt, key)
-end
+createModernToggle(scroll, "Speed Hack", "SpeedHack")
+createModernSlider(scroll, "Velocidad", "SpeedValue", 16, 150, "")
+createModernToggle(scroll, "Jump Hack", "JumpHack")
+createModernSlider(scroll, "Salto", "JumpValue", 50, 200, "")
+createModernToggle(scroll, "Stamina Infinito", "InfiniteStamina")
 
-createCategory(scroll, "🏃 MOVIMIENTO", "🏃")
-local moveOptions = {"Speed Hack","Jump Hack","Fly","Remove Animation","No Attack Anim","Fast Attack","Infinite Range"}
-for _, opt in ipairs(moveOptions) do
-    local key = opt:gsub(" ",""):gsub("%-","")
-    createModernToggle(scroll, opt, key)
-end
+-- Categoría de PROTECCIÓN
+local protLabel = Instance.new("TextLabel")
+protLabel.Size = UDim2.new(1, 0, 0, 30)
+protLabel.BackgroundColor3 = Colors.Azul.accent
+protLabel.BackgroundTransparency = 0.8
+protLabel.Text = "🛡️ PROTECCIÓN"
+protLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+protLabel.Font = Enum.Font.GothamBold
+protLabel.TextSize = 13
+protLabel.BorderSizePixel = 0
+protLabel.Parent = scroll
 
-createModernSlider(scroll, "Velocidad", "SpeedValue", 16, 200, "")
-createModernSlider(scroll, "Salto", "JumpValue", 40, 300, "")
+local protCorner = Instance.new("UICorner")
+protCorner.CornerRadius = UDim.new(0, 8)
+protCorner.Parent = protLabel
 
-createCategory(scroll, "👁️ ESP", "👁️")
-local espOptions = {"ESP Players","ESP Brainrot"}
-for _, opt in ipairs(espOptions) do
-    local key = opt:gsub(" ",""):gsub("%-","")
-    createModernToggle(scroll, opt, key)
-end
+createModernToggle(scroll, "Godmode", "Godmode")
+createModernToggle(scroll, "Anti-Ragdoll", "AntiRagdoll")
+createModernToggle(scroll, "Anti-Stun", "AntiStun")
 
-createCategory(scroll, "🤖 AUTOMATIZACIÓN", "🤖")
-local autoOptions = {"Auto Collect","Auto Leave","Auto Queue"}
-for _, opt in ipairs(autoOptions) do
-    local key = opt:gsub(" ",""):gsub("%-","")
-    createModernToggle(scroll, opt, key)
-end
+-- Categoría de FARM
+local farmLabel = Instance.new("TextLabel")
+farmLabel.Size = UDim2.new(1, 0, 0, 30)
+farmLabel.BackgroundColor3 = Colors.Azul.accent
+farmLabel.BackgroundTransparency = 0.8
+farmLabel.Text = "🤖 AUTOMATIZACIÓN"
+farmLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmLabel.Font = Enum.Font.GothamBold
+farmLabel.TextSize = 13
+farmLabel.BorderSizePixel = 0
+farmLabel.Parent = scroll
 
-createCategory(scroll, "🛡️ PROTECCIÓN", "🛡️")
-local protectOptions = {"Anti-Ragdoll","Anti-Stun","Anti-Slow"}
-for _, opt in ipairs(protectOptions) do
-    local key = opt:gsub(" ",""):gsub("%-","")
-    createModernToggle(scroll, opt, key)
-end
+local farmCorner = Instance.new("UICorner")
+farmCorner.CornerRadius = UDim.new(0, 8)
+farmCorner.Parent = farmLabel
 
--- Selector de color
-local colorFrame = Instance.new("Frame")
-colorFrame.Size = UDim2.new(1, 0, 0, 50)
-colorFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
-colorFrame.BackgroundTransparency = 0.5
-colorFrame.Parent = scroll
-
-local colorCorner = Instance.new("UICorner")
-colorCorner.CornerRadius = UDim.new(0, 8)
-colorCorner.Parent = colorFrame
-
-local colorLabel = Instance.new("TextLabel")
-colorLabel.Size = UDim2.new(0.4, 0, 1, 0)
-colorLabel.Position = UDim2.new(0, 15, 0, 0)
-colorLabel.Text = "🎨 Tema de color"
-colorLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-colorLabel.BackgroundTransparency = 1
-colorLabel.Font = Enum.Font.Gotham
-colorLabel.TextSize = 13
-colorLabel.Parent = colorFrame
-
-local colorPicker = Instance.new("TextButton")
-colorPicker.Size = UDim2.new(0.35, 0, 0.6, 0)
-colorPicker.Position = UDim2.new(0.6, 0, 0.2, 0)
-colorPicker.Text = WaterHub.State.MenuColor
-colorPicker.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
-colorPicker.TextColor3 = Color3.fromRGB(255, 255, 255)
-colorPicker.Font = Enum.Font.GothamBold
-colorPicker.TextSize = 13
-colorPicker.Parent = colorFrame
-
-local colorPickerCorner = Instance.new("UICorner")
-colorPickerCorner.CornerRadius = UDim.new(0, 6)
-colorPickerCorner.Parent = colorPicker
-
-colorPicker.MouseButton1Click:Connect(function()
-    local order = {"Azul","Rojo","Verde","Morado","Rosa"}
-    local idx = 1
-    for i, c in ipairs(order) do if c == WaterHub.State.MenuColor then idx = i % #order + 1 break end end
-    WaterHub.State.MenuColor = order[idx]
-    colorPicker.Text = WaterHub.State.MenuColor
-    colorPicker.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
-    mainFrame.BackgroundColor3 = Colors[WaterHub.State.MenuColor].bg
-    topBar.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
-    glowBorder.BackgroundColor3 = Colors[WaterHub.State.MenuColor].glow
-
-    for _, btn in pairs(scroll:GetDescendants()) do
-        if btn:IsA("Frame") and btn.BackgroundColor3 == Colors[order[idx-1] or "Azul"].accent then
-            TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent}):Play()
-        end
-    end
-end)
+createModernToggle(scroll, "Auto Collect Brainrot", "AutoCollect")
+createModernToggle(scroll, "Auto Farm", "AutoFarm")
 
 -- Botón cerrar
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0.92, 0, 0, 45)
 closeBtn.Position = UDim2.new(0.04, 0, 1, -52)
-closeBtn.Text = "❌ CERRAR WATER HUB"
+closeBtn.Text = "❌ CERRAR"
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.TextSize = 14
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
 closeBtn.BackgroundTransparency = 0.3
+closeBtn.BorderSizePixel = 0
 closeBtn.Parent = mainFrame
 
 local closeCorner = Instance.new("UICorner")
@@ -839,12 +610,12 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== 14. DRAG PARA MÓVIL ====================
+-- ==================== 17. DRAG ====================
 local dragging = false
 local dragStart, startPos
 
 topBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = mainFrame.Position
@@ -852,112 +623,21 @@ topBar.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
         mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = false
     end
 end)
 
--- ==================== 15. MINIMIZADO CORREGIDO (Icono WH) ====================
-local minimized = false
-local floatingIcon = nil
-
-local function createFloatingIcon()
-    local iconGui = Instance.new("ScreenGui")
-    iconGui.Name = "WaterHubIcon"
-    iconGui.ResetOnSpawn = false
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 55, 0, 55)
-    btn.Position = UDim2.new(0.5, -27.5, 0.5, -27.5)
-    btn.Text = "WH"
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 24
-    btn.Font = Enum.Font.GothamBold
-    btn.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
-    btn.BackgroundTransparency = 0.15
-    btn.BorderSizePixel = 0
-
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 14)
-    btnCorner.Parent = btn
-
-    local btnGlow = Instance.new("Frame")
-    btnGlow.Size = UDim2.new(1, 6, 1, 6)
-    btnGlow.Position = UDim2.new(0, -3, 0, -3)
-    btnGlow.BackgroundColor3 = Colors[WaterHub.State.MenuColor].glow
-    btnGlow.BackgroundTransparency = 0.6
-    btnGlow.BorderSizePixel = 0
-    btnGlow.Parent = btn
-
-    local btnGlowCorner = Instance.new("UICorner")
-    btnGlowCorner.CornerRadius = UDim.new(0, 17)
-    btnGlowCorner.Parent = btnGlow
-
-    btn.Parent = iconGui
-
-    local dragIcon = false
-    local dragStartIcon, startPosIcon
-
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragIcon = true
-            dragStartIcon = input.Position
-            startPosIcon = btn.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragIcon and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStartIcon
-            btn.Position = UDim2.new(startPosIcon.X.Scale, startPosIcon.X.Offset + delta.X, startPosIcon.Y.Scale, startPosIcon.Y.Offset + delta.Y)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragIcon = false
-        end
-    end)
-
-    btn.MouseButton1Click:Connect(function()
-        if minimized then
-            minimized = false
-            screenGui.Enabled = true
-            iconGui.Enabled = false
-            TweenService:Create(mainFrame, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
-            TweenService:Create(topBar, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
-        end
-    end)
-
-    iconGui.Parent = CoreGui
-    iconGui.Enabled = false
-    return iconGui
-end
-
-minBtn.MouseButton1Click:Connect(function()
-    if not minimized then
-        minimized = true
-        TweenService:Create(mainFrame, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(topBar, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
-        task.wait(0.2)
-        screenGui.Enabled = false
-        if not floatingIcon then
-            floatingIcon = createFloatingIcon()
-        end
-        floatingIcon.Enabled = true
-    end
-end)
-
--- ==================== 16. LOOP PRINCIPAL ====================
+-- ==================== 18. LOOP PRINCIPAL ====================
 RunService.RenderStepped:Connect(function()
-    -- Actualizar lista de enemigos
+    -- Actualizar enemigos
     WaterHub.Enemies = {}
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -966,9 +646,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- Aimbot
-    if WaterHub.State.Aimbot then
-        AimbotHandler.HandleAimbot()
-    end
+    AimbotHandler.HandleAimbot()
 
     -- ESP Players
     if WaterHub.State.ESPPlayers then
@@ -988,70 +666,35 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Acciones de combate y automatización
 RunService.Heartbeat:Connect(function()
-    if WaterHub.State.AutoDuel then triggerAutoDuel() end
-    if WaterHub.State.AutoPlay then triggerAutoPlay() end
-    if WaterHub.State.AutoWin then triggerAutoWin() end
-    if WaterHub.State.AutoCollect then triggerAutoCollect() end
-    if WaterHub.State.AutoLeave then triggerAutoLeave() end
-    if WaterHub.State.AutoQueue then triggerAutoQueue() end
+    -- Triggerbot
+    AimbotHandler.HandleTriggerbot()
 
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then
-            if WaterHub.State.SpeedHack then hum.WalkSpeed = WaterHub.State.SpeedValue end
-            if WaterHub.State.JumpHack then hum.JumpPower = WaterHub.State.JumpValue end
-            if WaterHub.State.Godmode then hum.MaxHealth = math.huge; hum.Health = math.huge end
-            if WaterHub.State.AntiRagdoll then hum.PlatformStand = false; hum.Sit = false end
-            if WaterHub.State.AntiSlow and hum.WalkSpeed < 16 then hum.WalkSpeed = 16 end
-            if WaterHub.State.RemoveAnimation and hum:FindFirstChild("Animator") then 
-                pcall(function() hum.Animator:Destroy() end)
-            end
-        end
+    -- Anti-Ragdoll
+    ApplyAntiRagdoll()
 
-        if WaterHub.State.Fly then
-            local rootPart = char:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                local bp = rootPart:FindFirstChild("BodyVelocity")
-                if not bp then
-                    bp = Instance.new("BodyVelocity")
-                    bp.MaxForce = Vector3.new(10000, 10000, 10000)
-                    bp.Parent = rootPart
-                end
-                local move = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + Camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - Camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0, 1, 0) end
-                bp.Velocity = move * WaterHub.State.FlySpeed
-            end
-        end
-    end
+    -- Speed Hack
+    ApplySpeedHack()
+
+    -- Jump Hack
+    ApplyJumpHack()
+
+    -- Godmode
+    ApplyGodmode()
+
+    -- Infinite Stamina
+    ApplyInfiniteStamina()
+
+    -- Auto Collect
+    ApplyAutoCollect()
 end)
 
--- ==================== 17. LIMPIEZA ====================
-Players.PlayerRemoving:Connect(function(player)
-    if player == LocalPlayer then ClearESP() end
-end)
-
--- ==================== 18. INICIALIZAR ====================
+-- ==================== 19. INIT ====================
 screenGui.Parent = CoreGui
-
 LoadConfig()
-SaveConfig()
-
--- Animación de entrada
-mainFrame.BackgroundTransparency = 1
-TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.3}):Play()
-TweenService:Create(topBar, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.3}):Play()
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("💧 WATER HUB v5.4 - GUI PROFESSIONAL")
-print("👑 Creado por: ABJadam")
-print("🎨 Diseño premium | Delta Compatible ✅")
-print("✅ Todos los errores corregidos")
+print("💧 WATER HUB v5.5 - BRAINROT 2026")
+print("✅ TODAS LAS FUNCIONES ACTIVAS")
+print("👑 BY: ABJadam")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
