@@ -70,11 +70,10 @@ local function verifyKey(key)
     end)
 
     if success and res and res.Body then
-        local decoded = pcall(function()
+        local success2, data = pcall(function()
             return HttpService:JSONDecode(res.Body)
         end)
-        if decoded then
-            local data = decoded
+        if success2 and data then
             return data.valid == true
         end
     end
@@ -221,10 +220,14 @@ local function LoadConfig()
         if readfile then
             local content = readfile(WaterHub.ConfigFile)
             if content then
-                local config = HttpService:JSONDecode(content)
-                for k, v in pairs(config) do
-                    if WaterHub.State[k] ~= nil then
-                        WaterHub.State[k] = v
+                local success, config = pcall(function()
+                    return HttpService:JSONDecode(content)
+                end)
+                if success and config then
+                    for k, v in pairs(config) do
+                        if WaterHub.State[k] ~= nil then
+                            WaterHub.State[k] = v
+                        end
                     end
                 end
             end
@@ -550,7 +553,7 @@ local function createModernSlider(parent, text, stateKey, minVal, maxVal, unit)
     return frame
 end
 
--- ==================== 13. GUI PRINCIPAL CORREGIDA ====================
+-- ==================== 12. GUI PRINCIPAL CORREGIDA ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "WaterHub"
 screenGui.ResetOnSpawn = false
@@ -562,11 +565,6 @@ background.Size = UDim2.new(1, 0, 1, 0)
 background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 background.BackgroundTransparency = 0.6
 background.Parent = screenGui
-
--- Efecto de desenfoque (blur)
-local blurEffect = Instance.new("BlurEffect")
-blurEffect.Size = 8
-blurEffect.Parent = background
 
 -- Frame principal (más transparente)
 local mainFrame = Instance.new("Frame")
@@ -692,7 +690,7 @@ scrollLayout.Padding = UDim.new(0, 8)
 scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 scrollLayout.Parent = scroll
 
--- ==================== 14. CATEGORÍA ====================
+-- ==================== 13. CATEGORÍA ====================
 local function createCategory(parent, titleText, icon)
     local categoryFrame = Instance.new("Frame")
     categoryFrame.Size = UDim2.new(1, 0, 0, 35)
@@ -841,7 +839,7 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== 15. DRAG PARA MÓVIL ====================
+-- ==================== 14. DRAG PARA MÓVIL ====================
 local dragging = false
 local dragStart, startPos
 
@@ -866,10 +864,9 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ==================== 16. MINIMIZADO CORREGIDO (Icono WH) ====================
+-- ==================== 15. MINIMIZADO CORREGIDO (Icono WH) ====================
 local minimized = false
 local floatingIcon = nil
-local originalMainFrameVisible = true
 
 local function createFloatingIcon()
     local iconGui = Instance.new("ScreenGui")
@@ -885,6 +882,7 @@ local function createFloatingIcon()
     btn.Font = Enum.Font.GothamBold
     btn.BackgroundColor3 = Colors[WaterHub.State.MenuColor].accent
     btn.BackgroundTransparency = 0.15
+    btn.BorderSizePixel = 0
 
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 14)
@@ -957,7 +955,7 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== 17. LOOP PRINCIPAL ====================
+-- ==================== 16. LOOP PRINCIPAL ====================
 RunService.RenderStepped:Connect(function()
     -- Actualizar lista de enemigos
     WaterHub.Enemies = {}
@@ -1008,15 +1006,20 @@ RunService.Heartbeat:Connect(function()
             if WaterHub.State.Godmode then hum.MaxHealth = math.huge; hum.Health = math.huge end
             if WaterHub.State.AntiRagdoll then hum.PlatformStand = false; hum.Sit = false end
             if WaterHub.State.AntiSlow and hum.WalkSpeed < 16 then hum.WalkSpeed = 16 end
-            if WaterHub.State.RemoveAnimation and hum:FindFirstChild("Animator") then hum.Animator:Destroy() end
+            if WaterHub.State.RemoveAnimation and hum:FindFirstChild("Animator") then 
+                pcall(function() hum.Animator:Destroy() end)
+            end
         end
 
         if WaterHub.State.Fly then
             local rootPart = char:FindFirstChild("HumanoidRootPart")
             if rootPart then
-                local bp = rootPart:FindFirstChild("BodyVelocity") or Instance.new("BodyVelocity")
-                bp.MaxForce = Vector3.new(10000, 10000, 10000)
-                bp.Parent = rootPart
+                local bp = rootPart:FindFirstChild("BodyVelocity")
+                if not bp then
+                    bp = Instance.new("BodyVelocity")
+                    bp.MaxForce = Vector3.new(10000, 10000, 10000)
+                    bp.Parent = rootPart
+                end
                 local move = Vector3.new()
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + Camera.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - Camera.CFrame.LookVector end
@@ -1030,12 +1033,12 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ==================== 18. LIMPIEZA ====================
+-- ==================== 17. LIMPIEZA ====================
 Players.PlayerRemoving:Connect(function(player)
     if player == LocalPlayer then ClearESP() end
 end)
 
--- ==================== 19. INICIALIZAR ====================
+-- ==================== 18. INICIALIZAR ====================
 screenGui.Parent = CoreGui
 
 LoadConfig()
@@ -1049,6 +1052,6 @@ TweenService:Create(topBar, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {Backgrou
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("💧 WATER HUB v5.4 - GUI PROFESSIONAL")
 print("👑 Creado por: ABJadam")
-print("🎨 Diseño premium | Efecto de desenfoque | Icono WH")
-print("✅ Versión corregida: Funciones activas, GUI transparente")
+print("🎨 Diseño premium | Delta Compatible ✅")
+print("✅ Todos los errores corregidos")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
