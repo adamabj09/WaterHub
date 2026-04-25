@@ -20,7 +20,7 @@ local isFluxus = fluxus ~= nil
 local isSynapse = syn ~= nil
 
 -- ==================== 2. KEY SYSTEM ====================
-local KEY_URL = "https://script.google.com/macros/s/AKfycbwFidcaEC0E2L72kUuyTyDqkx8PDpVoISwB5KBcO-t2p0m1LtQueCkFeYgVUFpdu96psg/exec"
+local KEY_URL = "https://script.google.com/macros/s/AKfycbyfxTS6LpCaDvEMrSyJRrRb32bXjNlDW3yaWWZZocqIYmG6ztz0uRKcpqx1ieP0uLXaog/exec"
 local KEY_FILE = "WaterHub_Key.txt"
 
 local function saveKey(key)
