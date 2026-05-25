@@ -1,14 +1,13 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN DELTA EJECUTABLE
-    Compatible con Delta Executor
+    WATER HUB | BLOCKSPIN - VERSIÓN DELTA (WINDUI IMPLEMENTADO)
     By: AdamABJ
 --]]
 
--- Verificar si es Delta
-if not getgenv or not hookmetamethod then
-    warn("⚠️ Este script requiere Delta Executor o similar")
+if getgenv and getgenv().WaterHubLoaded then
+    print("⚠️ Water Hub ya está cargado")
     return
 end
+getgenv().WaterHubLoaded = true
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -22,35 +21,29 @@ local StarterGui = game:GetService("StarterGui")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
--- Evitar múltiples ejecuciones
-if getgenv().WaterHubLoaded then
-    StarterGui:SetCore("SendNotification", {
-        Title = "Water Hub",
-        Text = "⚠️ Ya está cargado",
-        Duration = 2
-    })
-    return
-end
-getgenv().WaterHubLoaded = true
-
 -- ============================================
--- CARGAR WINDUI
+-- CARGAR WINDUI (CORRECTA)
 -- ============================================
-local WindUI
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local cloneref = (cloneref or clonereference or function(instance)
+	return instance
 end)
 
-if ok then
-    WindUI = result
-else
-    StarterGui:SetCore("SendNotification", {
-        Title = "Error",
-        Text = "No se pudo cargar WindUI",
-        Duration = 3
-    })
-    getgenv().WaterHubLoaded = false
-    return
+local WindUI
+
+do
+	local ok, result = pcall(function()
+		return require("./src/Init")
+	end)
+
+	if ok then
+		WindUI = result
+	else
+		if RunService:IsStudio() or not writefile then
+			WindUI = require(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init"))
+		else
+			WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+		end
+	end
 end
 
 -- ============================================
@@ -191,7 +184,7 @@ local function UpdateAllChams()
 end
 
 -- ============================================
--- SILENT AIM (DELTA COMPATIBLE)
+-- SILENT AIM
 -- ============================================
 local function UpdateSilentAim()
     if not Settings.SilentAim then 
@@ -297,7 +290,7 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- SPEED (CORREGIDO)
+-- SPEED
 -- ============================================
 local function ApplySpeed()
     if not Settings.SpeedEnabled then return end
@@ -324,7 +317,7 @@ local function SpeedLoop()
 end
 
 -- ============================================
--- INFINITE JUMP (CORREGIDO)
+-- INFINITE JUMP
 -- ============================================
 local InfiniteJumpConnection = nil
 
@@ -348,7 +341,7 @@ local function SetupInfiniteJump()
 end
 
 -- ============================================
--- INFINITE STAMINA (CORREGIDO)
+-- INFINITE STAMINA
 -- ============================================
 local function InfiniteStaminaLoop()
     while Settings.InfiniteStamina do
@@ -374,7 +367,7 @@ local function InfiniteStaminaLoop()
 end
 
 -- ============================================
--- WEAPON MODS (CORREGIDO)
+-- WEAPON MODS
 -- ============================================
 local WeaponModsRunning = false
 
@@ -676,92 +669,91 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- UI - WINDUI
+-- UI - WINDUI PRINCIPAL
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
     Folder = "WaterHub_Delta",
     Icon = "solar:water-drops-bold-duotone",
+    Theme = "Dark",
     NewElements = true,
-    HideSearchBar = false,
-    OpenButton = {
-        Title = "Water Hub",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
-        Scale = 0.5,
-        Color = ColorSequence.new(Color3.fromHex("#00F2FE"), Color3.fromHex("#4FACFE")),
-    },
-    Topbar = { Height = 44, ButtonsType = "Mac" },
+    Transparent = true,
+    ToggleKey = Enum.KeyCode.F,
+    Acrylic = true,
 })
 
-Window:Tag({ Title = "v2.1 Delta", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
+Window:Tag({ 
+    Title = "v2.1 | Bugs Fixed", 
+    Icon = "github", 
+    Color = Color3.fromHex("#1c1c1c"), 
+})
 
 -- ============================================
 -- PESTAÑAS
 -- ============================================
-local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "solar:swords-bold-duotone", Border = true })
-local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "solar:user-bold-duotone", Border = true })
-local WeaponsTab = Window:Tab({ Title = "WEAPON", Icon = "solar:tuning-bold-duotone", Border = true })
-local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "solar:eye-bold-duotone", Border = true })
-local MiscTab = Window:Tab({ Title = "MISC", Icon = "solar:slider-minimalistic-horizontal-bold-duotone", Border = true })
-local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "solar:settings-bold-duotone", Border = true })
+local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "solar:swords-bold-duotone" })
+local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "solar:user-bold-duotone" })
+local WeaponsTab = Window:Tab({ Title = "WEAPON", Icon = "solar:tuning-bold-duotone" })
+local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "solar:eye-bold-duotone" })
+local MiscTab = Window:Tab({ Title = "MISC", Icon = "solar:slider-minimalistic-horizontal-bold-duotone" })
+local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "solar:settings-bold-duotone" })
+
+CombatTab:Select()
 
 -- ============================================
 -- COMBAT TAB
 -- ============================================
-local CombatGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚔️ Combat" })
+CombatTab:Section({ Title = "⚔️ Combat", Desc = "Sistemas de combate" })
+
+local CombatGroup = CombatTab:Group()
 
 CombatGroup:Toggle({
-    Flag = "SilentAim", Title = "Silent Aim", Value = false,
+    Title = "Silent Aim",
+    Value = false,
     Callback = function(v) Settings.SilentAim = v end,
 })
 
-CombatGroup:Space()
-CombatGroup:Space()
+CombatGroup:Space({ Columns = 0.5 })
 
 CombatGroup:Slider({
-    Flag = "FOV", Title = "FOV Radius", IsTooltip = true, Step = 1,
+    Title = "FOV Radius",
+    IsTooltip = true,
+    Step = 1,
     Value = { Min = 50, Max = 500, Default = 200 },
     Callback = function(v) Settings.FOV = v end,
 })
 
-CombatGroup:Space()
-CombatGroup:Space()
+CombatTab:Space({ Columns = 1 })
 
-CombatGroup:Dropdown({
-    Flag = "AimPart", Title = "Aim Part", Values = { "Head", "Torso", "HumanoidRootPart" }, Value = "Head",
-    Callback = function(v) Settings.AimPart = v end,
-})
+CombatTab:Section({ Title = "🤖 Auto", Desc = "Automatizaciones" })
 
-CombatTab:Space({ Columns = 2 })
-
-local AutoGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🤖 Auto" })
+local AutoGroup = CombatTab:Group()
 
 AutoGroup:Toggle({
-    Flag = "AutoHeal", Title = "Auto Heal", Value = false,
+    Title = "Auto Heal",
+    Value = false,
     Callback = function(v)
         Settings.AutoHeal = v
         if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
     end,
 })
 
-AutoGroup:Space()
-AutoGroup:Space()
+AutoGroup:Space({ Columns = 0.5 })
 
 AutoGroup:Slider({
-    Flag = "HealHP", Title = "Heal at HP%", IsTooltip = true, Step = 1,
+    Title = "Heal at HP%",
+    IsTooltip = true,
+    Step = 1,
     Value = { Min = 20, Max = 90, Default = 70 },
     Callback = function(v) Settings.HealPercent = v end,
 })
 
-AutoGroup:Space()
-AutoGroup:Space()
+AutoGroup:Space({ Columns = 0.5 })
 
 AutoGroup:Toggle({
-    Flag = "AutoHit", Title = "Auto Hit", Value = false,
+    Title = "Auto Hit",
+    Value = false,
     Callback = function(v)
         Settings.AutoHit = v
         if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
@@ -771,10 +763,13 @@ AutoGroup:Toggle({
 -- ============================================
 -- MOVEMENT TAB
 -- ============================================
-local MoveGroup = MovementTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚡ Movement" })
+MovementTab:Section({ Title = "⚡ Movement", Desc = "Sistemas de movimiento" })
+
+local MoveGroup = MovementTab:Group()
 
 MoveGroup:Toggle({
-    Flag = "SpeedHack", Title = "Speed Hack", Value = false,
+    Title = "Speed Hack",
+    Value = false,
     Callback = function(v)
         Settings.SpeedEnabled = v
         if v then 
@@ -789,11 +784,12 @@ MoveGroup:Toggle({
     end,
 })
 
-MoveGroup:Space()
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Slider({
-    Flag = "SpeedValue", Title = "Speed Amount", IsTooltip = true, Step = 1,
+    Title = "Speed Amount",
+    IsTooltip = true,
+    Step = 1,
     Value = { Min = 16, Max = 250, Default = 50 },
     Callback = function(v)
         Settings.SpeedValue = v
@@ -803,22 +799,22 @@ MoveGroup:Slider({
     end,
 })
 
-MoveGroup:Space()
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Toggle({
-    Flag = "InfiniteJump", Title = "Infinite Jump", Value = false,
+    Title = "Infinite Jump",
+    Value = false,
     Callback = function(v)
         Settings.InfiniteJump = v
         SetupInfiniteJump()
     end,
 })
 
-MoveGroup:Space()
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Toggle({
-    Flag = "InfiniteStamina", Title = "Infinite Stamina", Value = false,
+    Title = "Infinite Stamina",
+    Value = false,
     Callback = function(v)
         Settings.InfiniteStamina = v
         if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
@@ -828,21 +824,24 @@ MoveGroup:Toggle({
 -- ============================================
 -- WEAPONS TAB
 -- ============================================
-local WeaponGroup = WeaponsTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🔫 Mods" })
+WeaponsTab:Section({ Title = "🔫 Mods", Desc = "Modificaciones de armas" })
+
+local WeaponGroup = WeaponsTab:Group()
 
 WeaponGroup:Toggle({
-    Flag = "NoRecoil", Title = "No Recoil", Value = false,
+    Title = "No Recoil",
+    Value = false,
     Callback = function(v)
         Settings.NoRecoil = v
         UpdateWeaponMods()
     end,
 })
 
-WeaponGroup:Space()
-WeaponGroup:Space()
+WeaponGroup:Space({ Columns = 0.5 })
 
 WeaponGroup:Toggle({
-    Flag = "NoSpread", Title = "No Spread", Value = false,
+    Title = "No Spread",
+    Value = false,
     Callback = function(v)
         Settings.NoSpread = v
         UpdateWeaponMods()
@@ -852,63 +851,72 @@ WeaponGroup:Toggle({
 -- ============================================
 -- VISUAL TAB
 -- ============================================
-local ChamsGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "👤 Chams" })
+VisualTab:Section({ Title = "👤 Chams", Desc = "Resaltar jugadores" })
+
+local ChamsGroup = VisualTab:Group()
 
 ChamsGroup:Toggle({
-    Flag = "Chams", Title = "Chams (Jugadores Azules)", Value = false,
+    Title = "Chams (Azul)",
+    Value = false,
     Callback = function(v)
         Settings.Chams = v
         UpdateAllChams()
     end,
 })
 
-VisualTab:Space({ Columns = 2 })
+VisualTab:Space({ Columns = 1 })
 
-local EspGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "👁️ ESP" })
+VisualTab:Section({ Title = "👁️ ESP", Desc = "Información en pantalla" })
+
+local EspGroup = VisualTab:Group()
 
 EspGroup:Toggle({
-    Flag = "NameESP", Title = "Name ESP", Value = false,
+    Title = "Name ESP",
+    Value = false,
     Callback = function(v) Settings.NameESP = v end,
 })
 
-EspGroup:Space()
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
-    Flag = "HealthESP", Title = "Health ESP", Value = false,
+    Title = "Health ESP",
+    Value = false,
     Callback = function(v) Settings.HealthESP = v end,
 })
 
-EspGroup:Space()
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
-    Flag = "DistanceESP", Title = "Distance ESP", Value = false,
+    Title = "Distance ESP",
+    Value = false,
     Callback = function(v) Settings.DistanceESP = v end,
 })
 
-EspGroup:Space()
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
-    Flag = "WeaponESP", Title = "Weapon Name ESP", Value = false,
+    Title = "Weapon ESP",
+    Value = false,
     Callback = function(v) Settings.WeaponESP = v end,
 })
 
-EspGroup:Space()
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
-    Flag = "WeaponIconESP", Title = "Weapon Icon ESP", Value = false,
+    Title = "Weapon Icon",
+    Value = false,
     Callback = function(v) Settings.WeaponIconESP = v end,
 })
 
-VisualTab:Space({ Columns = 2 })
+VisualTab:Space({ Columns = 1 })
 
-local WorldGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🌍 World" })
+VisualTab:Section({ Title = "🌍 World", Desc = "Efectos globales" })
+
+local WorldGroup = VisualTab:Group()
 
 WorldGroup:Toggle({
-    Flag = "FullBright", Title = "Full Bright", Value = false,
+    Title = "Full Bright",
+    Value = false,
     Callback = function(v)
         Settings.FullBright = v
         SetFullBright()
@@ -918,10 +926,13 @@ WorldGroup:Toggle({
 -- ============================================
 -- MISC TAB
 -- ============================================
-local MiscGroup = MiscTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚙️ Misc" })
+MiscTab:Section({ Title = "⚙️ Misc", Desc = "Otras opciones" })
+
+local MiscGroup = MiscTab:Group()
 
 MiscGroup:Toggle({
-    Flag = "AntiAFK", Title = "Anti AFK", Value = false,
+    Title = "Anti AFK",
+    Value = false,
     Callback = function(v)
         Settings.AntiAFK = v
         if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
@@ -931,25 +942,25 @@ MiscGroup:Toggle({
 -- ============================================
 -- CONFIG TAB
 -- ============================================
-local ConfigGroup = ConfigTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚙️ Config" })
+ConfigTab:Section({ Title = "⚙️ Config", Desc = "Configuración" })
+
+local ConfigGroup = ConfigTab:Group()
 
 ConfigGroup:Button({
     Title = "🔄 Rejoin Server",
     Icon = "solar:refresh-bold-duotone",
-    Justify = "Left",
+    Justify = "Center",
     Callback = function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end,
 })
 
-ConfigGroup:Space()
-ConfigGroup:Space()
+ConfigGroup:Space({ Columns = 0.5 })
 
 ConfigGroup:Button({
     Title = "💀 Destroy UI",
     Icon = "solar:logout-3-bold",
-    Justify = "Left",
-    Color = Color3.fromRGB(255, 70, 70),
+    Justify = "Center",
     Callback = function()
         -- Parar threads
         for name, thread in pairs(Threads) do
@@ -991,33 +1002,28 @@ ConfigGroup:Button({
         
         getgenv().WaterHubLoaded = false
         
-        StarterGui:SetCore("SendNotification", {
-            Title = "Water Hub",
-            Text = "✅ UI Destruida",
-            Duration = 2
-        })
+        print("✅ Water Hub Destruido")
     end,
 })
 
--- ============================================
--- CRÉDITOS
--- ============================================
-local CreditsGroup = ConfigTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "📝 Credits" })
+ConfigTab:Space({ Columns = 1 })
+
+ConfigTab:Section({ Title = "📝 Credits", Desc = "Créditos" })
+
+local CreditsGroup = ConfigTab:Group()
 
 CreditsGroup:Button({
-    Title = "Water Hub By AdamABJ",
+    Title = "Water Hub v2.1",
     Icon = "solar:star-bold-duotone",
-    Color = Color3.fromHex("#EF4F1D"),
     Justify = "Center",
     Callback = function() end,
 })
 
-CreditsGroup:Space()
+CreditsGroup:Space({ Columns = 0.5 })
 
 CreditsGroup:Button({
-    Title = "v2.1 Delta Executable",
+    Title = "By: AdamABJ",
     Icon = "solar:check-circle-bold",
-    Color = Color3.fromHex("#00F2FE"),
     Justify = "Center",
     Callback = function() end,
 })
@@ -1028,11 +1034,11 @@ CreditsGroup:Button({
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub | BlockSpin",
-        Content = "✅ Cargado para Delta Executor",
+        Content = "✅ v2.1 Cargado correctamente",
         Icon = "solar:water-drops-bold-duotone",
         Duration = 3,
     })
 end)
 
-print("✅ Water Hub v2.1 Delta | Cargado correctamente")
-print("🔧 Todas las opciones optimizadas para Delta Executor")
+print("✅ Water Hub v2.1 | Cargado para Delta Executor")
+print("🎮 Todas las opciones disponibles")
