@@ -1,7 +1,8 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSION FINAL (VERDE/AZUL)
+    WATER HUB | BLOCKSPIN - VERSIÓN MEJORADA (CON SISTEMA DE ARMAS)
     Colores: Verde #00FF88 → Azul #00F2FE
     By: AdamABJ
+    + Funcionalidades extraídas de script de combate (daño por distancia, armas, eventos)
 --]]
 
 if getgenv and getgenv().WaterHubLoaded then
@@ -47,6 +48,15 @@ local function Notify(title, message)
 end
 
 -- ============================================
+-- ARMAS (ROBADO DEL OTRO SCRIPT)
+-- ============================================
+local Weapons = {
+    { name = "Sword", damage = 15, cooldown = 0.8, range = 4 },
+    { name = "Bow", damage = 10, cooldown = 1.2, range = 30 },
+    { name = "Staff", damage = 25, cooldown = 2.5, range = 15 }
+}
+
+-- ============================================
 -- VARIABLES Y ESTADO
 -- ============================================
 local Features = {
@@ -84,7 +94,14 @@ local Features = {
     SpectateTarget = nil,
     Freecam = false,
     AntiAFK = false,
-    AutoAccept = false
+    AutoAccept = false,
+    -- NUEVAS FEATURES DEL OTRO SCRIPT
+    WeaponSystem = false,
+    SelectedWeapon = "Sword",
+    DamageMultiplier = 1,
+    DamageEvents = false,
+    ShowDamageNumbers = false,
+    AutoAttack = false,
 }
 
 local Threads = {}
@@ -95,6 +112,96 @@ local SilentAimTarget = nil
 local OldNamecall = nil
 local SpectateConnection = nil
 local InfiniteJumpConnection = nil
+
+-- ============================================
+-- FUNCIONES DE DAÑO (ROBADAS DEL OTRO SCRIPT)
+-- ============================================
+local function CalculateDamage(baseDamage, distance, isCritical)
+    local damage = baseDamage * Features.DamageMultiplier
+    
+    -- Caída de daño por distancia (después de 10 studs)
+    if distance > 10 then
+        damage = damage * (1 - (distance - 10) * 0.02)
+    end
+    
+    -- Golpe crítico (15% de probabilidad, x1.5)
+    if isCritical and math.random() < 0.15 then
+        damage = damage * 1.5
+        if Features.ShowDamageNumbers then
+            Notify("🔥 CRÍTICO!", tostring(math.floor(damage)) .. " de daño")
+        end
+    end
+    
+    -- Variación aleatoria (±10%)
+    damage = damage * (math.random() * 0.2 + 0.9)
+    
+    return math.floor(damage)
+end
+
+local function GetCurrentWeapon()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return nil end
+    
+    for _, w in ipairs(Weapons) do
+        if tool.Name:lower():find(w.name:lower()) then
+            return w, tool
+        end
+    end
+    return nil, tool
+end
+
+-- ============================================
+-- SISTEMA DE EVENTOS REMOTOS (ROBADO)
+-- ============================================
+local function SetupDamageEvents()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then
+        -- Si no existe "Remotes", buscar alternativas comunes
+        remotes = ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage
+    end
+    
+    local damageEvent = remotes:FindFirstChild("DamageEvent")
+    local healEvent = remotes:FindFirstChild("HealEvent")
+    local respawnEvent = remotes:FindFirstChild("RespawnEvent")
+    
+    if damageEvent and not Features.DamageEvents then
+        damageEvent.OnServerEvent:Connect(function(player, target, damageAmount, weaponIndex)
+            if player ~= LocalPlayer then return end
+            if not target or not target.Character then return end
+            
+            local weapon = Weapons[weaponIndex or 1]
+            if not weapon then return end
+            
+            local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+            if targetHumanoid then
+                local myChar = LocalPlayer.Character
+                local targetChar = target.Character
+                
+                if myChar and targetChar then
+                    local myPos = myChar:FindFirstChild("HumanoidRootPart")
+                    local targetPos = targetChar:FindFirstChild("HumanoidRootPart")
+                    
+                    if myPos and targetPos then
+                        local distance = (myPos.Position - targetPos.Position).Magnitude
+                        
+                        if distance <= weapon.range then
+                            local finalDamage = CalculateDamage(damageAmount or weapon.damage, distance, false)
+                            targetHumanoid.Health = math.max(0, targetHumanoid.Health - finalDamage)
+                            
+                            if Features.ShowDamageNumbers then
+                                Notify("💥 Daño!", tostring(finalDamage) .. " a " .. target.Name)
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        Features.DamageEvents = true
+        Notify("Eventos", "Sistema de daño conectado")
+    end
+end
 
 -- ============================================
 -- FUNCIONES UTILIDAD
@@ -129,7 +236,7 @@ local function GetPlayers()
 end
 
 -- ============================================
--- COMBAT - SILENT AIM
+-- COMBAT - SILENT AIM (MEJORADO CON ARMAS)
 -- ============================================
 RunService.RenderStepped:Connect(function()
     if not Features.SilentAim then
@@ -244,19 +351,40 @@ local function AutoHealLoop()
     end
 end
 
--- Auto Hit
+-- Auto Hit (MEJORADO CON SISTEMA DE ARMAS)
 local function AutoHitLoop()
     while Features.AutoHit do
         if SilentAimTarget then
             local char = LocalPlayer.Character
             if char then
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
+                local weapon, tool = GetCurrentWeapon()
+                local targetChar = SilentAimTarget.Character
+                
+                if weapon and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+                    local myPos = char:FindFirstChild("HumanoidRootPart")
+                    local targetPos = targetChar.HumanoidRootPart
+                    
+                    if myPos and targetPos then
+                        local distance = (myPos.Position - targetPos.Position).Magnitude
+                        
+                        -- Solo atacar si está dentro del rango del arma
+                        if distance <= weapon.range then
+                            pcall(function() 
+                                if tool then tool:Activate() end
+                            end)
+                            
+                            -- Pequeña pausa según el cooldown del arma
+                            task.wait(weapon.cooldown)
+                        end
+                    end
+                elseif tool then
+                    -- Si no hay arma definida, atacar normalmente
                     pcall(function() tool:Activate() end)
+                    task.wait(0.2)
                 end
             end
         end
-        task.wait(0.2)
+        task.wait(0.1)
     end
 end
 
@@ -468,14 +596,14 @@ local function CreateESP(player)
     
     esp.HealthBar = Instance.new("Frame")
     esp.HealthBar.Size = UDim2.new(1, 0, 1, 0)
-    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 100) -- Verde neón
+    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
     esp.HealthBar.BorderSizePixel = 0
     esp.HealthBar.Parent = esp.HealthBg
     
     esp.Distance = Instance.new("TextLabel")
     esp.Distance.Size = UDim2.new(0, 100, 0, 15)
     esp.Distance.BackgroundTransparency = 1
-    esp.Distance.TextColor3 = Color3.fromRGB(0, 242, 254) -- Azul claro
+    esp.Distance.TextColor3 = Color3.fromRGB(0, 242, 254)
     esp.Distance.TextSize = 10
     esp.Distance.Font = Enum.Font.Gotham
     esp.Distance.Parent = gui
@@ -483,7 +611,7 @@ local function CreateESP(player)
     esp.Weapon = Instance.new("TextLabel")
     esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
     esp.Weapon.BackgroundTransparency = 1
-    esp.Weapon.TextColor3 = Color3.fromRGB(0, 255, 150) -- Verde-azul
+    esp.Weapon.TextColor3 = Color3.fromRGB(0, 255, 150)
     esp.Weapon.TextSize = 10
     esp.Weapon.Font = Enum.Font.GothamBold
     esp.Weapon.Parent = gui
@@ -576,8 +704,8 @@ local function SetChams(enabled)
                 if not ChamsObjects[player] then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "Chams"
-                    highlight.FillColor = Color3.fromRGB(0, 255, 100) -- Verde
-                    highlight.OutlineColor = Color3.fromRGB(0, 242, 254) -- Azul borde
+                    highlight.FillColor = Color3.fromRGB(0, 255, 100)
+                    highlight.OutlineColor = Color3.fromRGB(0, 242, 254)
                     highlight.FillTransparency = 0.5
                     highlight.OutlineTransparency = 0
                     highlight.Adornee = player.Character
@@ -722,7 +850,6 @@ local Window = WindUI:CreateWindow({
     Transparent = true,
     ToggleKey = Enum.KeyCode.F,
     Acrylic = false,
-    -- BOTÓN FLOTANTE CON COLORES VERDE → AZUL
     OpenButton = {
         Title = "Open Water Hub",
         CornerRadius = UDim.new(1, 0),
@@ -731,24 +858,22 @@ local Window = WindUI:CreateWindow({
         Draggable = true,
         OnlyMobile = false,
         Scale = 0.5,
-        -- DEGRADADO VERDE A AZUL (Principal)
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromHex("#00FF88")),   -- Verde neón
-            ColorSequenceKeypoint.new(0.5, Color3.fromHex("#00E5FF")),   -- Cyan
-            ColorSequenceKeypoint.new(1, Color3.fromHex("#00B0FF"))    -- Azul
+            ColorSequenceKeypoint.new(0, Color3.fromHex("#00FF88")),
+            ColorSequenceKeypoint.new(0.5, Color3.fromHex("#00E5FF")),
+            ColorSequenceKeypoint.new(1, Color3.fromHex("#00B0FF"))
         }),
     },
 })
 
--- Tag con colores verde/azul
 Window:Tag({ 
-    Title = "v2.0 | Green Edition", 
+    Title = "v3.0 | Weapon System", 
     Icon = "leaf", 
     Color = Color3.fromHex("#00FF88"), 
     Border = true 
 })
 
-Notify("Water Hub", "Script cargado - Tema Verde/Azul activado")
+Notify("Water Hub", "Script cargado - Sistema de armas activado")
 
 -- ============================================
 -- PESTAÑAS
@@ -821,7 +946,60 @@ CombatTab:Toggle({
     end,
 })
 
--- 2. MOVEMENT
+-- 2. WEAPONS PRO (NUEVA PESTAÑA DEL OTRO SCRIPT)
+local WeaponsTab = Window:Tab({ Title = "WEAPONS PRO", Icon = "crosshair" })
+
+WeaponsTab:Section({ Title = "Weapon System", Desc = "Sistema de armas con daño real" })
+
+WeaponsTab:Toggle({
+    Title = "Enable Weapon System",
+    Value = false,
+    Callback = function(v)
+        Features.WeaponSystem = v
+        if v then
+            SetupDamageEvents()
+            Notify("Weapon System", "Sistema de armas activado")
+        end
+    end,
+})
+
+WeaponsTab:Dropdown({
+    Title = "Select Weapon",
+    Value = "Sword",
+    Values = { "Sword", "Bow", "Staff" },
+    Callback = function(v)
+        Features.SelectedWeapon = v
+        for i, w in ipairs(Weapons) do
+            if w.name == v then
+                Notify("Arma seleccionada", w.name .. " | Daño: " .. w.damage .. " | Rango: " .. w.range)
+                break
+            end
+        end
+    end,
+})
+
+WeaponsTab:Slider({
+    Title = "Damage Multiplier",
+    Step = 0.5,
+    Value = { Min = 0.5, Max = 5, Default = 1 },
+    Callback = function(v) Features.DamageMultiplier = v end,
+})
+
+WeaponsTab:Toggle({
+    Title = "Show Damage Numbers",
+    Value = false,
+    Callback = function(v) Features.ShowDamageNumbers = v end,
+})
+
+WeaponsTab:Space({ Columns = 1 })
+
+WeaponsTab:Section({ Title = "Weapon Info", Desc = "Estadísticas de armas" })
+
+for _, w in ipairs(Weapons) do
+    WeaponsTab:Label({ Title = "🗡️ " .. w.name .. " | Daño: " .. w.damage .. " | Rango: " .. w.range .. " | Cooldown: " .. w.cooldown .. "s" })
+end
+
+-- 3. MOVEMENT
 local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
 
 MovementTab:Section({ Title = "Speed", Desc = "Velocidad de movimiento" })
@@ -882,12 +1060,12 @@ MovementTab:Toggle({
     end,
 })
 
--- 3. WEAPON
-local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "crosshair" })
+-- 4. WEAPON MODS
+local WeaponModsTab = Window:Tab({ Title = "WEAPON MODS", Icon = "target" })
 
-WeaponTab:Section({ Title = "Mods", Desc = "Modificaciones de armas" })
+WeaponModsTab:Section({ Title = "Mods", Desc = "Modificaciones de armas" })
 
-WeaponTab:Toggle({
+WeaponModsTab:Toggle({
     Title = "No Recoil",
     Value = false,
     Callback = function(v)
@@ -896,7 +1074,7 @@ WeaponTab:Toggle({
     end,
 })
 
-WeaponTab:Toggle({
+WeaponModsTab:Toggle({
     Title = "No Spread",
     Value = false,
     Callback = function(v)
@@ -905,7 +1083,7 @@ WeaponTab:Toggle({
     end,
 })
 
-WeaponTab:Toggle({
+WeaponModsTab:Toggle({
     Title = "Rapid Fire",
     Value = false,
     Callback = function(v)
@@ -914,7 +1092,7 @@ WeaponTab:Toggle({
     end,
 })
 
-WeaponTab:Toggle({
+WeaponModsTab:Toggle({
     Title = "Instant Reload",
     Value = false,
     Callback = function(v)
@@ -923,7 +1101,26 @@ WeaponTab:Toggle({
     end,
 })
 
--- 4. VISUAL
+WeaponModsTab:Space({ Columns = 1 })
+
+WeaponModsTab:Section({ Title = "Ammo", Desc = "Municion infinita" })
+
+WeaponModsTab:Toggle({
+    Title = "Infinite Ammo",
+    Value = false,
+    Callback = function(v)
+        Features.InfiniteAmmo = v
+        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) end
+    end,
+})
+
+WeaponModsTab:Toggle({
+    Title = "No Reload",
+    Value = false,
+    Callback = function(v) Features.NoReload = v end,
+})
+
+-- 5. VISUAL
 local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "eye" })
 
 VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores" })
@@ -987,7 +1184,7 @@ VisualTab:Toggle({
     end,
 })
 
--- 5. AUTOFARM
+-- 6. AUTOFARM
 local AutoFarmTab = Window:Tab({ Title = "AUTOFARM", Icon = "robot" })
 
 AutoFarmTab:Section({ Title = "Farm", Desc = "Farmear automaticamente" })
@@ -1027,26 +1224,6 @@ AutoFarmTab:Toggle({
     Callback = function(v)
         Features.AutoDeposit = v
     end,
-})
-
--- 6. GUNS AMMO
-local GunsAmmoTab = Window:Tab({ Title = "GUNS AMMO", Icon = "target" })
-
-GunsAmmoTab:Section({ Title = "Ammo", Desc = "Municion infinita" })
-
-GunsAmmoTab:Toggle({
-    Title = "Infinite Ammo",
-    Value = false,
-    Callback = function(v)
-        Features.InfiniteAmmo = v
-        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) end
-    end,
-})
-
-GunsAmmoTab:Toggle({
-    Title = "No Reload",
-    Value = false,
-    Callback = function(v) Features.NoReload = v end,
 })
 
 -- 7. SPECTATE
@@ -1197,7 +1374,10 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if Features.NoRecoil or Features.NoSpread or Features.RapidFire then
         ApplyWeaponMods()
     end
+    if Features.WeaponSystem then
+        SetupDamageEvents()
+    end
 end)
 
 CombatTab:Select()
-print("✅ Water Hub | BlockSpin - Tema Verde/Azul cargado")
+print("✅ Water Hub | BlockSpin - Versión con sistema de armas cargada")
