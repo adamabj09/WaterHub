@@ -1,7 +1,7 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN DELTA
-    Optimizado para Delta Executor
-    By: AdamABJ (Editado para Delta)
+    WATER HUB | BLOCKSPIN - VERSIÓN DELTA COMPLETA
+    Con Chams Azules y 23 armas con iconos
+    By: AdamABJ
 --]]
 
 local Players = game:GetService("Players")
@@ -17,56 +17,52 @@ local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
 -- ============================================
--- VERIFICACIÓN DE DELTA / COMPATIBILIDAD
+-- CARGAR WINDUI (CON LA ESTRUCTURA QUE DISTE)
 -- ============================================
-local function getexecutorname()
-    return (identifyexecutor and identifyexecutor()) or (getexecutorname and getexecutorname()) or "Unknown"
+local WindUI
+local ThemeName = "Dark"
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+
+    if ok then
+        WindUI = result
+    else
+        if RunService:IsStudio() or not writefile then
+            WindUI = require(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init"))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+        end
+    end
 end
 
-print("Ejecutor detectado:", getexecutorname())
+if not WindUI then
+    StarterGui:SetCore("SendNotification", {Title = "Error", Text = "No se pudo cargar WindUI", Duration = 3})
+    return
+end
 
 -- ============================================
--- CARGAR WINDUI (CON MANEJO DE ERRORES PARA DELTA)
+-- REMOTES
 -- ============================================
-local success, WindUI = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+local SendRemote = Remotes and Remotes:FindFirstChild("Send")
 
-if not success or not WindUI then
-    warn("Error cargando WindUI:", WindUI)
-    -- Intentar alternativa para Delta
-    success, WindUI = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua", true))()
-    end)
-    
-    if not success then
-        StarterGui:SetCore("SendNotification", {
-            Title = "Error", 
-            Text = "No se pudo cargar WindUI. Reintenta.", 
-            Duration = 5
-        })
-        return
+local function FireSend(action, ...)
+    if SendRemote then
+        pcall(function() SendRemote:FireServer(action, ...) end)
     end
 end
 
 -- ============================================
--- REMOTES (ENCONTRADOS EN DEX)
--- ============================================
-local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-local SendRemote = Remotes and Remotes:FindFirstChild("Send")
-local GetRemote = Remotes and Remotes:FindFirstChild("Get")
-local HitDetection = ReplicatedStorage:FindFirstChild("HitDetection")
-local DamageClient = ReplicatedStorage:FindFirstChild("DamageClient")
-
--- ============================================
--- IDs DE ARMAS (EXTRAÍDOS CON DEX)
+-- IDs DE ARMAS (23 ARMAS COMPLETAS)
 -- ============================================
 local WeaponImages = {
     ["AK47"] = "rbxassetid://124555430577178",
     ["AUG"] = "rbxassetid://83729841153733",
     ["AWP"] = "rbxassetid://126356167274927",
     ["Anaconda"] = "rbxassetid://121547020534134",
-    ["Bizon"] = "rbxassetid://0",
     ["C9"] = "rbxassetid://79659079988022",
     ["Crossbow"] = "rbxassetid://89240642376715",
     ["Double Barrel"] = "rbxassetid://83625765638039",
@@ -88,33 +84,8 @@ local WeaponImages = {
     ["Uzi"] = "rbxassetid://109290695652338",
 }
 
--- ============================================
--- MÓDULO DE STAMINA (ENCONTRADO EN DEX)
--- ============================================
-local StaminaModule = ReplicatedStorage:FindFirstChild("Modules") and 
-                      ReplicatedStorage.Modules:FindFirstChild("Game") and
-                      ReplicatedStorage.Modules.Game:FindFirstChild("Skills") and
-                      ReplicatedStorage.Modules.Game.Skills:FindFirstChild("stamina")
-
--- ============================================
--- CONSUMIBLES (ENCONTRADOS EN DEX)
--- ============================================
-local Consumables = ReplicatedStorage:FindFirstChild("Items") and 
-                    ReplicatedStorage.Items:FindFirstChild("consumable")
-
--- ============================================
--- FUNCIONES DE UTILIDAD
--- ============================================
-local function FireSend(action, ...)
-    if SendRemote then
-        local args = {...}
-        local success, err = pcall(function()
-            SendRemote:FireServer(action, unpack(args))
-        end)
-        if not success then
-            warn("Error en FireSend:", err)
-        end
-    end
+local function GetWeaponIcon(weaponName)
+    return WeaponImages[weaponName] or "rbxassetid://0"
 end
 
 local function GetEquippedWeapon(player)
@@ -122,46 +93,13 @@ local function GetEquippedWeapon(player)
     if not char then return nil, nil end
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
-        return tool.Name, WeaponImages[tool.Name]
+        return tool.Name, GetWeaponIcon(tool.Name)
     end
     return nil, nil
 end
 
-local function ApplyWeaponMods()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return end
-    
-    if Settings.NoRecoil then
-        pcall(function() tool:SetAttribute("recoil", 0) end)
-    end
-    if Settings.NoSpread then
-        pcall(function() tool:SetAttribute("accuracy", 1) end)
-    end
-    if Settings.RapidFire then
-        pcall(function() tool:SetAttribute("fire_rate", 0) end)
-    end
-end
-
-local function SetInfiniteStamina(enabled)
-    if enabled and StaminaModule then
-        pcall(function()
-            local stamina = require(StaminaModule)
-            if stamina and type(stamina) == "table" then
-                for i, level in ipairs(stamina) do
-                    if level.reward_info then
-                        level.reward_info.stamina_capacity_increase = 1000
-                        level.reward_info.stamina_regeneration_increase = 1000
-                    end
-                end
-            end
-        end)
-    end
-end
-
 -- ============================================
--- TABLA DE CONFIGURACIÓN (MEJOR QUE _G)
+-- CONFIGURACIÓN
 -- ============================================
 local Settings = {
     SilentAim = false,
@@ -177,30 +115,59 @@ local Settings = {
     Fly = false,
     NoRecoil = false,
     NoSpread = false,
-    RapidFire = false,
     NameESP = false,
     HealthESP = false,
     DistanceESP = false,
     WeaponESP = false,
-    WeaponIconESP = false,
+    Chams = false,
     FullBright = false,
-    Magneto = false,
-    MagnetoRadius = 50,
     AntiAFK = false,
-    InfiniteStamina = false,
-    AutoReload = false
 }
 
 local SilentTarget = nil
 local ESPs = {}
-local MagnetoItems = {}
+local ChamsObjects = {}
 local NoClipConn = nil
 local FlyConnections = {}
 local Threads = {}
-local oldNamecall = nil
 
 -- ============================================
--- SILENT AIM (COMPATIBLE CON DELTA)
+-- CHAMS (JUGADORES EN AZUL)
+-- ============================================
+local function ApplyChams(player, enabled)
+    local char = player.Character
+    if not char then return end
+    
+    if enabled then
+        if not ChamsObjects[player] then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "WaterHubChams"
+            highlight.FillColor = Color3.fromRGB(0, 100, 255)
+            highlight.FillTransparency = 0.4
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.OutlineTransparency = 0
+            highlight.Adornee = char
+            highlight.Parent = char
+            ChamsObjects[player] = highlight
+        end
+    else
+        if ChamsObjects[player] then
+            ChamsObjects[player]:Destroy()
+            ChamsObjects[player] = nil
+        end
+    end
+end
+
+local function UpdateAllChams()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            ApplyChams(player, Settings.Chams)
+        end
+    end
+end
+
+-- ============================================
+-- SILENT AIM
 -- ============================================
 local function UpdateSilentAim()
     if not Settings.SilentAim then 
@@ -235,7 +202,8 @@ local function UpdateSilentAim()
     SilentTarget = closest
 end
 
--- Hook para Silent Aim (VERSIÓN DELTA COMPATIBLE)
+-- Hook para Silent Aim
+local oldNamecall
 if hookmetamethod and getnamecallmethod then
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
@@ -243,7 +211,7 @@ if hookmetamethod and getnamecallmethod then
         
         if Settings.SilentAim and method == "FireServer" and SilentTarget then
             local name = tostring(self.Name):lower()
-            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") or name:find("bullet") then
+            if name:find("hit") or name:find("damage") or name:find("shoot") then
                 if SilentTarget and SilentTarget.Character then
                     local targetPart = SilentTarget.Character:FindFirstChild(Settings.AimPart) or SilentTarget.Character:FindFirstChild("Head")
                     if targetPart then
@@ -263,8 +231,6 @@ if hookmetamethod and getnamecallmethod then
         
         return oldNamecall(self, unpack(args))
     end)
-else
-    warn("Tu ejecutor no soporta hookmetamethod - Silent Aim podría no funcionar correctamente")
 end
 
 -- ============================================
@@ -305,46 +271,27 @@ local function SpeedLoop()
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then 
-                hum.WalkSpeed = Settings.SpeedValue 
-            end
+            if hum then hum.WalkSpeed = Settings.SpeedValue end
         end
     end
-    
-    -- Reset al desactivar
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChild("Humanoid")
-        if hum then 
-            hum.WalkSpeed = 16 
-        end
+        if hum then hum.WalkSpeed = 16 end
     end
 end
 
 local function InfiniteJumpLoop()
-    local UserInputService = game:GetService("UserInputService")
-    local jumping = false
-    
-    local connection = UserInputService.JumpRequest:Connect(function()
-        if Settings.InfiniteJump then
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
+    while Settings.InfiniteJump do
+        task.wait(0.1)
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum:GetState() == Enum.HumanoidStateType.Landed then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
-    end)
-    
-    table.insert(Threads, connection)
-    
-    -- Mantener el loop activo mientras esté habilitado
-    while Settings.InfiniteJump do
-        task.wait(1)
     end
-    
-    connection:Disconnect()
 end
 
 local function NoClipLoop()
@@ -394,13 +341,8 @@ local function FlyLoop()
         if input.KeyCode == Enum.KeyCode.LeftShift then keys.LeftShift = isDown end
     end
     
-    FlyConnections.KeyDown = UserInputService.InputBegan:Connect(function(i, g) 
-        if not g then onInput(i, true) end
-    end)
-    
-    FlyConnections.KeyUp = UserInputService.InputEnded:Connect(function(i) 
-        onInput(i, false) 
-    end)
+    FlyConnections.KeyDown = UserInputService.InputBegan:Connect(function(i) onInput(i, true) end)
+    FlyConnections.KeyUp = UserInputService.InputEnded:Connect(function(i) onInput(i, false) end)
     
     local bv = Instance.new("BodyVelocity")
     bv.Name = "FlyVelocity"
@@ -427,66 +369,62 @@ local function FlyLoop()
         task.wait()
     end
     
-    -- Cleanup
     if FlyConnections.KeyDown then FlyConnections.KeyDown:Disconnect() end
     if FlyConnections.KeyUp then FlyConnections.KeyUp:Disconnect() end
     FlyConnections = {}
+    if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+end
+
+-- ============================================
+-- WEAPON MODS
+-- ============================================
+local function ApplyWeaponMods()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
     
-    if hrp:FindFirstChild("FlyVelocity") then
-        hrp.FlyVelocity:Destroy()
+    if Settings.NoRecoil then
+        pcall(function() tool:SetAttribute("recoil", 0) end)
+    end
+    if Settings.NoSpread then
+        pcall(function() tool:SetAttribute("accuracy", 1) end)
     end
 end
 
--- ============================================
--- INFINITE STAMINA
--- ============================================
-local function InfiniteStaminaLoop()
-    while Settings.InfiniteStamina do
-        task.wait(0.2)
-        local char = LocalPlayer.Character
-        if char then
-            local staminaVal = char:FindFirstChild("Stamina")
-            if staminaVal and staminaVal:IsA("NumberValue") then
-                staminaVal.Value = 100
-            end
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum:SetAttribute("Stamina", 100)
-            end
-        end
-        SetInfiniteStamina(true)
-    end
-    SetInfiniteStamina(false)
-end
-
--- ============================================
--- WEAPON MODS LOOP
--- ============================================
 local function WeaponModsLoop()
-    while Settings.NoRecoil or Settings.NoSpread or Settings.RapidFire do
+    while Settings.NoRecoil or Settings.NoSpread do
         task.wait(0.5)
         ApplyWeaponMods()
     end
 end
 
 -- ============================================
--- AUTO RELOAD
+-- FULL BRIGHT
 -- ============================================
-local function AutoReloadLoop()
-    while Settings.AutoReload do
-        task.wait(0.5)
-        local char = LocalPlayer.Character
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                local ammo = tool:GetAttribute("Ammo") or tool:GetAttribute("CurrentAmmo")
-                if ammo and ammo <= 0 then
-                    pcall(function() 
-                        VirtualUser:ClickButton1(Vector2.new(0,0), Enum.UserInputType.Keyboard, Enum.KeyCode.R) 
-                    end)
-                end
-            end
-        end
+local function SetFullBright()
+    if Settings.FullBright then
+        Lighting.Brightness = 10
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+    else
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 1000
+    end
+end
+
+-- ============================================
+-- ANTI AFK
+-- ============================================
+local function AntiAFKLoop()
+    while Settings.AntiAFK do
+        pcall(function()
+            VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            task.wait(0.1)
+            VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        end)
+        task.wait(60)
     end
 end
 
@@ -500,17 +438,10 @@ local function GetESP()
     ESPGui = Instance.new("ScreenGui")
     ESPGui.Name = "WaterHubESP"
     ESPGui.ResetOnSpawn = false
-    ESPGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Protección para Delta
-    pcall(function()
-        ESPGui.Parent = CoreGui
-    end)
-    
+    ESPGui.Parent = CoreGui
     if not ESPGui.Parent then
         ESPGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
-    
     return ESPGui
 end
 
@@ -587,55 +518,33 @@ local function UpdateESP()
                     esp.Name.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 50)
                     esp.Name.Text = player.Name
                     esp.Name.Visible = true
-                else 
-                    esp.Name.Visible = false 
-                end
+                else esp.Name.Visible = false end
                 
                 if Settings.HealthESP then
                     esp.HealthBar.Size = UDim2.new(math.clamp(percent, 0, 1), 0, 1, 0)
                     esp.HealthBar.BackgroundColor3 = Color3.fromRGB(255 * (1-percent), 255 * percent, 0)
                     esp.HealthBg.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 30)
                     esp.HealthBg.Visible = true
-                else 
-                    esp.HealthBg.Visible = false 
-                end
+                else esp.HealthBg.Visible = false end
                 
                 if Settings.DistanceESP then
                     esp.Distance.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 20)
                     esp.Distance.Text = math.floor(dist) .. "m"
                     esp.Distance.Visible = true
-                else 
-                    esp.Distance.Visible = false 
-                end
+                else esp.Distance.Visible = false end
                 
-                if Settings.WeaponESP or Settings.WeaponIconESP then
+                if Settings.WeaponESP then
                     local weaponName, weaponIcon = GetEquippedWeapon(player)
                     if weaponName and weaponName ~= esp.LastWeapon then
                         esp.LastWeapon = weaponName
-                        if Settings.WeaponESP then
-                            esp.Weapon.Text = "🔫 " .. weaponName
-                        end
-                        if Settings.WeaponIconESP and weaponIcon then
+                        esp.Weapon.Text = "🔫 " .. weaponName
+                        if weaponIcon then
                             esp.WeaponIcon.Image = weaponIcon
-                        end
-                    end
-                    
-                    if weaponName then
-                        local yOff = 0
-                        if Settings.WeaponESP then
-                            esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y + 10)
-                            esp.Weapon.Visible = true
-                            yOff = 25
-                        else
-                            esp.Weapon.Visible = false
-                        end
-                        
-                        if Settings.WeaponIconESP and weaponIcon then
-                            esp.WeaponIcon.Position = UDim2.new(0, pos.X - 95, 0, pos.Y + 10 + yOff)
                             esp.WeaponIcon.Visible = true
-                        else
-                            esp.WeaponIcon.Visible = false
                         end
+                        esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y + 10)
+                        esp.Weapon.Visible = true
+                        esp.WeaponIcon.Position = UDim2.new(0, pos.X - 95, 0, pos.Y + 10)
                     else
                         esp.Weapon.Visible = false
                         esp.WeaponIcon.Visible = false
@@ -662,84 +571,16 @@ local function UpdateESP()
 end
 
 -- ============================================
--- FULL BRIGHT
--- ============================================
-local function SetFullBright()
-    if Settings.FullBright then
-        Lighting.Brightness = 10
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 100000
-        Lighting.ClockTime = 14
-    else
-        Lighting.Brightness = 2
-        Lighting.GlobalShadows = true
-        Lighting.FogEnd = 1000
-    end
-end
-
--- ============================================
--- MAGNETO
--- ============================================
-local function MagnetoLoop()
-    while Settings.Magneto do
-        task.wait(0.5)
-        for _, part in ipairs(Workspace:GetDescendants()) do
-            if part:IsA("BasePart") and not MagnetoItems[part] then
-                local isItem = part:GetAttribute("Item") or 
-                              part.Name:find("Cash") or 
-                              part.Name:find("Money") or
-                              part.Name:find("Ammo") or
-                              part:FindFirstChild("DroppedItem")
-                if isItem and part.Parent and not part.Parent:FindFirstChild("Humanoid") then
-                    MagnetoItems[part] = true
-                    task.spawn(function()
-                        while MagnetoItems[part] and Settings.Magneto and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") do
-                            local success, dist = pcall(function()
-                                return (part.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                            end)
-                            
-                            if success and dist < Settings.MagnetoRadius then
-                                local dir = (LocalPlayer.Character.HumanoidRootPart.Position - part.Position).Unit
-                                part.Velocity = dir * 60
-                                part.AssemblyLinearVelocity = dir * 60
-                            end
-                            task.wait(0.1)
-                        end
-                    end)
-                end
-            end
-        end
-    end
-    MagnetoItems = {}
-end
-
--- ============================================
--- ANTI AFK
--- ============================================
-local function AntiAFKLoop()
-    while Settings.AntiAFK do
-        pcall(function()
-            VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-            task.wait(0.1)
-            VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        end)
-        task.wait(60)
-    end
-end
-
--- ============================================
--- INICIALIZAR ESP
+-- INICIALIZAR
 -- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then 
+    if player ~= LocalPlayer then
         pcall(function() CreateESP(player) end)
     end
 end
 
 Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then 
-        pcall(function() CreateESP(p) end)
-    end
+    if p ~= LocalPlayer then pcall(function() CreateESP(p) end) end
 end)
 
 Players.PlayerRemoving:Connect(function(p)
@@ -754,38 +595,30 @@ Players.PlayerRemoving:Connect(function(p)
         end)
         ESPs[p] = nil
     end
+    if ChamsObjects[p] then
+        pcall(function() ChamsObjects[p]:Destroy() end)
+        ChamsObjects[p] = nil
+    end
 end)
 
--- ============================================
--- RESPAWN HANDLER
--- ============================================
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     if Settings.SpeedEnabled then
         local hum = char:FindFirstChild("Humanoid")
         if hum then hum.WalkSpeed = Settings.SpeedValue end
     end
-    if Settings.NoRecoil or Settings.NoSpread or Settings.RapidFire then
+    if Settings.NoRecoil or Settings.NoSpread then
         ApplyWeaponMods()
     end
     if Settings.NoClip then
         NoClipLoop()
     end
-    if Settings.Fly then
-        -- Reiniciar fly si estaba activo
-        task.wait(0.5)
-        if Settings.Fly then
-            Threads.Fly = task.spawn(FlyLoop)
-        end
-    end
 end)
 
--- ============================================
--- ACTUALIZAR SILENT AIM Y ESP
--- ============================================
 RunService.RenderStepped:Connect(function()
     UpdateSilentAim()
     UpdateESP()
+    UpdateAllChams()
 end)
 
 -- ============================================
@@ -793,34 +626,25 @@ end)
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
-    Author = "By: AdamABJ | Delta Edition",
-    Folder = "WaterHub_Delta",
+    Author = "By: AdamABJ",
+    Folder = "WaterHub_BlockSpin",
     Icon = "solar:water-drops-bold-duotone",
+    Theme = "Dark",
     NewElements = true,
-    HideSearchBar = false,
-    OpenButton = {
-        Title = "Open Water Hub",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false,
-        Scale = 0.5,
-        Color = ColorSequence.new(Color3.fromHex("#00F2FE"), Color3.fromHex("#4FACFE")),
-    },
-    Topbar = { Height = 44, ButtonsType = "Mac" },
+    Transparent = true,
+    ToggleKey = Enum.KeyCode.RightShift,
+    Acrylic = true,
 })
 
-Window:Tag({ Title = "v1.0 | Delta Edition", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
+Window:Tag({ Title = "v1.0 | 23 Armas + Chams Azules", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
 
 -- ============================================
 -- PESTAÑAS
 -- ============================================
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "solar:swords-bold-duotone", Border = true })
 local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "solar:user-bold-duotone", Border = true })
-local WeaponsTab = Window:Tab({ Title = "WEAPON", Icon = "solar:tuning-bold-duotone", Border = true })
+local WeaponsTab = Window:Tab({ Title = "WEAPONS", Icon = "solar:tuning-bold-duotone", Border = true })
 local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "solar:eye-bold-duotone", Border = true })
-local MagnetoTab = Window:Tab({ Title = "MAGNETO", Icon = "solar:magnet-bold-duotone", Border = true })
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "solar:slider-minimalistic-horizontal-bold-duotone", Border = true })
 local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "solar:settings-bold-duotone", Border = true })
 
@@ -859,9 +683,7 @@ AutoGroup:Toggle({
     Flag = "AutoHeal", Title = "Auto Heal", Value = false,
     Callback = function(v)
         Settings.AutoHeal = v
-        if v then 
-            Threads.AutoHeal = task.spawn(AutoHealLoop) 
-        end
+        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
     end,
 })
 
@@ -881,22 +703,7 @@ AutoGroup:Toggle({
     Flag = "AutoHit", Title = "Auto Hit", Value = false,
     Callback = function(v)
         Settings.AutoHit = v
-        if v then 
-            Threads.AutoHit = task.spawn(AutoHitLoop) 
-        end
-    end,
-})
-
-AutoGroup:Space()
-AutoGroup:Space()
-
-AutoGroup:Toggle({
-    Flag = "AutoReload", Title = "Auto Reload", Value = false,
-    Callback = function(v)
-        Settings.AutoReload = v
-        if v then 
-            Threads.AutoReload = task.spawn(AutoReloadLoop) 
-        end
+        if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
     end,
 })
 
@@ -909,16 +716,7 @@ MoveGroup:Toggle({
     Flag = "SpeedHack", Title = "Speed Hack", Value = false,
     Callback = function(v)
         Settings.SpeedEnabled = v
-        if v then 
-            Threads.Speed = task.spawn(SpeedLoop) 
-        else
-            -- Reset speed
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then hum.WalkSpeed = 16 end
-            end
-        end
+        if v then Threads.Speed = task.spawn(SpeedLoop) end
     end,
 })
 
@@ -944,22 +742,7 @@ MoveGroup:Toggle({
     Flag = "InfiniteJump", Title = "Infinite Jump", Value = false,
     Callback = function(v)
         Settings.InfiniteJump = v
-        if v then 
-            Threads.Jump = task.spawn(InfiniteJumpLoop) 
-        end
-    end,
-})
-
-MoveGroup:Space()
-MoveGroup:Space()
-
-MoveGroup:Toggle({
-    Flag = "InfiniteStamina", Title = "Infinite Stamina", Value = false,
-    Callback = function(v)
-        Settings.InfiniteStamina = v
-        if v then 
-            Threads.Stamina = task.spawn(InfiniteStaminaLoop) 
-        end
+        if v then Threads.Jump = task.spawn(InfiniteJumpLoop) end
     end,
 })
 
@@ -981,21 +764,7 @@ MoveGroup:Toggle({
     Flag = "Fly", Title = "Fly Mode", Value = false,
     Callback = function(v)
         Settings.Fly = v
-        if v then
-            Threads.Fly = task.spawn(FlyLoop)
-        else
-            -- Limpiar fly
-            if FlyConnections.KeyDown then FlyConnections.KeyDown:Disconnect() end
-            if FlyConnections.KeyUp then FlyConnections.KeyUp:Disconnect() end
-            FlyConnections = {}
-            local char = LocalPlayer.Character
-            if char then
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp and hrp:FindFirstChild("FlyVelocity") then
-                    hrp.FlyVelocity:Destroy()
-                end
-            end
-        end
+        if v then Threads.Fly = task.spawn(FlyLoop) end
     end,
 })
 
@@ -1010,7 +779,7 @@ WeaponGroup:Toggle({
         Settings.NoRecoil = v
         if v and not Threads.WeaponMods then
             Threads.WeaponMods = task.spawn(WeaponModsLoop)
-        elseif not v and not (Settings.NoSpread or Settings.RapidFire) then
+        elseif not v and not Settings.NoSpread then
             Threads.WeaponMods = nil
         end
     end,
@@ -1025,22 +794,7 @@ WeaponGroup:Toggle({
         Settings.NoSpread = v
         if v and not Threads.WeaponMods then
             Threads.WeaponMods = task.spawn(WeaponModsLoop)
-        elseif not v and not (Settings.NoRecoil or Settings.RapidFire) then
-            Threads.WeaponMods = nil
-        end
-    end,
-})
-
-WeaponGroup:Space()
-WeaponGroup:Space()
-
-WeaponGroup:Toggle({
-    Flag = "RapidFire", Title = "Rapid Fire", Value = false,
-    Callback = function(v)
-        Settings.RapidFire = v
-        if v and not Threads.WeaponMods then
-            Threads.WeaponMods = task.spawn(WeaponModsLoop)
-        elseif not v and not (Settings.NoRecoil or Settings.NoSpread) then
+        elseif not v and not Settings.NoRecoil then
             Threads.WeaponMods = nil
         end
     end,
@@ -1076,16 +830,8 @@ EspGroup:Space()
 EspGroup:Space()
 
 EspGroup:Toggle({
-    Flag = "WeaponESP", Title = "Weapon Name ESP", Value = false,
+    Flag = "WeaponESP", Title = "Weapon ESP (con iconos)", Value = false,
     Callback = function(v) Settings.WeaponESP = v end,
-})
-
-EspGroup:Space()
-EspGroup:Space()
-
-EspGroup:Toggle({
-    Flag = "WeaponIconESP", Title = "Weapon Icon ESP", Value = false,
-    Callback = function(v) Settings.WeaponIconESP = v end,
 })
 
 VisualTab:Space({ Columns = 2 })
@@ -1093,35 +839,22 @@ VisualTab:Space({ Columns = 2 })
 local WorldGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🌍 World" })
 
 WorldGroup:Toggle({
+    Flag = "Chams", Title = "Chams (Jugadores en AZUL)", Value = false,
+    Callback = function(v)
+        Settings.Chams = v
+        UpdateAllChams()
+    end,
+})
+
+WorldGroup:Space()
+WorldGroup:Space()
+
+WorldGroup:Toggle({
     Flag = "FullBright", Title = "Full Bright", Value = false,
     Callback = function(v)
         Settings.FullBright = v
         SetFullBright()
     end,
-})
-
--- ============================================
--- MAGNETO TAB
--- ============================================
-local MagnetoGroup = MagnetoTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🧲 Magneto" })
-
-MagnetoGroup:Toggle({
-    Flag = "Magneto", Title = "Magneto (Attract Items)", Value = false,
-    Callback = function(v)
-        Settings.Magneto = v
-        if v then 
-            Threads.Magneto = task.spawn(MagnetoLoop) 
-        end
-    end,
-})
-
-MagnetoGroup:Space()
-MagnetoGroup:Space()
-
-MagnetoGroup:Slider({
-    Flag = "MagnetoRadius", Title = "Magneto Radius", IsTooltip = true, Step = 1,
-    Value = { Min = 10, Max = 100, Default = 50 },
-    Callback = function(v) Settings.MagnetoRadius = v end,
 })
 
 -- ============================================
@@ -1133,9 +866,7 @@ MiscGroup:Toggle({
     Flag = "AntiAFK", Title = "Anti AFK", Value = false,
     Callback = function(v)
         Settings.AntiAFK = v
-        if v then 
-            Threads.AntiAFK = task.spawn(AntiAFKLoop) 
-        end
+        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
     end,
 })
 
@@ -1162,29 +893,12 @@ ConfigGroup:Button({
     Justify = "Left",
     Color = Color3.fromRGB(255, 70, 70),
     Callback = function()
-        -- Detener todos los threads
-        for name, thread in pairs(Threads) do
-            if type(thread) == "thread" then
-                pcall(function() task.cancel(thread) end)
-            elseif typeof(thread) == "RBXScriptConnection" then
-                pcall(function() thread:Disconnect() end)
-            end
+        for _, thread in pairs(Threads) do
+            pcall(function() task.cancel(thread) end)
         end
-        
-        -- Limpiar conexiones
-        if NoClipConn then
-            pcall(function() NoClipConn:Disconnect() end)
-        end
-        
-        for _, conn in pairs(FlyConnections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        
-        -- Resetear valores
-        Settings = {}
-        SetFullBright()
-        
-        -- Destruir ESP
+        if NoClipConn then NoClipConn:Disconnect() end
+        for _, conn in pairs(FlyConnections) do pcall(function() conn:Disconnect() end) end
+        for _, cham in pairs(ChamsObjects) do pcall(function() cham:Destroy() end) end
         for _, esp in pairs(ESPs) do
             pcall(function()
                 esp.Name:Destroy()
@@ -1194,13 +908,9 @@ ConfigGroup:Button({
                 esp.WeaponIcon:Destroy()
             end)
         end
-        
-        -- Destruir UI
+        SetFullBright()
         pcall(function() Window:Destroy() end)
-        if ESPGui then
-            pcall(function() ESPGui:Destroy() end)
-        end
-        
+        if ESPGui then ESPGui:Destroy() end
         StarterGui:SetCore("SendNotification", {Title = "Water Hub", Text = "UI Destruida", Duration = 2})
     end,
 })
@@ -1218,22 +928,13 @@ CreditsGroup:Button({
     Callback = function() end,
 })
 
-CreditsGroup:Space()
-CreditsGroup:Button({
-    Title = "Optimizado para Delta Executor",
-    Icon = "solar:check-circle-bold",
-    Color = Color3.fromHex("#00F2FE"),
-    Justify = "Center",
-    Callback = function() end,
-})
-
 -- ============================================
--- NOTIFICACIÓN DE CARGA
+-- NOTIFICACIÓN FINAL
 -- ============================================
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub | BlockSpin",
-        Content = "¡Cargado con éxito en Delta! By: AdamABJ",
+        Content = "¡Cargado! 23 armas con iconos + Chams azules",
         Icon = "solar:water-drops-bold-duotone",
         Duration = 3,
     })
@@ -1241,17 +942,9 @@ end)
 
 StarterGui:SetCore("SendNotification", {
     Title = "Water Hub",
-    Text = "✅ Delta Edition cargado correctamente",
+    Text = "✅ Cargado - Chams azules | 23 armas",
     Duration = 3,
 })
 
 print("=" .. string.rep("=", 50))
-print("WATER HUB | BLOCKSPIN - VERSIÓN DELTA")
-print("By: AdamABJ")
-print("=" .. string.rep("=", 50))
-print("🔧 Compatibilidad: Delta Executor")
-print("📊 Información cargada desde Dex Explorer:")
-print("   - Remotes encontrados:", SendRemote and "Send ✓" or "Send ✗")
-print("   - Armas con IDs:", #WeaponImages)
-print("   - Módulo de stamina:", StaminaModule and "✓" or "✗")
-print("=" .. string.rep("=", 50))
+print("WATER HUB | BLOCK
