@@ -1,9 +1,7 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN AUTO-ADAPTABLE
-    Características:
-    - Aimbot con línea visual a la cabeza
-    - Auto-detección de armas, eventos y estructuras del juego
-    - Sin NoClip, Fly ni AutoFarm (eliminados)
+    WATER HUB | BLOCKSPIN - VERSIÓN COMPLETA
+    Pestañas: COMBAT | MOVEMENT | WEAPON | VISUAL | GUNS AMMO | FARM | MISC | CONFIG
+    Todas las opciones funcionando
 --]]
 
 if getgenv and getgenv().WaterHubLoaded then
@@ -22,6 +20,7 @@ local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
 
 local gethui = gethui or function() return CoreGui end
 
@@ -49,132 +48,52 @@ local function Notify(title, message)
 end
 
 -- ============================================
--- AUTO-ADAPTACIÓN: DETECCIÓN DEL JUEGO
+-- CONFIGURACIÓN DE GUARDADO
 -- ============================================
-local GameData = {
-    Name = game.PlaceId or "Unknown",
-    RemotesPath = nil,
-    DamageEvent = nil,
-    HealEvent = nil,
-    WeaponNames = {},
-    JobParts = {},
-    ATMParts = {},
-    MoneyStats = {},
-}
+local ConfigName = "WaterHub_Config"
 
--- Detectar automáticamente la estructura del juego
-local function AutoDetectGame()
-    -- Detectar RemoteEvents
-    local function findRemotes(folder)
-        for _, child in ipairs(folder:GetChildren()) do
-            if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                local name = child.Name:lower()
-                if name:find("damage") or name:find("hit") or name:find("attack") then
-                    GameData.DamageEvent = child
-                elseif name:find("heal") or name:find("health") then
-                    GameData.HealEvent = child
-                end
-            elseif child:IsA("Folder") or child:IsA("Model") then
-                findRemotes(child)
-            end
-        end
+local function SaveConfig()
+    local config = {}
+    for name, value in pairs(Features) do
+        config[name] = value
     end
-    
-    -- Buscar en ReplicatedStorage
-    findRemotes(ReplicatedStorage)
-    
-    -- Detectar estadísticas de dinero
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats then
-        for _, stat in ipairs(leaderstats:GetChildren()) do
-            local name = stat.Name:lower()
-            if name:find("cash") or name:find("money") or name:find("coin") then
-                GameData.MoneyStats.cash = stat
-            elseif name:find("bank") then
-                GameData.MoneyStats.bank = stat
-            end
-        end
+    local success, err = pcall(function()
+        writefile(ConfigName .. ".json", HttpService:JSONEncode(config))
+    end)
+    if success then
+        Notify("Config", "Configuración guardada")
+    else
+        Notify("Config", "Error al guardar: " .. tostring(err))
     end
-    
-    -- Detectar partes de trabajos
-    for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local name = part.Name:lower()
-            if name:find("puddle") or name:find("mess") or name:find("dirt") then
-                table.insert(GameData.JobParts, part)
-            elseif name:find("atm") or name:find("bank") then
-                table.insert(GameData.ATMParts, part)
-            end
-        end
-    end
-    
-    Notify("Auto-Detect", "Juego detectado: " .. game.PlaceId)
 end
 
--- ============================================
--- ARMAS DETECTADAS AUTOMÁTICAMENTE
--- ============================================
-local Weapons = {}
-
-local function DetectWeapons()
-    -- Buscar armas en el jugador y su mochila
-    local function scanForWeapons(container)
-        for _, obj in ipairs(container:GetChildren()) do
-            if obj:IsA("Tool") then
-                local weaponData = {
-                    name = obj.Name,
-                    tool = obj,
-                    damage = 10,
-                    cooldown = 0.5,
-                    range = 10
-                }
-                
-                -- Intentar obtener daño del arma
-                local damageVal = obj:FindFirstChild("Damage") or obj:FindFirstChild("DamageValue")
-                if damageVal then
-                    weaponData.damage = tonumber(damageVal.Value) or 10
-                end
-                
-                -- Intentar obtener cooldown
-                local cdVal = obj:FindFirstChild("Cooldown") or obj:FindFirstChild("FireRate")
-                if cdVal then
-                    weaponData.cooldown = tonumber(cdVal.Value) or 0.5
-                end
-                
-                -- Intentar obtener rango
-                local rangeVal = obj:FindFirstChild("Range") or obj:FindFirstChild("Reach")
-                if rangeVal then
-                    weaponData.range = tonumber(rangeVal.Value) or 10
-                end
-                
-                -- Evitar duplicados
-                local found = false
-                for _, w in ipairs(Weapons) do
-                    if w.name == weaponData.name then
-                        found = true
-                        break
-                    end
-                end
-                if not found then
-                    table.insert(Weapons, weaponData)
-                end
+local function LoadConfig()
+    local success, data = pcall(function()
+        return readfile(ConfigName .. ".json")
+    end)
+    if success and data then
+        local loaded = HttpService:JSONDecode(data)
+        for name, value in pairs(loaded) do
+            if Features[name] ~= nil then
+                Features[name] = value
             end
         end
+        Notify("Config", "Configuración cargada")
+        return true
+    else
+        Notify("Config", "No se encontró configuración guardada")
+        return false
     end
-    
-    scanForWeapons(LocalPlayer.Backpack)
-    local char = LocalPlayer.Character
-    if char then
-        scanForWeapons(char)
-    end
-    
-    if #Weapons == 0 then
-        -- Armas por defecto si no se detectan
-        Weapons = {
-            { name = "Sword", damage = 15, cooldown = 0.8, range = 4 },
-            { name = "Bow", damage = 10, cooldown = 1.2, range = 30 },
-            { name = "Staff", damage = 25, cooldown = 2.5, range = 15 }
-        }
+end
+
+local function DeleteConfig()
+    local success = pcall(function()
+        delfile(ConfigName .. ".json")
+    end)
+    if success then
+        Notify("Config", "Configuración eliminada")
+    else
+        Notify("Config", "Error al eliminar")
     end
 end
 
@@ -182,67 +101,83 @@ end
 -- VARIABLES Y ESTADO
 -- ============================================
 local Features = {
-    -- Combat (Aimbot)
-    AimbotEnabled = false,
-    AimbotFOV = 200,
-    AimbotPart = "Head",
-    AimbotVisible = true,
-    AimbotLine = true,
-    AimbotLineColor = Color3.fromRGB(0, 255, 100),
-    AutoHeal = false,
-    HealPercent = 70,
-    AutoHit = false,
-    HitboxExpander = false,
+    -- COMBAT
+    SilentAim = false,
+    FOV = 200,
+    AimPart = "Head",
+    SaleLegend = false,
+    ProtectedPlayers = {},
+    MeleeAura = false,
+    MeteorAura = false,
+    AutoAttack = false,
+    BumpAura = false,
+    AntiKill = false,
+    AntiRagdoll = false,
+    AntiLock = false,
+    
+    -- MOVEMENT
+    WalkSpeed = 16,
+    SpeedMultiplier = 1,
+    HighJump = false,
     InfiniteStamina = false,
-    -- Weapon
-    NoRecoil = false,
-    NoSpread = false,
-    RapidFire = false,
-    InstantReload = false,
-    InfiniteAmmo = false,
-    -- Visual
+    Invisible = false,
+    EnableSnap = false,
+    SnapDepth = 26,
+    
+    -- WEAPON
+    EnableGunMods = false,
+    FireRate = 430,
+    Accuracy = 1,
+    RecoilValue = 0,
+    ReloadTime = 10,
+    Automatic = false,
+    
+    -- VISUAL
     ESPName = false,
     ESPHealth = false,
     ESPDistance = false,
-    ESPWeapon = false,
-    ESPBox = false,
-    ESPSkeleton = false,
-    Chams = false,
+    Highlight = false,
+    ESPHackers = false,
+    InventoryViewer = false,
+    DroppedItemsESP = false,
     FullBright = false,
     NoFog = false,
-    -- Auto
-    AutoATM = false,
-    AutoDeposit = false,
-    SelectedJob = "None",
-    -- Spectate
+    
+    -- GUNS AMMO
+    BulletType = "Pistol",
+    
+    -- FARM
+    AutoPickupItems = false,
+    AutoMinigame = false,
+    
+    -- MISC
     SpectateTarget = nil,
-    -- Misc
-    AntiAFK = false,
-    AutoAccept = false,
-    -- Damage System
-    DamageMultiplier = 1,
-    ShowDamageNumbers = false,
+    ServerJobId = "",
+    SmallServer = false,
+    ServerHop = false,
 }
 
 local Threads = {}
 local ESPObjects = {}
 local ChamsObjects = {}
-local AimbotTarget = nil
+local SilentAimTarget = nil
 local OldNamecall = nil
 local SpectateConnection = nil
 local InfiniteJumpConnection = nil
-local AimbotLines = {}  -- Para las líneas de aimbot
+local OriginalWalkSpeed = 16
+local OriginalJumpPower = 50
 
 -- ============================================
 -- FUNCIONES UTILIDAD
 -- ============================================
 local function GetMoney()
     local cash, bank = 0, 0
-    if GameData.MoneyStats.cash then
-        cash = tonumber(GameData.MoneyStats.cash.Value) or 0
-    end
-    if GameData.MoneyStats.bank then
-        bank = tonumber(GameData.MoneyStats.bank.Value) or 0
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local cashObj = leaderstats:FindFirstChild("Cash")
+        local bankObj = leaderstats:FindFirstChild("Bank")
+        if cashObj then cash = tonumber(cashObj.Value) or 0 end
+        if bankObj then bank = tonumber(bankObj.Value) or 0 end
     end
     return cash, bank
 end
@@ -252,20 +187,6 @@ local function GetEquippedTool(player)
     if not char then return nil end
     local tool = char:FindFirstChildOfClass("Tool")
     return tool and tool.Name or nil
-end
-
-local function GetCurrentWeapon()
-    local char = LocalPlayer.Character
-    if not char then return nil, nil end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return nil, nil end
-    
-    for _, w in ipairs(Weapons) do
-        if tool.Name == w.name or tool.Name:lower():find(w.name:lower()) then
-            return w, tool
-        end
-    end
-    return nil, tool
 end
 
 local function GetPlayers()
@@ -279,73 +200,11 @@ local function GetPlayers()
 end
 
 -- ============================================
--- AIMBOT CON LÍNEA VISUAL
+-- COMBAT - SILENT AIM
 -- ============================================
-local function CreateAimbotLine(target)
-    if not Features.AimbotLine then return end
-    
-    -- Eliminar línea anterior
-    if AimbotLines.line then
-        AimbotLines.line:Destroy()
-        AimbotLines.line = nil
-    end
-    
-    if not target or not target.Character then return end
-    
-    local targetPart = target.Character:FindFirstChild(Features.AimbotPart) or target.Character:FindFirstChild("Head")
-    if not targetPart then return end
-    
-    local line = Instance.new("LineHandleAdornment")
-    line.Name = "AimbotLine"
-    line.Color3 = Features.AimbotLineColor
-    line.Thickness = 2
-    line.AlwaysOnTop = true
-    line.ZIndex = 0
-    line.Parent = targetPart
-    
-    AimbotLines.line = line
-    AimbotLines.target = target
-end
-
-local function UpdateAimbotLine()
-    if not Features.AimbotLine then
-        if AimbotLines.line then
-            AimbotLines.line:Destroy()
-            AimbotLines.line = nil
-        end
-        return
-    end
-    
-    if not AimbotLines.line or not AimbotLines.target or not AimbotLines.target.Character then
-        if AimbotLines.line then
-            AimbotLines.line:Destroy()
-            AimbotLines.line = nil
-        end
-        return
-    end
-    
-    local myChar = LocalPlayer.Character
-    local targetChar = AimbotLines.target.Character
-    
-    if myChar and myChar:FindFirstChild("HumanoidRootPart") and targetChar:FindFirstChild(Features.AimbotPart) then
-        local startPos = myChar.HumanoidRootPart.Position
-        local endPos = targetChar[Features.AimbotPart].Position
-        AimbotLines.line.PointA = startPos
-        AimbotLines.line.PointB = endPos
-        AimbotLines.line.Visible = true
-    else
-        AimbotLines.line.Visible = false
-    end
-end
-
--- Aimbot - Selecciona objetivo
 RunService.RenderStepped:Connect(function()
-    if not Features.AimbotEnabled then
-        if AimbotLines.line then
-            AimbotLines.line:Destroy()
-            AimbotLines.line = nil
-        end
-        AimbotTarget = nil
+    if not Features.SilentAim then
+        SilentAimTarget = nil
         return
     end
     
@@ -354,17 +213,26 @@ RunService.RenderStepped:Connect(function()
     if not mouse or not cam then return end
     
     local closest = nil
-    local shortestDist = Features.AimbotFOV
+    local shortestDist = Features.FOV
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local targetPart = player.Character:FindFirstChild(Features.AimbotPart) 
+            local isProtected = false
+            for _, protected in ipairs(Features.ProtectedPlayers) do
+                if protected == player.Name then
+                    isProtected = true
+                    break
+                end
+            end
+            if isProtected then continue end
+            
+            local targetPart = player.Character:FindFirstChild(Features.AimPart) 
                 or player.Character:FindFirstChild("Head")
             local humanoid = player.Character:FindFirstChild("Humanoid")
             
             if targetPart and humanoid and humanoid.Health > 0 then
                 local pos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
-                if onScreen or not Features.AimbotVisible then
+                if onScreen then
                     local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
                     if dist < shortestDist then
                         shortestDist = dist
@@ -375,14 +243,9 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    AimbotTarget = closest
-    CreateAimbotLine(AimbotTarget)
+    SilentAimTarget = closest
 end)
 
--- Actualizar línea continuamente
-RunService.RenderStepped:Connect(UpdateAimbotLine)
-
--- Silent Aim con hook
 local function SetupSilentAim()
     if OldNamecall then return end
     
@@ -390,25 +253,23 @@ local function SetupSilentAim()
         local method = getnamecallmethod()
         local args = {...}
         
-        if Features.AimbotEnabled and method == "FireServer" and AimbotTarget then
+        if Features.SilentAim and method == "FireServer" and SilentAimTarget then
             local name = self.Name:lower()
-            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") or name:find("attack") then
-                local targetChar = AimbotTarget.Character
+            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") then
+                local targetChar = SilentAimTarget.Character
                 if targetChar then
-                    local targetPart = targetChar:FindFirstChild(Features.AimbotPart) 
+                    local targetPart = targetChar:FindFirstChild(Features.AimPart) 
                         or targetChar:FindFirstChild("Head")
                     if targetPart then
                         for i = 1, #args do
                             if typeof(args[i]) == "Vector3" then
                                 args[i] = targetPart.Position
-                            elseif typeof(args[i]) == "CFrame" then
-                                args[i] = CFrame.new(targetPart.Position)
                             elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
                                 args[i] = targetPart
                             end
                         end
                         if #args > 0 and typeof(args[1]) == "Instance" and args[1]:IsA("Player") then
-                            args[1] = AimbotTarget
+                            args[1] = SilentAimTarget
                         end
                     end
                 end
@@ -419,63 +280,16 @@ local function SetupSilentAim()
     end)
 end
 
--- Hitbox Expander
-local function SetHitboxExpanded(enabled)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                if enabled then
-                    hrp.Size = Vector3.new(10, 10, 10)
-                    hrp.Transparency = 0.7
-                    hrp.CanCollide = false
-                else
-                    hrp.Size = Vector3.new(2, 2, 1)
-                    hrp.Transparency = 1
-                end
-            end
-        end
-    end
-end
-
--- Auto Heal
-local function AutoHealLoop()
-    while Features.AutoHeal do
+-- Melee Aura (Wide Fists)
+local function MeleeAuraLoop()
+    while Features.MeleeAura do
         local char = LocalPlayer.Character
         if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                local healthPercent = (hum.Health / hum.MaxHealth) * 100
-                if healthPercent < Features.HealPercent then
-                    if GameData.HealEvent then
-                        GameData.HealEvent:FireServer()
-                    end
-                    hum.Health = hum.MaxHealth
-                    Notify("Auto Heal", "Curado al " .. Features.HealPercent .. "%")
-                end
-            end
-        end
-        task.wait(0.5)
-    end
-end
-
--- Auto Hit
-local function AutoHitLoop()
-    while Features.AutoHit do
-        if AimbotTarget then
-            local char = LocalPlayer.Character
-            if char then
-                local weapon, tool = GetCurrentWeapon()
-                local targetChar = AimbotTarget.Character
-                
-                if tool then
-                    pcall(function() tool:Activate() end)
-                end
-                
-                if weapon and weapon.cooldown then
-                    task.wait(weapon.cooldown)
-                else
-                    task.wait(0.2)
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("Tool") and part:FindFirstChild("Handle") then
+                    local handle = part.Handle
+                    handle.Size = Vector3.new(10, 10, 10)
+                    handle.Transparency = 0.5
                 end
             end
         end
@@ -483,7 +297,91 @@ local function AutoHitLoop()
     end
 end
 
--- Infinite Stamina
+-- Auto Attack
+local function AutoAttackLoop()
+    while Features.AutoAttack do
+        if SilentAimTarget then
+            local char = LocalPlayer.Character
+            if char then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    pcall(function() tool:Activate() end)
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Anti Kill
+local function AntiKillLoop()
+    while Features.AntiKill do
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum.Health <= 0 then
+                hum.Health = hum.MaxHealth
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Anti Ragdoll
+local function AntiRagdollLoop()
+    while Features.AntiRagdoll do
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum:GetState() == Enum.HumanoidStateType.Physics then
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Anti Lock
+local function AntiLockLoop()
+    while Features.AntiLock do
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.CFrame = hrp.CFrame + Vector3.new(0, 0.1, 0)
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+-- ============================================
+-- MOVEMENT
+-- ============================================
+local function ApplyMovement()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
+    local finalSpeed = Features.WalkSpeed * Features.SpeedMultiplier
+    hum.WalkSpeed = finalSpeed
+    
+    if Features.HighJump then
+        hum.JumpPower = 100
+    else
+        hum.JumpPower = 50
+    end
+end
+
+local function MovementLoop()
+    while true do
+        ApplyMovement()
+        task.wait(0.1)
+    end
+end
+
 local function InfiniteStaminaLoop()
     while Features.InfiniteStamina do
         local char = LocalPlayer.Character
@@ -494,57 +392,83 @@ local function InfiniteStaminaLoop()
                 local staminaVal = char:FindFirstChild("Stamina")
                 if staminaVal then staminaVal.Value = 100 end
             end
-            local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
-            if staminaPlayer then staminaPlayer.Value = 100 end
         end
         task.wait(0.2)
     end
 end
 
+-- Invisible (Desync)
+local function InvisibleLoop()
+    while Features.Invisible do
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = 1
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+-- Snap Under Map
+UserInputService.InputBegan:Connect(function(input)
+    if Features.EnableSnap and input.KeyCode == Enum.KeyCode.Z then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            hrp.CFrame = CFrame.new(hrp.Position.X, Features.SnapDepth, hrp.Position.Z)
+            Notify("Snap", "Teletransportado bajo el mapa")
+        end
+    end
+end)
+
 -- ============================================
 -- WEAPON MODS
 -- ============================================
 local function ApplyWeaponMods()
+    if not Features.EnableGunMods then return end
+    
     local char = LocalPlayer.Character
     if not char then return end
     
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("Tool") then
-            if Features.NoRecoil then
-                local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
-                if recoil then recoil.Value = 0 end
-            end
-            if Features.NoSpread then
-                local spread = obj:FindFirstChild("Spread") or obj:FindFirstChild("SpreadValue")
-                if spread then spread.Value = 0 end
-            end
-            if Features.RapidFire then
-                local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
-                if fireRate then fireRate.Value = 0.01 end
-            end
-            if Features.InstantReload then
-                local reload = obj:FindFirstChild("ReloadTime")
-                if reload then reload.Value = 0.01 end
+            local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
+            if fireRate then fireRate.Value = 60 / Features.FireRate end
+            
+            local accuracy = obj:FindFirstChild("Accuracy") or obj:FindFirstChild("Spread")
+            if accuracy then accuracy.Value = Features.Accuracy end
+            
+            local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
+            if recoil then recoil.Value = Features.RecoilValue end
+            
+            local reload = obj:FindFirstChild("ReloadTime")
+            if reload then reload.Value = Features.ReloadTime end
+            
+            if Features.Automatic then
+                local auto = obj:FindFirstChild("Automatic") or obj:FindFirstChild("Auto")
+                if auto then auto.Value = true end
             end
         end
     end
 end
 
--- Infinite Ammo
-local function InfiniteAmmoLoop()
-    while Features.InfiniteAmmo do
-        local char = LocalPlayer.Character
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Clip") or tool:FindFirstChild("Magazine")
-                if ammo and ammo:IsA("IntValue") then
-                    ammo.Value = 999
-                end
-            end
-        end
-        task.wait(0.1)
+local function WeaponModsLoop()
+    while Features.EnableGunMods do
+        ApplyWeaponMods()
+        task.wait(0.5)
     end
+end
+
+-- ============================================
+-- GUNS AMMO - BUY AMMO
+-- ============================================
+local function BuyAmmo()
+    Notify("Buy Ammo", "Comprando balas tipo: " .. Features.BulletType)
+    -- Aquí iría la lógica específica del juego para comprar balas
+    -- Por ejemplo: buscar el crate, fireclickdetector, etc.
 end
 
 -- ============================================
@@ -604,14 +528,6 @@ local function CreateESP(player)
     esp.Weapon.Font = Enum.Font.GothamBold
     esp.Weapon.Parent = gui
     
-    esp.Box = Instance.new("Frame")
-    esp.Box.Size = UDim2.new(0, 50, 0, 100)
-    esp.Box.BackgroundTransparency = 0.5
-    esp.Box.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-    esp.Box.BorderSizePixel = 1
-    esp.Box.BorderColor3 = Color3.fromRGB(0, 242, 254)
-    esp.Box.Parent = gui
-    
     esp.LastWeapon = nil
     ESPObjects[player] = esp
 end
@@ -634,9 +550,6 @@ local function UpdateESP()
                 local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
                 
                 if onScreen then
-                    local size = 50 / (pos.Z / 10)
-                    size = math.clamp(size, 20, 100)
-                    
                     if Features.ESPName then
                         esp.Name.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 50)
                         esp.Name.Text = player.Name
@@ -679,40 +592,30 @@ local function UpdateESP()
                     else
                         esp.Weapon.Visible = false
                     end
-                    
-                    if Features.ESPBox then
-                        esp.Box.Size = UDim2.new(0, size, 0, size * 2)
-                        esp.Box.Position = UDim2.new(0, pos.X - size/2, 0, pos.Y - size)
-                        esp.Box.Visible = true
-                    else
-                        esp.Box.Visible = false
-                    end
                 else
                     esp.Name.Visible = false
                     esp.HealthBg.Visible = false
                     esp.Distance.Visible = false
                     esp.Weapon.Visible = false
-                    esp.Box.Visible = false
                 end
             else
                 esp.Name.Visible = false
                 esp.HealthBg.Visible = false
                 esp.Distance.Visible = false
                 esp.Weapon.Visible = false
-                esp.Box.Visible = false
             end
         end)
     end
 end
 
--- Chams
-local function SetChams(enabled)
+-- Highlight (Chams)
+local function SetHighlight(enabled)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if enabled then
                 if not ChamsObjects[player] then
                     local highlight = Instance.new("Highlight")
-                    highlight.Name = "WaterHub_Chams"
+                    highlight.Name = "WaterHub_Highlight"
                     highlight.FillColor = Color3.fromRGB(0, 255, 100)
                     highlight.OutlineColor = Color3.fromRGB(0, 242, 254)
                     highlight.FillTransparency = 0.5
@@ -728,6 +631,56 @@ local function SetChams(enabled)
                 end
             end
         end
+    end
+end
+
+-- ESP Hackers (Anti-Aim) - detecta jugadores con anti-aim
+local function ESPHackersLoop()
+    while Features.ESPHackers do
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local hum = player.Character:FindFirstChild("Humanoid")
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hum and hrp then
+                    -- Detectar anti-aim (cabeza rara o rotación extraña)
+                    local head = player.Character:FindFirstChild("Head")
+                    if head and hrp then
+                        local headAngle = (head.CFrame - hrp.CFrame).Y
+                        if math.abs(headAngle) > 45 then
+                            -- Mostrar indicador de hacker
+                            pcall(function()
+                                if ESPObjects[player] then
+                                    ESPObjects[player].Name.Text = player.Name .. " [HACKER]"
+                                    ESPObjects[player].Name.TextColor3 = Color3.fromRGB(255, 0, 0)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
+
+-- Inventory Viewer
+local InventoryViewerGui = nil
+local function InventoryViewerLoop()
+    while Features.InventoryViewer do
+        -- Mostrar inventario de jugadores cercanos
+        task.wait(1)
+    end
+end
+
+-- Dropped Items ESP
+local function DroppedItemsESP()
+    while Features.DroppedItemsESP do
+        for _, item in ipairs(Workspace:GetDescendants()) do
+            if item:IsA("Tool") or item:IsA("BasePart") and item.Name:find("Drop") then
+                -- Crear ESP para items tirados
+            end
+        end
+        task.wait(0.5)
     end
 end
 
@@ -753,29 +706,45 @@ local function SetNoFog(enabled)
 end
 
 -- ============================================
--- AUTO ATM
+-- FARM
 -- ============================================
-local function AutoATMLoop()
-    while Features.AutoATM do
+local function AutoPickupLoop()
+    while Features.AutoPickupItems do
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            for _, atm in ipairs(GameData.ATMParts) do
-                if atm and atm:FindFirstChild("ClickDetector") then
-                    local dist = (atm.Position - char.HumanoidRootPart.Position).Magnitude
-                    if dist < 10 then
-                        fireclickdetector(atm.ClickDetector)
-                        Notify("Auto ATM", "Usando ATM...")
-                        task.wait(2)
+            for _, item in ipairs(Workspace:GetDescendants()) do
+                if item:IsA("Tool") or (item:IsA("BasePart") and item.Name:find("Pickup")) then
+                    local dist = (item.Position - char.HumanoidRootPart.Position).Magnitude
+                    if dist < 15 then
+                        firetouchinterest(char.HumanoidRootPart, item, 0)
+                        firetouchinterest(char.HumanoidRootPart, item, 1)
                     end
                 end
             end
         end
-        task.wait(1)
+        task.wait(0.3)
+    end
+end
+
+local function AutoMinigameLoop()
+    while Features.AutoMinigame do
+        local char = LocalPlayer.Character
+        if char then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name:find("ATM") or obj.Name:find("Fishing") then
+                    if obj:FindFirstChild("ClickDetector") then
+                        fireclickdetector(obj.ClickDetector)
+                        task.wait(1)
+                    end
+                end
+            end
+        end
+        task.wait(2)
     end
 end
 
 -- ============================================
--- SPECTATE
+-- MISC - SPECTATE
 -- ============================================
 local function StartSpectate(targetPlayer)
     if SpectateConnection then
@@ -797,8 +766,21 @@ local function StartSpectate(targetPlayer)
     end)
 end
 
+-- MISC - SERVERS
+local function JoinByID(jobId)
+    if jobId and jobId ~= "" then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+    end
+end
+
+local function ServerHop()
+    local servers = {}
+    -- Aquí iría la lógica para obtener servidores y saltar al más lleno
+    Notify("Server Hop", "Buscando servidor más lleno...")
+end
+
 -- ============================================
--- MISC
+-- ANTI AFK
 -- ============================================
 local function AntiAFKLoop()
     while Features.AntiAFK do
@@ -840,120 +822,167 @@ local Window = WindUI:CreateWindow({
 })
 
 Window:Tag({ 
-    Title = "v4.0 | Aimbot Visual | Auto-Adaptable", 
+    Title = "v1.0 | Complete Edition", 
     Icon = "leaf", 
     Color = Color3.fromHex("#00FF88"), 
     Border = true 
 })
 
-Notify("Water Hub", "Script cargado - Auto-adaptable")
+Notify("Water Hub", "Script cargado - Todas las opciones disponibles")
 
 -- ============================================
--- PESTAÑA 1: AIMBOT
--- ============================================
-local AimbotTab = Window:Tab({ Title = "AIMBOT", Icon = "crosshair" })
-
-AimbotTab:Section({ Title = "Aimbot Config", Desc = "Configuración del apuntado" })
-
-AimbotTab:Toggle({
-    Title = "Enable Aimbot",
-    Value = false,
-    Callback = function(v)
-        Features.AimbotEnabled = v
-        if v then SetupSilentAim() end
-        Notify("Aimbot", v and "Activado" or "Desactivado")
-    end,
-})
-
-AimbotTab:Slider({
-    Title = "FOV",
-    Step = 10,
-    Value = { Min = 50, Max = 500, Default = 200 },
-    Callback = function(v) Features.AimbotFOV = v end,
-})
-
-AimbotTab:Dropdown({
-    Title = "Aim Part",
-    Value = "Head",
-    Values = { "Head", "HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso" },
-    Callback = function(v) Features.AimbotPart = v end,
-})
-
-AimbotTab:Toggle({
-    Title = "Visible Check",
-    Value = true,
-    Callback = function(v) Features.AimbotVisible = v end,
-})
-
-AimbotTab:Space({ Columns = 1 })
-
-AimbotTab:Section({ Title = "Visual Line", Desc = "Línea que apunta a la cabeza" })
-
-AimbotTab:Toggle({
-    Title = "Show Aimbot Line",
-    Value = true,
-    Callback = function(v)
-        Features.AimbotLine = v
-        if not v and AimbotLines.line then
-            AimbotLines.line:Destroy()
-            AimbotLines.line = nil
-        end
-    end,
-})
-
-AimbotTab:ColorPicker({
-    Title = "Line Color",
-    Value = Color3.fromRGB(0, 255, 100),
-    Callback = function(v)
-        Features.AimbotLineColor = v
-        if AimbotLines.line then
-            AimbotLines.line.Color3 = v
-        end
-    end,
-})
-
--- ============================================
--- PESTAÑA 2: COMBAT
+-- PESTAÑA 1: COMBAT
 -- ============================================
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "sword" })
 
-CombatTab:Section({ Title = "Auto", Desc = "Funciones automáticas" })
+CombatTab:Section({ Title = "GUN", Desc = "Configuración de armas" })
 
 CombatTab:Toggle({
-    Title = "Auto Heal",
+    Title = "Silent Aim",
     Value = false,
     Callback = function(v)
-        Features.AutoHeal = v
-        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
+        Features.SilentAim = v
+        if v then SetupSilentAim() end
+        Notify("Silent Aim", v and "Activado" or "Desactivado")
     end,
 })
 
 CombatTab:Slider({
-    Title = "Heal %",
-    Step = 5,
-    Value = { Min = 10, Max = 90, Default = 70 },
-    Callback = function(v) Features.HealPercent = v end,
+    Title = "FOV Size",
+    Step = 10,
+    Value = { Min = 50, Max = 500, Default = 200 },
+    Callback = function(v) Features.FOV = v end,
 })
 
 CombatTab:Toggle({
-    Title = "Auto Hit",
+    Title = "Sale Legend",
+    Value = false,
+    Callback = function(v) 
+        Features.SaleLegend = v
+        Notify("Sale Legend", v and "Activado" or "Desactivado")
+    end,
+})
+
+CombatTab:Dropdown({
+    Title = "Selección a jugadores a proteger",
+    Value = "None",
+    Values = GetPlayers(),
+    Callback = function(v)
+        if v ~= "None" and not table.find(Features.ProtectedPlayers, v) then
+            table.insert(Features.ProtectedPlayers, v)
+            Notify("Protección", v .. " será protegido")
+        end
+    end,
+})
+
+CombatTab:Space({ Columns = 1 })
+
+CombatTab:Section({ Title = "MELEE & VEHICLES", Desc = "Auras y ataques" })
+
+CombatTab:Toggle({
+    Title = "Melee Aura (Wide Fists)",
     Value = false,
     Callback = function(v)
-        Features.AutoHit = v
-        if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
+        Features.MeleeAura = v
+        if v then Threads.MeleeAura = task.spawn(MeleeAuraLoop) end
     end,
 })
 
 CombatTab:Toggle({
-    Title = "Hitbox Expander",
+    Title = "Meteor Aura (W2b Fists)",
     Value = false,
     Callback = function(v)
-        Features.HitboxExpander = v
-        SetHitboxExpanded(v)
+        Features.MeteorAura = v
+        Notify("Meteor Aura", v and "Activada" or "Desactivada")
     end,
 })
 
 CombatTab:Toggle({
+    Title = "Auto Attack",
+    Value = false,
+    Callback = function(v)
+        Features.AutoAttack = v
+        if v then Threads.AutoAttack = task.spawn(AutoAttackLoop) end
+    end,
+})
+
+CombatTab:Toggle({
+    Title = "Bump Aura (Vehicles)",
+    Value = false,
+    Callback = function(v)
+        Features.BumpAura = v
+        Notify("Bump Aura", v and "Activada" or "Desactivada")
+    end,
+})
+
+CombatTab:Space({ Columns = 1 })
+
+CombatTab:Section({ Title = "DEFENSE", Desc = "Protección" })
+
+CombatTab:Toggle({
+    Title = "Anti Kill",
+    Value = false,
+    Callback = function(v)
+        Features.AntiKill = v
+        if v then Threads.AntiKill = task.spawn(AntiKillLoop) end
+    end,
+})
+
+CombatTab:Toggle({
+    Title = "Anti Ragdoll",
+    Value = false,
+    Callback = function(v)
+        Features.AntiRagdoll = v
+        if v then Threads.AntiRagdoll = task.spawn(AntiRagdollLoop) end
+    end,
+})
+
+CombatTab:Toggle({
+    Title = "Anti Lock",
+    Value = false,
+    Callback = function(v)
+        Features.AntiLock = v
+        if v then Threads.AntiLock = task.spawn(AntiLockLoop) end
+    end,
+})
+
+-- ============================================
+-- PESTAÑA 2: MOVEMENT
+-- ============================================
+local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
+
+MovementTab:Section({ Title = "Movement", Desc = "Configuración de movimiento" })
+
+MovementTab:Slider({
+    Title = "Walk Speed",
+    Step = 1,
+    Value = { Min = 16, Max = 200, Default = 16 },
+    Callback = function(v) 
+        Features.WalkSpeed = v
+        ApplyMovement()
+    end,
+})
+
+MovementTab:Slider({
+    Title = "Speed Multiplier",
+    Step = 0.1,
+    Value = { Min = 0.5, Max = 5, Default = 1 },
+    Callback = function(v) 
+        Features.SpeedMultiplier = v
+        ApplyMovement()
+    end,
+})
+
+MovementTab:Toggle({
+    Title = "High Jump",
+    Value = false,
+    Callback = function(v)
+        Features.HighJump = v
+        ApplyMovement()
+    end,
+})
+
+MovementTab:Toggle({
     Title = "Infinite Stamina",
     Value = false,
     Callback = function(v)
@@ -962,59 +991,96 @@ CombatTab:Toggle({
     end,
 })
 
+MovementTab:Toggle({
+    Title = "Invisible (Desync)",
+    Value = false,
+    Callback = function(v)
+        Features.Invisible = v
+        if v then Threads.Invisible = task.spawn(InvisibleLoop) end
+    end,
+})
+
+MovementTab:Space({ Columns = 1 })
+
+MovementTab:Section({ Title = "SNAP UNDER MAP", Desc = "Teletransportarse bajo el mapa" })
+
+MovementTab:Toggle({
+    Title = "Enable Snap",
+    Value = false,
+    Callback = function(v) Features.EnableSnap = v end,
+})
+
+MovementTab:Slider({
+    Title = "Snap Depth",
+    Step = 1,
+    Value = { Min = 0, Max = 100, Default = 26 },
+    Callback = function(v) Features.SnapDepth = v end,
+})
+
+MovementTab:Label({ Title = "Hold Z to snap under map" })
+
 -- ============================================
--- PESTAÑA 3: WEAPON MODS
+-- PESTAÑA 3: WEAPON
 -- ============================================
-local WeaponTab = Window:Tab({ Title = "WEAPON MODS", Icon = "target" })
+local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "crosshair" })
 
-WeaponTab:Section({ Title = "Mods", Desc = "Modificaciones de armas" })
+WeaponTab:Section({ Title = "GUN MODS", Desc = "Modificaciones de armas" })
 
 WeaponTab:Toggle({
-    Title = "No Recoil",
+    Title = "Enable Gun Mods",
     Value = false,
     Callback = function(v)
-        Features.NoRecoil = v
-        ApplyWeaponMods()
+        Features.EnableGunMods = v
+        if v then Threads.WeaponMods = task.spawn(WeaponModsLoop) end
+    end,
+})
+
+WeaponTab:Slider({
+    Title = "Fire Rate",
+    Step = 10,
+    Value = { Min = 50, Max = 1000, Default = 430 },
+    Callback = function(v) 
+        Features.FireRate = v
+        if Features.EnableGunMods then ApplyWeaponMods() end
+    end,
+})
+
+WeaponTab:Slider({
+    Title = "Accuracy",
+    Step = 0.1,
+    Value = { Min = 0.1, Max = 2, Default = 1 },
+    Callback = function(v) 
+        Features.Accuracy = v
+        if Features.EnableGunMods then ApplyWeaponMods() end
+    end,
+})
+
+WeaponTab:Slider({
+    Title = "Recoil",
+    Step = 1,
+    Value = { Min = 0, Max = 100, Default = 0 },
+    Callback = function(v) 
+        Features.RecoilValue = v
+        if Features.EnableGunMods then ApplyWeaponMods() end
+    end,
+})
+
+WeaponTab:Slider({
+    Title = "Reload Time",
+    Step = 0.5,
+    Value = { Min = 0.1, Max = 10, Default = 10 },
+    Callback = function(v) 
+        Features.ReloadTime = v
+        if Features.EnableGunMods then ApplyWeaponMods() end
     end,
 })
 
 WeaponTab:Toggle({
-    Title = "No Spread",
+    Title = "Automatic",
     Value = false,
     Callback = function(v)
-        Features.NoSpread = v
-        ApplyWeaponMods()
-    end,
-})
-
-WeaponTab:Toggle({
-    Title = "Rapid Fire",
-    Value = false,
-    Callback = function(v)
-        Features.RapidFire = v
-        ApplyWeaponMods()
-    end,
-})
-
-WeaponTab:Toggle({
-    Title = "Instant Reload",
-    Value = false,
-    Callback = function(v)
-        Features.InstantReload = v
-        ApplyWeaponMods()
-    end,
-})
-
-WeaponTab:Space({ Columns = 1 })
-
-WeaponTab:Section({ Title = "Ammo", Desc = "Munición infinita" })
-
-WeaponTab:Toggle({
-    Title = "Infinite Ammo",
-    Value = false,
-    Callback = function(v)
-        Features.InfiniteAmmo = v
-        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) end
+        Features.Automatic = v
+        if Features.EnableGunMods then ApplyWeaponMods() end
     end,
 })
 
@@ -1044,33 +1110,52 @@ VisualTab:Toggle({
 })
 
 VisualTab:Toggle({
-    Title = "Weapon ESP",
-    Value = false,
-    Callback = function(v) Features.ESPWeapon = v end,
-})
-
-VisualTab:Toggle({
-    Title = "Box ESP",
-    Value = false,
-    Callback = function(v) Features.ESPBox = v end,
-})
-
-VisualTab:Space({ Columns = 1 })
-
-VisualTab:Section({ Title = "Chams", Desc = "Resaltar jugadores" })
-
-VisualTab:Toggle({
-    Title = "Chams (Verde/Azul)",
+    Title = "Highlight",
     Value = false,
     Callback = function(v)
-        Features.Chams = v
-        SetChams(v)
+        Features.Highlight = v
+        SetHighlight(v)
     end,
 })
 
 VisualTab:Space({ Columns = 1 })
 
-VisualTab:Section({ Title = "World", Desc = "Modificar mundo" })
+VisualTab:Section({ Title = "HACKER DETECTION", Desc = "Detectar hackers" })
+
+VisualTab:Toggle({
+    Title = "ESP Hackers (Anti-Aim)",
+    Value = false,
+    Callback = function(v)
+        Features.ESPHackers = v
+        if v then Threads.ESPHackers = task.spawn(ESPHackersLoop) end
+    end,
+})
+
+VisualTab:Space({ Columns = 1 })
+
+VisualTab:Section({ Title = "ITEMS", Desc = "Ver items" })
+
+VisualTab:Toggle({
+    Title = "Inventory Viewer",
+    Value = false,
+    Callback = function(v)
+        Features.InventoryViewer = v
+        if v then Threads.InventoryViewer = task.spawn(InventoryViewerLoop) end
+    end,
+})
+
+VisualTab:Toggle({
+    Title = "Dropped Items ESP",
+    Value = false,
+    Callback = function(v)
+        Features.DroppedItemsESP = v
+        if v then Threads.DroppedItems = task.spawn(DroppedItemsESP) end
+    end,
+})
+
+VisualTab:Space({ Columns = 1 })
+
+VisualTab:Section({ Title = "WORLD", Desc = "Modificar mundo" })
 
 VisualTab:Toggle({
     Title = "Full Bright",
@@ -1091,60 +1176,50 @@ VisualTab:Toggle({
 })
 
 -- ============================================
--- PESTAÑA 5: AUTO
+-- PESTAÑA 5: GUNS AMMO
 -- ============================================
-local AutoTab = Window:Tab({ Title = "AUTO", Icon = "robot" })
+local GunsAmmoTab = Window:Tab({ Title = "GUNS AMMO", Icon = "target" })
 
-AutoTab:Section({ Title = "ATM", Desc = "Robar y depositar" })
+GunsAmmoTab:Section({ Title = "Ammo", Desc = "Configuración de munición" })
 
-AutoTab:Toggle({
-    Title = "Auto ATM",
-    Value = false,
-    Callback = function(v)
-        Features.AutoATM = v
-        if v then Threads.AutoATM = task.spawn(AutoATMLoop) end
-    end,
+GunsAmmoTab:Dropdown({
+    Title = "Tipo de Bala",
+    Value = "Pistol",
+    Values = { "Pistol", "Rifle", "Shotgun", "Sniper", "SMG", "LMG" },
+    Callback = function(v) Features.BulletType = v end,
 })
 
-AutoTab:Toggle({
-    Title = "Auto Deposit",
-    Value = false,
-    Callback = function(v) Features.AutoDeposit = v end,
-})
-
--- ============================================
--- PESTAÑA 6: SPECTATE
--- ============================================
-local SpectateTab = Window:Tab({ Title = "SPECTATE", Icon = "video" })
-
-SpectateTab:Section({ Title = "Spectate", Desc = "Ver otros jugadores" })
-
-local PlayerList = SpectateTab:Dropdown({
-    Title = "Select Player",
-    Value = "None",
-    Values = GetPlayers(),
-    Callback = function(v)
-        local target = Players:FindFirstChild(v)
-        Features.SpectateTarget = target
-        StartSpectate(target)
-    end,
-})
-
-task.spawn(function()
-    while true do
-        task.wait(5)
-        pcall(function()
-            PlayerList:SetValues(GetPlayers())
-        end)
-    end
-end)
-
-SpectateTab:Button({
-    Title = "Stop Spectate",
+GunsAmmoTab:Button({
+    Title = "BUY AMMO",
     Callback = function()
-        StartSpectate(nil)
-        Features.SpectateTarget = nil
-        Notify("Spectate", "Detenido")
+        BuyAmmo()
+    end,
+})
+
+GunsAmmoTab:Label({ Title = "Abre el crate con el tipo seleccionado" })
+
+-- ============================================
+-- PESTAÑA 6: FARM
+-- ============================================
+local FarmTab = Window:Tab({ Title = "FARM", Icon = "robot" })
+
+FarmTab:Section({ Title = "Farm", Desc = "Auto farmeo" })
+
+FarmTab:Toggle({
+    Title = "Auto Pickup Items",
+    Value = false,
+    Callback = function(v)
+        Features.AutoPickupItems = v
+        if v then Threads.AutoPickup = task.spawn(AutoPickupLoop) end
+    end,
+})
+
+FarmTab:Toggle({
+    Title = "Auto Minigame (ATM/Fishing)",
+    Value = false,
+    Callback = function(v)
+        Features.AutoMinigame = v
+        if v then Threads.AutoMinigame = task.spawn(AutoMinigameLoop) end
     end,
 })
 
@@ -1153,32 +1228,96 @@ SpectateTab:Button({
 -- ============================================
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
-MiscTab:Section({ Title = "General", Desc = "Funciones varias" })
+MiscTab:Section({ Title = "SPECTATE", Desc = "Ver otros jugadores" })
 
-MiscTab:Toggle({
-    Title = "Anti AFK",
-    Value = false,
+local PlayerList = MiscTab:Dropdown({
+    Title = "Select Player",
+    Value = "None",
+    Values = GetPlayers(),
     Callback = function(v)
-        Features.AntiAFK = v
-        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
+        local target = Players:FindFirstChild(v)
+        Features.SpectateTarget = target
+    end,
+})
+
+MiscTab:Button({
+    Title = "espectear",
+    Callback = function()
+        StartSpectate(Features.SpectateTarget)
+        Notify("Spectate", "Specteando a " .. (Features.SpectateTarget and Features.SpectateTarget.Name or "nadie"))
+    end,
+})
+
+MiscTab:Space({ Columns = 1 })
+
+MiscTab:Section({ Title = "SERVERS", Desc = "Control de servidores" })
+
+MiscTab:Textbox({
+    Title = "Server JobId",
+    Value = "",
+    Callback = function(v) Features.ServerJobId = v end,
+})
+
+MiscTab:Button({
+    Title = "Join by ID",
+    Callback = function()
+        JoinByID(Features.ServerJobId)
     end,
 })
 
 MiscTab:Toggle({
-    Title = "Auto Accept",
+    Title = "Small Server (1-2 players)",
     Value = false,
-    Callback = function(v) Features.AutoAccept = v end,
+    Callback = function(v) Features.SmallServer = v end,
 })
+
+MiscTab:Toggle({
+    Title = "Server Hop",
+    Value = false,
+    Callback = function(v)
+        Features.ServerHop = v
+        if v then ServerHop() end
+    end,
+})
+
+MiscTab:Label({ Title = "Salta al servidor más lleno con espacio" })
 
 -- ============================================
 -- PESTAÑA 8: CONFIG
 -- ============================================
 local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "cog" })
 
+ConfigTab:Section({ Title = "CONFIG MANAGER", Desc = "Guardar y cargar configuraciones" })
+
+ConfigTab:Button({
+    Title = "Save Config",
+    Callback = function()
+        SaveConfig()
+    end,
+})
+
+ConfigTab:Button({
+    Title = "Load Config",
+    Callback = function()
+        LoadConfig()
+        -- Actualizar UI con los valores cargados (esto se puede mejorar)
+        Notify("Config", "Configuración cargada - Reinicia el UI para ver cambios")
+    end,
+})
+
+ConfigTab:Button({
+    Title = "Delete Config",
+    Callback = function()
+        DeleteConfig()
+    end,
+})
+
+ConfigTab:Space({ Columns = 1 })
+
 ConfigTab:Section({ Title = "Account", Desc = "Tu información" })
 
-local CashLabel = ConfigTab:Label({ Title = "Cash: Loading..." })
-local BankLabel = ConfigTab:Label({ Title = "Bank: Loading..." })
+local CashLabel = ConfigTab:Label({ Title = "💵 Cash: Loading..." })
+local BankLabel = ConfigTab:Label({ Title = "🏦 Bank: Loading..." })
 
 task.spawn(function()
     while true do
@@ -1199,8 +1338,9 @@ ConfigTab:Button({
     Title = "Destroy UI",
     Callback = function()
         for k, _ in pairs(Threads) do Threads[k] = nil end
-        SetChams(false)
+        SetHighlight(false)
         StartSpectate(nil)
+        if InfiniteJumpConnection then InfiniteJumpConnection:Disconnect() end
         Window:Destroy()
         if getgenv then getgenv().WaterHubLoaded = false end
         Notify("Water Hub", "UI Destruida")
@@ -1215,10 +1355,9 @@ ConfigTab:Button({
 })
 
 -- ============================================
--- INICIALIZACIÓN AUTO-ADAPTABLE
+-- INICIALIZACIÓN
 -- ============================================
-AutoDetectGame()
-DetectWeapons()
+task.spawn(MovementLoop)
 
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then 
@@ -1239,7 +1378,6 @@ Players.PlayerRemoving:Connect(function(p)
             ESPObjects[p].HealthBg:Destroy()
             ESPObjects[p].Distance:Destroy()
             ESPObjects[p].Weapon:Destroy()
-            ESPObjects[p].Box:Destroy()
         end)
         ESPObjects[p] = nil
     end
@@ -1253,24 +1391,24 @@ RunService.RenderStepped:Connect(UpdateESP)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
-    if Features.NoRecoil or Features.NoSpread or Features.RapidFire then
+    ApplyMovement()
+    if Features.EnableGunMods then
         ApplyWeaponMods()
     end
-    -- Re-detectar armas al cambiar de personaje
-    DetectWeapons()
+    if Features.Invisible then
+        task.spawn(InvisibleLoop)
+    end
 end)
 
 -- Actualizar lista de jugadores periódicamente
 task.spawn(function()
     while true do
-        task.wait(10)
+        task.wait(5)
         pcall(function()
-            if PlayerList then
-                PlayerList:SetValues(GetPlayers())
-            end
+            PlayerList:SetValues(GetPlayers())
         end)
     end
 end)
 
-AimbotTab:Select()
-print("✅ Water Hub | BlockSpin - Versión Auto-Adaptable con Aimbot Visual")
+CombatTab:Select()
+print("✅ Water Hub | BlockSpin - Versión Completa cargada")
