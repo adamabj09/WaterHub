@@ -1,10 +1,6 @@
 --[[
-    WATER HUB | BLOCKSPIN - FINAL EDITION v3.0
-    ✓ Círculo FOV visible y funcional
-    ✓ Silent Aim con aim a la cabeza dentro del FOV
-    ✓ Todas las tabs completas y funcionando
-    ✓ Sin Fly/NoClip (anti-cheat del juego)
-    ✓ Tema Verde/Azul profesional
+    WATER HUB | BLOCKSPIN - VERSION FINAL (VERDE/AZUL)
+    Colores: Verde #00FF88 → Azul #00F2FE
     By: AdamABJ
 --]]
 
@@ -17,7 +13,9 @@ if getgenv then getgenv().WaterHubLoaded = true end
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
@@ -25,7 +23,9 @@ local TeleportService = game:GetService("TeleportService")
 
 local gethui = gethui or function() return CoreGui end
 
+-- ============================================
 -- CARGAR WINDUI
+-- ============================================
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 if not WindUI then
@@ -33,7 +33,9 @@ if not WindUI then
     return
 end
 
+-- ============================================
 -- NOTIFICACIONES
+-- ============================================
 local function Notify(title, message)
     pcall(function()
         WindUI:Notify({
@@ -44,56 +46,59 @@ local function Notify(title, message)
     end)
 end
 
--- VARIABLES
+-- ============================================
+-- VARIABLES Y ESTADO
+-- ============================================
 local Features = {
     SilentAim = false,
-    ShowFOV = false,
     FOV = 200,
     AimPart = "Head",
     AutoHeal = false,
     HealPercent = 70,
     AutoHit = false,
-    ShootingDistance = 1500,
-    
+    HitboxExpander = false,
     SpeedEnabled = false,
     SpeedValue = 50,
     InfiniteJump = false,
-    JumpMode = "Fly Jump",
     InfiniteStamina = false,
-    
-    Automatic = false,
-    FireRate = 1000,
+    NoClip = false,
+    Fly = false,
     NoRecoil = false,
     NoSpread = false,
+    RapidFire = false,
     InstantReload = false,
-    
     ESPName = false,
     ESPHealth = false,
     ESPDistance = false,
     ESPWeapon = false,
     Chams = false,
+    Tracers = false,
     FullBright = false,
     NoFog = false,
-    
+    AutoFarm = false,
+    AutoATM = false,
+    AutoDeposit = false,
+    SelectedJob = "None",
+    InfiniteAmmo = false,
+    NoReload = false,
+    SpectateTarget = nil,
+    Freecam = false,
     AntiAFK = false,
+    AutoAccept = false
 }
 
 local Threads = {}
 local ESPObjects = {}
 local ChamsObjects = {}
+local NoClipConnection = nil
 local SilentAimTarget = nil
 local OldNamecall = nil
+local SpectateConnection = nil
 local InfiniteJumpConnection = nil
-local FOVCircle = nil
 
+-- ============================================
 -- FUNCIONES UTILIDAD
-local function GetEquippedTool(player)
-    local char = player.Character
-    if not char then return nil end
-    local tool = char:FindFirstChildOfClass("Tool")
-    return tool and tool.Name or nil
-end
-
+-- ============================================
 local function GetMoney()
     local cash, bank = 0, 0
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
@@ -106,75 +111,27 @@ local function GetMoney()
     return cash, bank
 end
 
--- FOV CIRCLE
-local function CreateFOVCircle()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "FOVCircle"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    screenGui.Parent = gethui()
-    
-    local circle = Instance.new("Frame")
-    circle.Name = "Circle"
-    circle.BackgroundTransparency = 1
-    circle.BorderSizePixel = 0
-    circle.AnchorPoint = Vector2.new(0.5, 0.5)
-    circle.Position = UDim2.new(0.5, 0, 0.5, 0)
-    circle.Size = UDim2.new(0, Features.FOV * 2, 0, Features.FOV * 2)
-    circle.Visible = false
-    circle.Parent = screenGui
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 255, 136)
-    stroke.Thickness = 2
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    stroke.Parent = circle
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = circle
-    
-    local bg = Instance.new("Frame")
-    bg.Name = "BG"
-    bg.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
-    bg.BackgroundTransparency = 0.9
-    bg.BorderSizePixel = 0
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.Parent = circle
-    
-    local bgCorner = Instance.new("UICorner")
-    bgCorner.CornerRadius = UDim.new(1, 0)
-    bgCorner.Parent = bg
-    
-    local center = Instance.new("Frame")
-    center.Name = "Center"
-    center.BackgroundColor3 = Color3.fromRGB(0, 242, 254)
-    center.BorderSizePixel = 0
-    center.AnchorPoint = Vector2.new(0.5, 0.5)
-    center.Position = UDim2.new(0.5, 0, 0.5, 0)
-    center.Size = UDim2.new(0, 4, 0, 4)
-    center.Parent = circle
-    
-    local centerCorner = Instance.new("UICorner")
-    centerCorner.CornerRadius = UDim.new(1, 0)
-    centerCorner.Parent = center
-    
-    FOVCircle = {Screen = screenGui, Circle = circle, Stroke = stroke}
-    return FOVCircle
+local function GetEquippedTool(player)
+    local char = player.Character
+    if not char then return nil end
+    local tool = char:FindFirstChildOfClass("Tool")
+    return tool and tool.Name or nil
 end
 
-local function UpdateFOV()
-    if not FOVCircle then CreateFOVCircle() end
-    if FOVCircle then
-        FOVCircle.Circle.Size = UDim2.new(0, Features.FOV * 2, 0, Features.FOV * 2)
-        FOVCircle.Circle.Visible = Features.ShowFOV and Features.SilentAim
+local function GetPlayers()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
     end
+    return list
 end
 
--- SILENT AIM
+-- ============================================
+-- COMBAT - SILENT AIM
+-- ============================================
 RunService.RenderStepped:Connect(function()
-    UpdateFOV()
-    
     if not Features.SilentAim then
         SilentAimTarget = nil
         return
@@ -182,35 +139,23 @@ RunService.RenderStepped:Connect(function()
     
     local mouse = LocalPlayer:GetMouse()
     local cam = Workspace.CurrentCamera
-    if not mouse or not cam then 
-        SilentAimTarget = nil
-        return 
-    end
+    if not mouse or not cam then return end
     
-    local screenCenter = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
     local closest = nil
     local shortestDist = Features.FOV
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local targetPart = player.Character:FindFirstChild(Features.AimPart) or player.Character:FindFirstChild("Head")
+            local targetPart = player.Character:FindFirstChild(Features.AimPart) 
+                or player.Character:FindFirstChild("Head")
             local humanoid = player.Character:FindFirstChild("Humanoid")
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             
-            if targetPart and humanoid and humanoid.Health > 0 and hrp then
-                local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if localHRP then
-                    local dist = (hrp.Position - localHRP.Position).Magnitude
-                    if dist > Features.ShootingDistance then continue end
-                end
-                
+            if targetPart and humanoid and humanoid.Health > 0 then
                 local pos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
-                    local screenPos = Vector2.new(pos.X, pos.Y)
-                    local distFromCenter = (screenPos - screenCenter).Magnitude
-                    
-                    if distFromCenter < shortestDist then
-                        shortestDist = distFromCenter
+                    local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
                         closest = player
                     end
                 end
@@ -219,14 +164,6 @@ RunService.RenderStepped:Connect(function()
     end
     
     SilentAimTarget = closest
-    
-    if FOVCircle and Features.ShowFOV then
-        if closest then
-            FOVCircle.Stroke.Color = Color3.fromRGB(255, 50, 50)
-        else
-            FOVCircle.Stroke.Color = Color3.fromRGB(0, 255, 136)
-        end
-    end
 end)
 
 local function SetupSilentAim()
@@ -238,10 +175,11 @@ local function SetupSilentAim()
         
         if Features.SilentAim and method == "FireServer" and SilentAimTarget then
             local name = self.Name:lower()
-            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") or name:find("bullet") then
+            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") then
                 local targetChar = SilentAimTarget.Character
                 if targetChar then
-                    local targetPart = targetChar:FindFirstChild(Features.AimPart) or targetChar:FindFirstChild("Head")
+                    local targetPart = targetChar:FindFirstChild(Features.AimPart) 
+                        or targetChar:FindFirstChild("Head")
                     if targetPart then
                         for i = 1, #args do
                             if typeof(args[i]) == "Vector3" then
@@ -250,9 +188,10 @@ local function SetupSilentAim()
                                 args[i] = CFrame.new(targetPart.Position)
                             elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
                                 args[i] = targetPart
-                            elseif typeof(args[i]) == "Player" then
-                                args[i] = SilentAimTarget
                             end
+                        end
+                        if #args > 0 and typeof(args[1]) == "Instance" and args[1]:IsA("Player") then
+                            args[1] = SilentAimTarget
                         end
                     end
                 end
@@ -263,50 +202,76 @@ local function SetupSilentAim()
     end)
 end
 
--- AUTO HEAL/HIT
+-- Hitbox Expander
+local function SetHitboxExpanded(enabled)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if enabled then
+                    hrp.Size = Vector3.new(10, 10, 10)
+                    hrp.Transparency = 0.7
+                    hrp.CanCollide = false
+                else
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
+                end
+            end
+        end
+    end
+end
+
+-- Auto Heal
 local function AutoHealLoop()
     while Features.AutoHeal do
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum and hum.Health > 0 then
-                    local healthPercent = (hum.Health / hum.MaxHealth) * 100
-                    if healthPercent < Features.HealPercent then
-                        hum.Health = hum.MaxHealth
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                local healthPercent = (hum.Health / hum.MaxHealth) * 100
+                if healthPercent < Features.HealPercent then
+                    local backpack = LocalPlayer:FindFirstChild("Backpack")
+                    if backpack then
+                        local medkit = backpack:FindFirstChild("Medkit") or backpack:FindFirstChild("Bandage")
+                        if medkit then
+                            hum.Health = hum.MaxHealth
+                        end
                     end
                 end
             end
-        end)
+        end
         task.wait(0.5)
     end
 end
 
+-- Auto Hit
 local function AutoHitLoop()
     while Features.AutoHit do
-        pcall(function()
-            if SilentAimTarget and SilentAimTarget.Character then
-                local char = LocalPlayer.Character
-                if char then
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    if tool then tool:Activate() end
+        if SilentAimTarget then
+            local char = LocalPlayer.Character
+            if char then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    pcall(function() tool:Activate() end)
                 end
             end
-        end)
-        task.wait(0.1)
+        end
+        task.wait(0.2)
     end
 end
 
+-- ============================================
 -- MOVEMENT
+-- ============================================
 local function SpeedLoop()
     while Features.SpeedEnabled do
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then hum.WalkSpeed = Features.SpeedValue end
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                hum.WalkSpeed = Features.SpeedValue
             end
-        end)
+        end
         task.wait(0.1)
     end
     local char = LocalPlayer.Character
@@ -324,62 +289,151 @@ local function SetupInfiniteJump()
     
     if Features.InfiniteJump then
         InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChild("Humanoid")
-                    if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
-            end)
+            end
         end)
     end
 end
 
 local function InfiniteStaminaLoop()
     while Features.InfiniteStamina do
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum:SetAttribute("Stamina", 100)
-                    local staminaVal = char:FindFirstChild("Stamina")
-                    if staminaVal then staminaVal.Value = 100 end
-                end
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                pcall(function() hum:SetAttribute("Stamina", 100) end)
+                local staminaVal = char:FindFirstChild("Stamina")
+                if staminaVal then staminaVal.Value = 100 end
             end
-        end)
+            local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
+            if staminaPlayer then staminaPlayer.Value = 100 end
+        end
         task.wait(0.2)
     end
 end
 
--- WEAPON MODS
-local function ApplyWeaponMods()
-    pcall(function()
+local function SetNoClip(enabled)
+    if enabled then
+        if NoClipConnection then return end
+        NoClipConnection = RunService.Stepped:Connect(function()
+            if not Features.NoClip then return end
+            local char = LocalPlayer.Character
+            if not char then return end
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    else
+        if NoClipConnection then
+            NoClipConnection:Disconnect()
+            NoClipConnection = nil
+        end
         local char = LocalPlayer.Character
-        if not char then return end
-        
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Tool") then
-                if Features.NoRecoil then
-                    local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
-                    if recoil then recoil.Value = 0 end
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
                 end
-                if Features.NoSpread then
-                    local spread = obj:FindFirstChild("Spread") or obj:FindFirstChild("SpreadValue")
-                    if spread then spread.Value = 0 end
-                end
-                if Features.Automatic then
-                    local auto = obj:FindFirstChild("Automatic")
-                    if auto then auto.Value = true end
-                end
-                local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
-                if fireRate then fireRate.Value = 60 / Features.FireRate end
             end
         end
-    end)
+    end
 end
 
--- ESP
+-- Fly
+local function FlyLoop()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local speed = 50
+    local keys = {W = false, A = false, S = false, D = false, Space = false, LeftShift = false}
+    
+    local connections = {}
+    
+    connections.KeyDown = UserInputService.InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.W then keys.W = true end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = true end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = true end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = true end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = true end
+        if input.KeyCode == Enum.KeyCode.LeftShift then keys.LeftShift = true end
+    end)
+    
+    connections.KeyUp = UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.W then keys.W = false end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = false end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = false end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = false end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = false end
+        if input.KeyCode == Enum.KeyCode.LeftShift then keys.LeftShift = false end
+    end)
+    
+    while Features.Fly do
+        local cam = Workspace.CurrentCamera
+        local direction = Vector3.new(0, 0, 0)
+        
+        if keys.W then direction = direction + cam.CFrame.LookVector end
+        if keys.S then direction = direction - cam.CFrame.LookVector end
+        if keys.A then direction = direction - cam.CFrame.RightVector end
+        if keys.D then direction = direction + cam.CFrame.RightVector end
+        if keys.Space then direction = direction + Vector3.new(0, 1, 0) end
+        if keys.LeftShift then direction = direction - Vector3.new(0, 1, 0) end
+        
+        if direction.Magnitude > 0 then
+            direction = direction.Unit * speed
+            hrp.Velocity = direction
+        else
+            hrp.Velocity = Vector3.new(0, 0, 0)
+        end
+        
+        task.wait()
+    end
+    
+    for _, conn in pairs(connections) do
+        conn:Disconnect()
+    end
+end
+
+-- ============================================
+-- WEAPON MODS
+-- ============================================
+local function ApplyWeaponMods()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    for _, obj in ipairs(char:GetDescendants()) do
+        if obj:IsA("Tool") then
+            if Features.NoRecoil then
+                local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
+                if recoil then recoil.Value = 0 end
+            end
+            if Features.NoSpread then
+                local spread = obj:FindFirstChild("Spread") or obj:FindFirstChild("SpreadValue")
+                if spread then spread.Value = 0 end
+            end
+            if Features.RapidFire then
+                local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
+                if fireRate then fireRate.Value = 0.01 end
+            end
+            if Features.InstantReload then
+                local reload = obj:FindFirstChild("ReloadTime")
+                if reload then reload.Value = 0.01 end
+            end
+        end
+    end
+end
+
+-- ============================================
+-- VISUAL - ESP
+-- ============================================
 local ESPGui = nil
 
 local function GetESPGui()
@@ -414,14 +468,14 @@ local function CreateESP(player)
     
     esp.HealthBar = Instance.new("Frame")
     esp.HealthBar.Size = UDim2.new(1, 0, 1, 0)
-    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 100) -- Verde neón
     esp.HealthBar.BorderSizePixel = 0
     esp.HealthBar.Parent = esp.HealthBg
     
     esp.Distance = Instance.new("TextLabel")
     esp.Distance.Size = UDim2.new(0, 100, 0, 15)
     esp.Distance.BackgroundTransparency = 1
-    esp.Distance.TextColor3 = Color3.fromRGB(0, 242, 254)
+    esp.Distance.TextColor3 = Color3.fromRGB(0, 242, 254) -- Azul claro
     esp.Distance.TextSize = 10
     esp.Distance.Font = Enum.Font.Gotham
     esp.Distance.Parent = gui
@@ -429,7 +483,7 @@ local function CreateESP(player)
     esp.Weapon = Instance.new("TextLabel")
     esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
     esp.Weapon.BackgroundTransparency = 1
-    esp.Weapon.TextColor3 = Color3.fromRGB(0, 255, 150)
+    esp.Weapon.TextColor3 = Color3.fromRGB(0, 255, 150) -- Verde-azul
     esp.Weapon.TextSize = 10
     esp.Weapon.Font = Enum.Font.GothamBold
     esp.Weapon.Parent = gui
@@ -447,7 +501,7 @@ local function UpdateESP()
     if myPos then myPos = myPos.Position end
     
     for player, esp in pairs(ESPObjects) do
-        pcall(function()
+        local success = pcall(function()
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
@@ -514,27 +568,25 @@ local function UpdateESP()
     end
 end
 
--- CHAMS
+-- Chams
 local function SetChams(enabled)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if enabled then
                 if not ChamsObjects[player] then
-                    pcall(function()
-                        local highlight = Instance.new("Highlight")
-                        highlight.Name = "Chams"
-                        highlight.FillColor = Color3.fromRGB(0, 255, 100)
-                        highlight.OutlineColor = Color3.fromRGB(0, 242, 254)
-                        highlight.FillTransparency = 0.5
-                        highlight.OutlineTransparency = 0
-                        highlight.Adornee = player.Character
-                        highlight.Parent = player.Character
-                        ChamsObjects[player] = highlight
-                    end)
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "Chams"
+                    highlight.FillColor = Color3.fromRGB(0, 255, 100) -- Verde
+                    highlight.OutlineColor = Color3.fromRGB(0, 242, 254) -- Azul borde
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineTransparency = 0
+                    highlight.Adornee = player.Character
+                    highlight.Parent = player.Character
+                    ChamsObjects[player] = highlight
                 end
             else
                 if ChamsObjects[player] then
-                    pcall(function() ChamsObjects[player]:Destroy() end)
+                    ChamsObjects[player]:Destroy()
                     ChamsObjects[player] = nil
                 end
             end
@@ -542,7 +594,7 @@ local function SetChams(enabled)
     end
 end
 
--- LIGHTING
+-- Full Bright / No Fog
 local function SetFullBright(enabled)
     if enabled then
         Lighting.Brightness = 10
@@ -563,20 +615,104 @@ local function SetNoFog(enabled)
     end
 end
 
--- ANTI AFK
+-- ============================================
+-- AUTOFARM
+-- ============================================
+local function AutoFarmLoop()
+    while Features.AutoFarm do
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and Features.SelectedJob == "Cleaner" then
+                for _, part in ipairs(Workspace:GetDescendants()) do
+                    if part.Name:find("Puddle") or part.Name:find("Mess") then
+                        if (part.Position - char.HumanoidRootPart.Position).Magnitude < 50 then
+                            firetouchinterest(char.HumanoidRootPart, part, 0)
+                            firetouchinterest(char.HumanoidRootPart, part, 1)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+local function AutoATMLoop()
+    while Features.AutoATM do
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            for _, atm in ipairs(Workspace:GetDescendants()) do
+                if atm.Name:find("ATM") and atm:FindFirstChild("ClickDetector") then
+                    local dist = (atm.Position - char.HumanoidRootPart.Position).Magnitude
+                    if dist < 10 then
+                        fireclickdetector(atm.ClickDetector)
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
+
+-- ============================================
+-- GUNS AMMO
+-- ============================================
+local function InfiniteAmmoLoop()
+    while Features.InfiniteAmmo do
+        local char = LocalPlayer.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Clip")
+                if ammo and ammo:IsA("IntValue") then
+                    ammo.Value = 999
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- ============================================
+-- SPECTATE
+-- ============================================
+local function StartSpectate(targetPlayer)
+    if SpectateConnection then
+        SpectateConnection:Disconnect()
+        SpectateConnection = nil
+    end
+    
+    if not targetPlayer then
+        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character
+        return
+    end
+    
+    SpectateConnection = RunService.RenderStepped:Connect(function()
+        if targetPlayer and targetPlayer.Character then
+            Workspace.CurrentCamera.CameraSubject = targetPlayer.Character:FindFirstChild("Humanoid") or targetPlayer.Character
+        else
+            Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character
+        end
+    end)
+end
+
+-- ============================================
+-- MISC
+-- ============================================
 local function AntiAFKLoop()
     while Features.AntiAFK do
-        pcall(function()
-            local vu = game:GetService("VirtualUser")
-            vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-            task.wait(1)
-            vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        end)
+        local vu = game:GetService("VirtualUser")
+        vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
         task.wait(60)
     end
 end
 
--- WINDOW
+-- ============================================
+-- VENTANA PRINCIPAL - COLORES VERDE Y AZUL
+-- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
@@ -586,6 +722,7 @@ local Window = WindUI:CreateWindow({
     Transparent = true,
     ToggleKey = Enum.KeyCode.F,
     Acrylic = false,
+    -- BOTÓN FLOTANTE CON COLORES VERDE → AZUL
     OpenButton = {
         Title = "Open Water Hub",
         CornerRadius = UDim.new(1, 0),
@@ -594,29 +731,33 @@ local Window = WindUI:CreateWindow({
         Draggable = true,
         OnlyMobile = false,
         Scale = 0.5,
+        -- DEGRADADO VERDE A AZUL (Principal)
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromHex("#00FF88")),
-            ColorSequenceKeypoint.new(0.5, Color3.fromHex("#00E5FF")),
-            ColorSequenceKeypoint.new(1, Color3.fromHex("#00B0FF"))
+            ColorSequenceKeypoint.new(0, Color3.fromHex("#00FF88")),   -- Verde neón
+            ColorSequenceKeypoint.new(0.5, Color3.fromHex("#00E5FF")),   -- Cyan
+            ColorSequenceKeypoint.new(1, Color3.fromHex("#00B0FF"))    -- Azul
         }),
     },
 })
 
+-- Tag con colores verde/azul
 Window:Tag({ 
-    Title = "v3.0 | FOV Edition", 
-    Icon = "target", 
+    Title = "v2.0 | Green Edition", 
+    Icon = "leaf", 
     Color = Color3.fromHex("#00FF88"), 
     Border = true 
 })
 
-Notify("Water Hub", "✓ Script cargado correctamente")
+Notify("Water Hub", "Script cargado - Tema Verde/Azul activado")
 
--- TABS
+-- ============================================
+-- PESTAÑAS
+-- ============================================
 
--- COMBAT TAB
-local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "target" })
+-- 1. COMBAT
+local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "sword" })
 
-CombatTab:Section({ Title = "Aimbot", Desc = "Silent Aim con FOV" })
+CombatTab:Section({ Title = "Aimbot", Desc = "Apuntado automatico" })
 
 CombatTab:Toggle({
     Title = "Silent Aim",
@@ -624,32 +765,15 @@ CombatTab:Toggle({
     Callback = function(v)
         Features.SilentAim = v
         if v then SetupSilentAim() end
-        UpdateFOV()
-        Notify("Silent Aim", v and "✓ ON" or "✗ OFF")
-    end,
-})
-
-CombatTab:Toggle({
-    Title = "Show FOV Circle",
-    Value = false,
-    Callback = function(v)
-        Features.ShowFOV = v
-        UpdateFOV()
+        Notify("Silent Aim", v and "Activado" or "Desactivado")
     end,
 })
 
 CombatTab:Slider({
-    Title = "FOV Size",
+    Title = "FOV",
     Step = 10,
-    Value = { Min = 50, Max = 400, Default = 200 },
-    Callback = function(v) Features.FOV = v UpdateFOV() end,
-})
-
-CombatTab:Slider({
-    Title = "Shooting Distance",
-    Step = 100,
-    Value = { Min = 100, Max = 3000, Default = 1500 },
-    Callback = function(v) Features.ShootingDistance = v end,
+    Value = { Min = 50, Max = 500, Default = 200 },
+    Callback = function(v) Features.FOV = v end,
 })
 
 CombatTab:Dropdown({
@@ -661,7 +785,7 @@ CombatTab:Dropdown({
 
 CombatTab:Space({ Columns = 1 })
 
-CombatTab:Section({ Title = "Auto Combat", Desc = "Automatización" })
+CombatTab:Section({ Title = "Auto", Desc = "Funciones automaticas" })
 
 CombatTab:Toggle({
     Title = "Auto Heal",
@@ -669,7 +793,6 @@ CombatTab:Toggle({
     Callback = function(v)
         Features.AutoHeal = v
         if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
-        Notify("Auto Heal", v and "✓ ON" or "✗ OFF")
     end,
 })
 
@@ -686,14 +809,22 @@ CombatTab:Toggle({
     Callback = function(v)
         Features.AutoHit = v
         if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
-        Notify("Auto Hit", v and "✓ ON" or "✗ OFF")
     end,
 })
 
--- MOVEMENT TAB
+CombatTab:Toggle({
+    Title = "Hitbox Expander",
+    Value = false,
+    Callback = function(v)
+        Features.HitboxExpander = v
+        SetHitboxExpanded(v)
+    end,
+})
+
+-- 2. MOVEMENT
 local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
 
-MovementTab:Section({ Title = "Speed", Desc = "Velocidad" })
+MovementTab:Section({ Title = "Speed", Desc = "Velocidad de movimiento" })
 
 MovementTab:Toggle({
     Title = "Speed Hack",
@@ -701,12 +832,11 @@ MovementTab:Toggle({
     Callback = function(v)
         Features.SpeedEnabled = v
         if v then Threads.Speed = task.spawn(SpeedLoop) end
-        Notify("Speed", v and "✓ ON" or "✗ OFF")
     end,
 })
 
 MovementTab:Slider({
-    Title = "Speed Value",
+    Title = "Speed",
     Step = 5,
     Value = { Min = 16, Max = 200, Default = 50 },
     Callback = function(v) Features.SpeedValue = v end,
@@ -714,7 +844,7 @@ MovementTab:Slider({
 
 MovementTab:Space({ Columns = 1 })
 
-MovementTab:Section({ Title = "Jump & Stamina", Desc = "Salto y energía" })
+MovementTab:Section({ Title = "Extras", Desc = "Otras funciones" })
 
 MovementTab:Toggle({
     Title = "Infinite Jump",
@@ -722,15 +852,7 @@ MovementTab:Toggle({
     Callback = function(v)
         Features.InfiniteJump = v
         SetupInfiniteJump()
-        Notify("Infinite Jump", v and "✓ ON" or "✗ OFF")
     end,
-})
-
-MovementTab:Dropdown({
-    Title = "Jump Mode",
-    Value = "Fly Jump",
-    Values = { "Fly Jump", "Normal" },
-    Callback = function(v) Features.JumpMode = v end,
 })
 
 MovementTab:Toggle({
@@ -739,14 +861,31 @@ MovementTab:Toggle({
     Callback = function(v)
         Features.InfiniteStamina = v
         if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
-        Notify("Infinite Stamina", v and "✓ ON" or "✗ OFF")
     end,
 })
 
--- WEAPON TAB
+MovementTab:Toggle({
+    Title = "No Clip",
+    Value = false,
+    Callback = function(v)
+        Features.NoClip = v
+        SetNoClip(v)
+    end,
+})
+
+MovementTab:Toggle({
+    Title = "Fly",
+    Value = false,
+    Callback = function(v)
+        Features.Fly = v
+        if v then Threads.Fly = task.spawn(FlyLoop) end
+    end,
+})
+
+-- 3. WEAPON
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "crosshair" })
 
-WeaponTab:Section({ Title = "Weapon Mods", Desc = "Modificaciones" })
+WeaponTab:Section({ Title = "Mods", Desc = "Modificaciones de armas" })
 
 WeaponTab:Toggle({
     Title = "No Recoil",
@@ -754,7 +893,6 @@ WeaponTab:Toggle({
     Callback = function(v)
         Features.NoRecoil = v
         ApplyWeaponMods()
-        Notify("No Recoil", v and "✓ ON" or "✗ OFF")
     end,
 })
 
@@ -764,28 +902,28 @@ WeaponTab:Toggle({
     Callback = function(v)
         Features.NoSpread = v
         ApplyWeaponMods()
-        Notify("No Spread", v and "✓ ON" or "✗ OFF")
     end,
 })
 
 WeaponTab:Toggle({
-    Title = "Automatic",
+    Title = "Rapid Fire",
     Value = false,
     Callback = function(v)
-        Features.Automatic = v
+        Features.RapidFire = v
         ApplyWeaponMods()
-        Notify("Automatic", v and "✓ ON" or "✗ OFF")
     end,
 })
 
-WeaponTab:Slider({
-    Title = "Fire Rate (RPM)",
-    Step = 50,
-    Value = { Min = 100, Max = 3000, Default = 1000 },
-    Callback = function(v) Features.FireRate = v ApplyWeaponMods() end,
+WeaponTab:Toggle({
+    Title = "Instant Reload",
+    Value = false,
+    Callback = function(v)
+        Features.InstantReload = v
+        ApplyWeaponMods()
+    end,
 })
 
--- VISUAL TAB
+-- 4. VISUAL
 local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "eye" })
 
 VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores" })
@@ -793,56 +931,43 @@ VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores" })
 VisualTab:Toggle({
     Title = "Name ESP",
     Value = false,
-    Callback = function(v)
-        Features.ESPName = v
-        Notify("Name ESP", v and "✓ ON" or "✗ OFF")
-    end,
+    Callback = function(v) Features.ESPName = v end,
 })
 
 VisualTab:Toggle({
     Title = "Health ESP",
     Value = false,
-    Callback = function(v)
-        Features.ESPHealth = v
-        Notify("Health ESP", v and "✓ ON" or "✗ OFF")
-    end,
+    Callback = function(v) Features.ESPHealth = v end,
 })
 
 VisualTab:Toggle({
     Title = "Distance ESP",
     Value = false,
-    Callback = function(v)
-        Features.ESPDistance = v
-        Notify("Distance ESP", v and "✓ ON" or "✗ OFF")
-    end,
+    Callback = function(v) Features.ESPDistance = v end,
 })
 
 VisualTab:Toggle({
     Title = "Weapon ESP",
     Value = false,
-    Callback = function(v)
-        Features.ESPWeapon = v
-        Notify("Weapon ESP", v and "✓ ON" or "✗ OFF")
-    end,
+    Callback = function(v) Features.ESPWeapon = v end,
 })
 
 VisualTab:Space({ Columns = 1 })
 
-VisualTab:Section({ Title = "Chams", Desc = "Resaltar" })
+VisualTab:Section({ Title = "Chams", Desc = "Resaltar jugadores" })
 
 VisualTab:Toggle({
-    Title = "Chams",
+    Title = "Chams (Verde/Azul)",
     Value = false,
     Callback = function(v)
         Features.Chams = v
         SetChams(v)
-        Notify("Chams", v and "✓ ON" or "✗ OFF")
     end,
 })
 
 VisualTab:Space({ Columns = 1 })
 
-VisualTab:Section({ Title = "World", Desc = "Mundo" })
+VisualTab:Section({ Title = "World", Desc = "Modificar mundo" })
 
 VisualTab:Toggle({
     Title = "Full Bright",
@@ -850,7 +975,6 @@ VisualTab:Toggle({
     Callback = function(v)
         Features.FullBright = v
         SetFullBright(v)
-        Notify("Full Bright", v and "✓ ON" or "✗ OFF")
     end,
 })
 
@@ -860,14 +984,120 @@ VisualTab:Toggle({
     Callback = function(v)
         Features.NoFog = v
         SetNoFog(v)
-        Notify("No Fog", v and "✓ ON" or "✗ OFF")
     end,
 })
 
--- MISC TAB
+-- 5. AUTOFARM
+local AutoFarmTab = Window:Tab({ Title = "AUTOFARM", Icon = "robot" })
+
+AutoFarmTab:Section({ Title = "Farm", Desc = "Farmear automaticamente" })
+
+AutoFarmTab:Toggle({
+    Title = "Auto Farm Job",
+    Value = false,
+    Callback = function(v)
+        Features.AutoFarm = v
+        if v then Threads.AutoFarm = task.spawn(AutoFarmLoop) end
+    end,
+})
+
+AutoFarmTab:Dropdown({
+    Title = "Job",
+    Value = "None",
+    Values = { "None", "Cleaner", "Pizza", "Delivery" },
+    Callback = function(v) Features.SelectedJob = v end,
+})
+
+AutoFarmTab:Space({ Columns = 1 })
+
+AutoFarmTab:Section({ Title = "ATM", Desc = "Robar y depositar" })
+
+AutoFarmTab:Toggle({
+    Title = "Auto ATM",
+    Value = false,
+    Callback = function(v)
+        Features.AutoATM = v
+        if v then Threads.AutoATM = task.spawn(AutoATMLoop) end
+    end,
+})
+
+AutoFarmTab:Toggle({
+    Title = "Auto Deposit",
+    Value = false,
+    Callback = function(v)
+        Features.AutoDeposit = v
+    end,
+})
+
+-- 6. GUNS AMMO
+local GunsAmmoTab = Window:Tab({ Title = "GUNS AMMO", Icon = "target" })
+
+GunsAmmoTab:Section({ Title = "Ammo", Desc = "Municion infinita" })
+
+GunsAmmoTab:Toggle({
+    Title = "Infinite Ammo",
+    Value = false,
+    Callback = function(v)
+        Features.InfiniteAmmo = v
+        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) end
+    end,
+})
+
+GunsAmmoTab:Toggle({
+    Title = "No Reload",
+    Value = false,
+    Callback = function(v) Features.NoReload = v end,
+})
+
+-- 7. SPECTATE
+local SpectateTab = Window:Tab({ Title = "SPECTATE", Icon = "video" })
+
+SpectateTab:Section({ Title = "Spectate", Desc = "Ver otros jugadores" })
+
+local PlayerList = SpectateTab:Dropdown({
+    Title = "Select Player",
+    Value = "None",
+    Values = GetPlayers(),
+    Callback = function(v)
+        local target = Players:FindFirstChild(v)
+        Features.SpectateTarget = target
+        StartSpectate(target)
+    end,
+})
+
+task.spawn(function()
+    while true do
+        task.wait(5)
+        pcall(function()
+            PlayerList:SetValues(GetPlayers())
+        end)
+    end
+end)
+
+SpectateTab:Button({
+    Title = "Stop Spectate",
+    Callback = function()
+        StartSpectate(nil)
+        Features.SpectateTarget = nil
+    end,
+})
+
+SpectateTab:Space({ Columns = 1 })
+
+SpectateTab:Section({ Title = "Freecam", Desc = "Camara libre" })
+
+SpectateTab:Toggle({
+    Title = "Freecam",
+    Value = false,
+    Callback = function(v)
+        Features.Freecam = v
+    end,
+})
+
+-- 8. MISC
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
-MiscTab:Section({ Title = "General", Desc = "Funciones" })
+MiscTab:Section({ Title = "General", Desc = "Funciones varias" })
 
 MiscTab:Toggle({
     Title = "Anti AFK",
@@ -875,16 +1105,22 @@ MiscTab:Toggle({
     Callback = function(v)
         Features.AntiAFK = v
         if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
-        Notify("Anti AFK", v and "✓ ON" or "✗ OFF")
     end,
 })
 
-MiscTab:Space({ Columns = 1 })
+MiscTab:Toggle({
+    Title = "Auto Accept",
+    Value = false,
+    Callback = function(v) Features.AutoAccept = v end,
+})
 
-MiscTab:Section({ Title = "Account Info", Desc = "Tu cuenta" })
+-- 9. CONFIG
+local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "cog" })
 
-local CashLabel = MiscTab:Label({ Title = "💵 Cash: Loading..." })
-local BankLabel = MiscTab:Label({ Title = "🏦 Bank: Loading..." })
+ConfigTab:Section({ Title = "Account", Desc = "Tu informacion" })
+
+local CashLabel = ConfigTab:Label({ Title = "Cash: Loading..." })
+local BankLabel = ConfigTab:Label({ Title = "Bank: Loading..." })
 
 task.spawn(function()
     while true do
@@ -893,60 +1129,42 @@ task.spawn(function()
             CashLabel:Set("💵 Cash: $" .. cash)
             BankLabel:Set("🏦 Bank: $" .. bank)
         end)
-        task.wait(2)
+        task.wait(1)
     end
 end)
 
-MiscTab:Space({ Columns = 1 })
+ConfigTab:Space({ Columns = 1 })
 
-MiscTab:Section({ Title = "Script", Desc = "Control" })
+ConfigTab:Section({ Title = "Script", Desc = "Control del script" })
 
-MiscTab:Button({
+ConfigTab:Button({
     Title = "Destroy UI",
     Callback = function()
-        Features.SilentAim = false
-        Features.ShowFOV = false
-        Features.SpeedEnabled = false
-        Features.AutoHeal = false
-        Features.AutoHit = false
-        Features.InfiniteJump = false
-        Features.InfiniteStamina = false
-        Features.Chams = false
-        Features.FullBright = false
-        Features.NoFog = false
-        Features.AntiAFK = false
-        
+        for k, _ in pairs(Threads) do Threads[k] = nil end
         SetChams(false)
-        SetNoFog(false)
-        SetFullBright(false)
-        
+        SetNoClip(false)
+        StartSpectate(nil)
         if InfiniteJumpConnection then InfiniteJumpConnection:Disconnect() end
-        if FOVCircle then FOVCircle.Screen:Destroy() end
-        if ESPGui then ESPGui:Destroy() end
-        
         Window:Destroy()
         if getgenv then getgenv().WaterHubLoaded = false end
-        Notify("Water Hub", "✓ Destruido")
     end,
 })
 
-MiscTab:Button({
+ConfigTab:Button({
     Title = "Rejoin Server",
     Callback = function()
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end,
 })
 
--- INICIALIZACIÓN
+-- ============================================
+-- INICIALIZACION
+-- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then CreateESP(player) end
 end
 
-Players.PlayerAdded:Connect(function(p) 
-    task.wait(0.2)
-    if p ~= LocalPlayer then CreateESP(p) end 
-end)
-
+Players.PlayerAdded:Connect(function(p) if p ~= LocalPlayer then CreateESP(p) end end)
 Players.PlayerRemoving:Connect(function(p)
     if ESPObjects[p] then
         pcall(function()
@@ -958,7 +1176,7 @@ Players.PlayerRemoving:Connect(function(p)
         ESPObjects[p] = nil
     end
     if ChamsObjects[p] then
-        pcall(function() ChamsObjects[p]:Destroy() end)
+        ChamsObjects[p]:Destroy()
         ChamsObjects[p] = nil
     end
 end)
@@ -971,10 +1189,15 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         local hum = char:FindFirstChild("Humanoid")
         if hum then hum.WalkSpeed = Features.SpeedValue end
     end
-    if Features.NoRecoil or Features.NoSpread or Features.Automatic then
+    if Features.NoClip then
+        SetNoClip(false)
+        task.wait(0.1)
+        SetNoClip(true)
+    end
+    if Features.NoRecoil or Features.NoSpread or Features.RapidFire then
         ApplyWeaponMods()
     end
 end)
 
 CombatTab:Select()
-print("✅ Water Hub v3.0 - FUNCIONAL")
+print("✅ Water Hub | BlockSpin - Tema Verde/Azul cargado")
