@@ -1,6 +1,6 @@
 --[[
     WATER HUB | BLOCKSPIN - VERSIÓN DELTA FINAL
-    Librería WindUI Oficial - Corregida
+    UI Nativa (Sin dependencias externas)
     By: AdamABJ
 --]]
 
@@ -22,35 +22,7 @@ local StarterGui = game:GetService("StarterGui")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
--- ============================================
--- CARGAR WINDUI - VERSIÓN FUNCIONAL
--- ============================================
-local WindUI
-
-print("⏳ Cargando WindUI...")
-
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
-
-if not ok then
-    warn("❌ Error cargando WindUI: " .. tostring(result))
-    getgenv().WaterHubLoaded = false
-    return
-end
-
-WindUI = result
-
-if not WindUI then
-    warn("❌ WindUI es nil después de cargar")
-    getgenv().WaterHubLoaded = false
-    return
-end
-
-print("✅ WindUI Cargado Correctamente")
-
--- Esperar a que esté completamente listo
-task.wait(0.5)
+print("✅ Water Hub iniciando...")
 
 -- ============================================
 -- REMOTES
@@ -72,26 +44,10 @@ local WeaponImages = {
     ["AUG"] = "rbxassetid://83729841153733",
     ["AWP"] = "rbxassetid://126356167274927",
     ["Anaconda"] = "rbxassetid://121547020534134",
-    ["Bizon"] = "rbxassetid://0",
-    ["C9"] = "rbxassetid://79659079988022",
-    ["Crossbow"] = "rbxassetid://89240642376715",
-    ["Double Barrel"] = "rbxassetid://83625765638039",
-    ["Draco"] = "rbxassetid://120937616266903",
-    ["Firework Launcher"] = "rbxassetid://88284317820274",
-    ["G3"] = "rbxassetid://133411291398002",
     ["Glock"] = "rbxassetid://97846154366870",
-    ["Hunting Rifle"] = "rbxassetid://81547704965153",
-    ["M16"] = "rbxassetid://74321352408872",
-    ["M24"] = "rbxassetid://73387965982603",
-    ["M249"] = "rbxassetid://80044343904275",
     ["MP5"] = "rbxassetid://80501079489777",
-    ["P226"] = "rbxassetid://92521100297776",
-    ["P90"] = "rbxassetid://110565990980804",
+    ["M24"] = "rbxassetid://73387965982603",
     ["RPG"] = "rbxassetid://138426000142807",
-    ["Remington"] = "rbxassetid://101271375930409",
-    ["Sawnoff"] = "rbxassetid://90588305892707",
-    ["Skorpion"] = "rbxassetid://105318377951686",
-    ["Uzi"] = "rbxassetid://109290695652338",
 }
 
 local function GetEquippedWeapon(player)
@@ -191,7 +147,7 @@ local function UpdateAllChams()
 end
 
 -- ============================================
--- SILENT AIM (OPTIMIZADO)
+-- SILENT AIM
 -- ============================================
 local function UpdateSilentAim()
     if not Settings.SilentAim then 
@@ -297,7 +253,7 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- SPEED (CORREGIDO)
+-- SPEED
 -- ============================================
 local function ApplySpeed()
     if not Settings.SpeedEnabled then return end
@@ -324,7 +280,7 @@ local function SpeedLoop()
 end
 
 -- ============================================
--- INFINITE JUMP (CORREGIDO)
+-- INFINITE JUMP
 -- ============================================
 local InfiniteJumpConnection = nil
 
@@ -348,33 +304,23 @@ local function SetupInfiniteJump()
 end
 
 -- ============================================
--- INFINITE STAMINA (CORREGIDO)
+-- INFINITE STAMINA
 -- ============================================
 local function InfiniteStaminaLoop()
     while Settings.InfiniteStamina do
         task.wait(0.1)
-        
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
             if hum then
                 pcall(function() hum:SetAttribute("Stamina", 100) end)
-                local staminaVal = char:FindFirstChild("Stamina")
-                if staminaVal then
-                    staminaVal.Value = 100
-                end
-            end
-            
-            local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
-            if staminaPlayer then
-                staminaPlayer.Value = 100
             end
         end
     end
 end
 
 -- ============================================
--- WEAPON MODS (CORREGIDO)
+-- WEAPON MODS
 -- ============================================
 local WeaponModsRunning = false
 
@@ -463,18 +409,6 @@ local function CreateESP(player)
     esp.Distance.TextSize = 10
     esp.Distance.Parent = gui
     
-    esp.Weapon = Instance.new("TextLabel")
-    esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
-    esp.Weapon.BackgroundTransparency = 1
-    esp.Weapon.TextColor3 = Color3.fromRGB(255,200,100)
-    esp.Weapon.TextSize = 10
-    esp.Weapon.Parent = gui
-    
-    esp.WeaponIcon = Instance.new("ImageLabel")
-    esp.WeaponIcon.Size = UDim2.new(0, 30, 0, 30)
-    esp.WeaponIcon.BackgroundTransparency = 1
-    esp.WeaponIcon.Parent = gui
-    
     esp.LastWeapon = nil
     ESPs[player] = esp
 end
@@ -523,54 +457,15 @@ local function UpdateESP()
                 else 
                     esp.Distance.Visible = false 
                 end
-                
-                if Settings.WeaponESP or Settings.WeaponIconESP then
-                    local weaponName, weaponIcon = GetEquippedWeapon(player)
-                    if weaponName and weaponName ~= esp.LastWeapon then
-                        esp.LastWeapon = weaponName
-                        if Settings.WeaponESP then
-                            esp.Weapon.Text = "🔫 " .. weaponName
-                        end
-                        if Settings.WeaponIconESP and weaponIcon then
-                            esp.WeaponIcon.Image = weaponIcon
-                        end
-                    end
-                    
-                    if weaponName then
-                        if Settings.WeaponESP then
-                            esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
-                            esp.Weapon.Visible = true
-                        else
-                            esp.Weapon.Visible = false
-                        end
-                        
-                        if Settings.WeaponIconESP and weaponIcon then
-                            esp.WeaponIcon.Position = UDim2.new(0, pos.X - 110, 0, pos.Y - 15)
-                            esp.WeaponIcon.Visible = true
-                        else
-                            esp.WeaponIcon.Visible = false
-                        end
-                    else
-                        esp.Weapon.Visible = false
-                        esp.WeaponIcon.Visible = false
-                    end
-                else
-                    esp.Weapon.Visible = false
-                    esp.WeaponIcon.Visible = false
-                end
             else
                 esp.Name.Visible = false
                 esp.HealthBg.Visible = false
                 esp.Distance.Visible = false
-                esp.Weapon.Visible = false
-                esp.WeaponIcon.Visible = false
             end
         else
             esp.Name.Visible = false
             esp.HealthBg.Visible = false
             esp.Distance.Visible = false
-            esp.Weapon.Visible = false
-            esp.WeaponIcon.Visible = false
         end
     end
 end
@@ -633,8 +528,6 @@ Players.PlayerRemoving:Connect(function(p)
             esp.Name:Destroy()
             esp.HealthBg:Destroy()
             esp.Distance:Destroy()
-            esp.Weapon:Destroy()
-            esp.WeaponIcon:Destroy()
         end)
         ESPs[p] = nil
     end
@@ -674,445 +567,319 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- UI - WINDUI OFICIAL
+-- CREAR UI NATIVA
 -- ============================================
-print("⏳ Creando ventana WindUI...")
+local MainGui = Instance.new("ScreenGui")
+MainGui.Name = "WaterHubMain"
+MainGui.ResetOnSpawn = false
+MainGui.Parent = CoreGui
 
-local Window = WindUI:CreateWindow({
-    Title = "Water Hub | BlockSpin",
-    Author = "By: AdamABJ",
-    Folder = "WaterHub_Final",
-    Icon = "solar:water-drops-bold-duotone",
-    Theme = "Dark",
-    NewElements = true,
-})
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 500, 0, 700)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -350)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Color3.fromRGB(0, 150, 200)
+MainFrame.Parent = MainGui
+MainFrame.Draggable = true
+MainFrame.Active = true
 
-if not Window then
-    warn("❌ Error creando la ventana WindUI")
-    getgenv().WaterHubLoaded = false
-    return
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+-- Título
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.BackgroundColor3 = Color3.fromRGB(0, 120, 180)
+Title.BorderSizePixel = 0
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.Text = "🌊 Water Hub | BlockSpin v2.1"
+Title.Parent = MainFrame
+
+-- Scroll
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -10, 1, -60)
+ScrollFrame.Position = UDim2.new(0, 5, 0, 55)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 5
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 200)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 2000)
+ScrollFrame.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Parent = ScrollFrame
+
+-- ============================================
+-- CREAR TOGGLE GENÉRICO
+-- ============================================
+local function CreateToggle(parent, label, callback)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, -10, 0, 35)
+    Container.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    Container.BorderColor3 = Color3.fromRGB(0, 100, 150)
+    Container.BorderSizePixel = 1
+    Container.Parent = parent
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0, 350, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.Gotham
+    Label.Text = label
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Container
+    
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 55, 0, 25)
+    Button.Position = UDim2.new(1, -65, 0.5, -12)
+    Button.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 11
+    Button.Font = Enum.Font.GothamBold
+    Button.Text = "OFF"
+    Button.BorderSizePixel = 0
+    Button.Parent = Container
+    
+    local enabled = false
+    
+    Button.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        Button.BackgroundColor3 = enabled and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(100, 50, 50)
+        Button.Text = enabled and "ON" or "OFF"
+        callback(enabled)
+    end)
+    
+    return Button
 end
 
-print("✅ Ventana WindUI creada correctamente")
-
-local Tag = Window:Tag({
-    Title = "v2.1 | Delta Ready",
-    Color = "Text",
-})
-
 -- ============================================
--- PESTAÑAS
+-- CREAR SLIDER GENÉRICO
 -- ============================================
-local CombatTab = Window:Tab({
-    Title = "COMBAT",
-    Icon = "solar:swords-bold-duotone",
-})
-
-local MovementTab = Window:Tab({
-    Title = "MOVEMENT",
-    Icon = "solar:user-bold-duotone",
-})
-
-local WeaponsTab = Window:Tab({
-    Title = "WEAPON",
-    Icon = "solar:tuning-bold-duotone",
-})
-
-local VisualTab = Window:Tab({
-    Title = "VISUAL",
-    Icon = "solar:eye-bold-duotone",
-})
-
-local MiscTab = Window:Tab({
-    Title = "MISC",
-    Icon = "solar:slider-minimalistic-horizontal-bold-duotone",
-})
-
-local ConfigTab = Window:Tab({
-    Title = "CONFIG",
-    Icon = "solar:settings-bold-duotone",
-})
-
-CombatTab:Select()
-
--- ============================================
--- COMBAT TAB
--- ============================================
-CombatTab:Section({
-    Title = "⚔️ Combat",
-})
-
-local CombatGroup = CombatTab:Group()
-
-CombatGroup:Toggle({
-    Title = "Silent Aim",
-    Value = false,
-    Callback = function(v) Settings.SilentAim = v end,
-})
-
-CombatGroup:Space()
-
-CombatGroup:Slider({
-    Title = "FOV Radius",
-    IsTooltip = true,
-    Step = 1,
-    Value = { Min = 50, Max = 500, Default = 200 },
-    Callback = function(v) Settings.FOV = v end,
-})
-
-CombatGroup:Space()
-
-CombatGroup:Dropdown({
-    Title = "Aim Part",
-    Values = { "Head", "Torso", "HumanoidRootPart" },
-    Value = "Head",
-    Callback = function(v) Settings.AimPart = v end,
-})
-
-CombatTab:Space({ Columns = 2 })
-
-CombatTab:Section({
-    Title = "🤖 Auto",
-})
-
-local AutoGroup = CombatTab:Group()
-
-AutoGroup:Toggle({
-    Title = "Auto Heal",
-    Value = false,
-    Callback = function(v)
-        Settings.AutoHeal = v
-        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
-    end,
-})
-
-AutoGroup:Space()
-
-AutoGroup:Slider({
-    Title = "Heal at HP%",
-    IsTooltip = true,
-    Step = 1,
-    Value = { Min = 20, Max = 90, Default = 70 },
-    Callback = function(v) Settings.HealPercent = v end,
-})
-
-AutoGroup:Space()
-
-AutoGroup:Toggle({
-    Title = "Auto Hit",
-    Value = false,
-    Callback = function(v)
-        Settings.AutoHit = v
-        if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
-    end,
-})
-
--- ============================================
--- MOVEMENT TAB
--- ============================================
-MovementTab:Section({
-    Title = "⚡ Movement",
-})
-
-local MoveGroup = MovementTab:Group()
-
-MoveGroup:Toggle({
-    Title = "Speed Hack",
-    Value = false,
-    Callback = function(v)
-        Settings.SpeedEnabled = v
-        if v then 
-            Threads.Speed = task.spawn(SpeedLoop) 
-        else
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then hum.WalkSpeed = 16 end
-            end
-        end
-    end,
-})
-
-MoveGroup:Space()
-
-MoveGroup:Slider({
-    Title = "Speed Amount",
-    IsTooltip = true,
-    Step = 1,
-    Value = { Min = 16, Max = 250, Default = 50 },
-    Callback = function(v)
-        Settings.SpeedValue = v
-        if Settings.SpeedEnabled then
-            ApplySpeed()
-        end
-    end,
-})
-
-MoveGroup:Space()
-
-MoveGroup:Toggle({
-    Title = "Infinite Jump",
-    Value = false,
-    Callback = function(v)
-        Settings.InfiniteJump = v
-        SetupInfiniteJump()
-    end,
-})
-
-MoveGroup:Space()
-
-MoveGroup:Toggle({
-    Title = "Infinite Stamina",
-    Value = false,
-    Callback = function(v)
-        Settings.InfiniteStamina = v
-        if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
-    end,
-})
-
--- ============================================
--- WEAPONS TAB
--- ============================================
-WeaponsTab:Section({
-    Title = "🔫 Weapon Mods",
-})
-
-local WeaponGroup = WeaponsTab:Group()
-
-WeaponGroup:Toggle({
-    Title = "No Recoil",
-    Value = false,
-    Callback = function(v)
-        Settings.NoRecoil = v
-        UpdateWeaponMods()
-    end,
-})
-
-WeaponGroup:Space()
-
-WeaponGroup:Toggle({
-    Title = "No Spread",
-    Value = false,
-    Callback = function(v)
-        Settings.NoSpread = v
-        UpdateWeaponMods()
-    end,
-})
-
--- ============================================
--- VISUAL TAB
--- ============================================
-VisualTab:Section({
-    Title = "👤 Chams",
-})
-
-local ChamsGroup = VisualTab:Group()
-
-ChamsGroup:Toggle({
-    Title = "Enable Chams",
-    Value = false,
-    Callback = function(v)
-        Settings.Chams = v
-        UpdateAllChams()
-    end,
-})
-
-VisualTab:Space({ Columns = 2 })
-
-VisualTab:Section({
-    Title = "👁️ ESP",
-})
-
-local EspGroup = VisualTab:Group()
-
-EspGroup:Toggle({
-    Title = "Name ESP",
-    Value = false,
-    Callback = function(v) Settings.NameESP = v end,
-})
-
-EspGroup:Space()
-
-EspGroup:Toggle({
-    Title = "Health ESP",
-    Value = false,
-    Callback = function(v) Settings.HealthESP = v end,
-})
-
-EspGroup:Space()
-
-EspGroup:Toggle({
-    Title = "Distance ESP",
-    Value = false,
-    Callback = function(v) Settings.DistanceESP = v end,
-})
-
-EspGroup:Space()
-
-EspGroup:Toggle({
-    Title = "Weapon ESP",
-    Value = false,
-    Callback = function(v) Settings.WeaponESP = v end,
-})
-
-EspGroup:Space()
-
-EspGroup:Toggle({
-    Title = "Weapon Icon ESP",
-    Value = false,
-    Callback = function(v) Settings.WeaponIconESP = v end,
-})
-
-VisualTab:Space({ Columns = 2 })
-
-VisualTab:Section({
-    Title = "🌍 World",
-})
-
-local WorldGroup = VisualTab:Group()
-
-WorldGroup:Toggle({
-    Title = "Full Bright",
-    Value = false,
-    Callback = function(v)
-        Settings.FullBright = v
-        SetFullBright()
-    end,
-})
-
--- ============================================
--- MISC TAB
--- ============================================
-MiscTab:Section({
-    Title = "⚙️ Miscellaneous",
-})
-
-local MiscGroup = MiscTab:Group()
-
-MiscGroup:Toggle({
-    Title = "Anti AFK",
-    Value = false,
-    Callback = function(v)
-        Settings.AntiAFK = v
-        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
-    end,
-})
-
--- ============================================
--- CONFIG TAB
--- ============================================
-ConfigTab:Section({
-    Title = "⚙️ Server",
-})
-
-local ServerGroup = ConfigTab:Group()
-
-ServerGroup:Button({
-    Title = "Rejoin Server",
-    Icon = "solar:refresh-bold-duotone",
-    Callback = function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-    end,
-})
-
-ConfigTab:Space({ Columns = 2 })
-
-ConfigTab:Section({
-    Title = "💀 Danger Zone",
-})
-
-local DangerGroup = ConfigTab:Group()
-
-DangerGroup:Button({
-    Title = "Destroy UI",
-    Icon = "solar:logout-3-bold",
-    Size = "Small",
-    Color = Color3.fromRGB(255, 70, 70),
-    Callback = function()
-        -- Parar threads
-        for name, thread in pairs(Threads) do
-            if type(thread) == "thread" then
-                pcall(function() task.cancel(thread) end)
-            end
-        end
+local function CreateSlider(parent, label, min, max, default, callback)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, -10, 0, 70)
+    Container.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    Container.BorderColor3 = Color3.fromRGB(0, 100, 150)
+    Container.BorderSizePixel = 1
+    Container.Parent = parent
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -10, 0, 20)
+    Label.Position = UDim2.new(0, 5, 0, 3)
+    Label.BackgroundTransparency = 1
+    Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamBold
+    Label.Text = label .. ": " .. default
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Container
+    
+    local Slider = Instance.new("Frame")
+    Slider.Size = UDim2.new(1, -10, 0, 8)
+    Slider.Position = UDim2.new(0, 5, 0, 28)
+    Slider.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    Slider.BorderSizePixel = 0
+    Slider.Parent = Container
+    
+    local Fill = Instance.new("Frame")
+    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    Fill.BorderSizePixel = 0
+    Fill.Parent = Slider
+    
+    local currentValue = default
+    
+    local function UpdateSlider(x)
+        local relX = math.clamp(x - Slider.AbsolutePosition.X, 0, Slider.AbsoluteSize.X)
+        local percent = relX / Slider.AbsoluteSize.X
+        currentValue = math.floor(min + (max - min) * percent)
         
-        -- Parar infinite jump
-        if InfiniteJumpConnection then
-            pcall(function() InfiniteJumpConnection:Disconnect() end)
-        end
-        
-        -- Limpiar chams
-        for player, data in pairs(ChamsObjects) do
-            CleanupChams(player)
-        end
-        
-        -- Reset
-        Settings = {}
-        SetFullBright()
-        
-        -- Destruir ESP
-        for _, esp in pairs(ESPs) do
-            pcall(function()
-                esp.Name:Destroy()
-                esp.HealthBg:Destroy()
-                esp.Distance:Destroy()
-                esp.Weapon:Destroy()
-                esp.WeaponIcon:Destroy()
+        Fill.Size = UDim2.new(percent, 0, 1, 0)
+        Label.Text = label .. ": " .. currentValue
+        callback(currentValue)
+    end
+    
+    Slider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local conn
+            conn = UserInputService.InputChanged:Connect(function(inputObj)
+                if inputObj.UserInputType == Enum.UserInputType.MouseMovement then
+                    UpdateSlider(inputObj.Position.X)
+                end
+            end)
+            UserInputService.InputEnded:Connect(function(inputObj)
+                if inputObj.UserInputType == Enum.UserInputType.MouseButton1 then
+                    conn:Disconnect()
+                end
             end)
         end
-        
-        -- Destruir UI
-        pcall(function() Window:Destroy() end)
-        if ESPGui then
-            pcall(function() ESPGui:Destroy() end)
-        end
-        
-        getgenv().WaterHubLoaded = false
-        
-        print("✅ Water Hub Destruido Correctamente")
-    end,
-})
-
-ConfigTab:Space({ Columns = 2 })
-
-ConfigTab:Section({
-    Title = "📝 About",
-})
-
-local AboutGroup = ConfigTab:Group()
-
-AboutGroup:Button({
-    Title = "Water Hub v2.1",
-    Icon = "solar:star-bold-duotone",
-    Size = "Small",
-    Color = Color3.fromHex("#EF4F1D"),
-    Callback = function() end,
-})
-
-AboutGroup:Space()
-
-AboutGroup:Button({
-    Title = "By: AdamABJ",
-    Icon = "solar:check-circle-bold",
-    Size = "Small",
-    Color = Color3.fromHex("#00F2FE"),
-    Callback = function() end,
-})
+    end)
+    
+    return Fill
+end
 
 -- ============================================
--- NOTIFICACIONES
+-- CREAR SECCIONES
 -- ============================================
-task.wait(0.5)
+local function CreateSection(parent, title)
+    local Section = Instance.new("TextLabel")
+    Section.Size = UDim2.new(1, -10, 0, 30)
+    Section.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+    Section.BorderSizePixel = 0
+    Section.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Section.TextSize = 14
+    Section.Font = Enum.Font.GothamBold
+    Section.Text = "  " .. title
+    Section.TextXAlignment = Enum.TextXAlignment.Left
+    Section.Parent = parent
+end
 
-pcall(function()
-    WindUI:Notify({
-        Title = "Water Hub",
-        Content = "✅ v2.1 Cargado Exitosamente",
-        Icon = "solar:water-drops-bold-duotone",
-        Duration = 3,
-    })
+-- ============================================
+-- CONSTRUIR UI
+-- ============================================
+CreateSection(ScrollFrame, "⚔️ COMBAT")
+CreateToggle(ScrollFrame, "Silent Aim", function(v) Settings.SilentAim = v end)
+CreateSlider(ScrollFrame, "FOV Radius", 50, 500, 200, function(v) Settings.FOV = v end)
+
+CreateSection(ScrollFrame, "🤖 AUTO")
+CreateToggle(ScrollFrame, "Auto Heal", function(v)
+    Settings.AutoHeal = v
+    if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
+end)
+CreateSlider(ScrollFrame, "Heal at %", 20, 90, 70, function(v) Settings.HealPercent = v end)
+CreateToggle(ScrollFrame, "Auto Hit", function(v)
+    Settings.AutoHit = v
+    if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
 end)
 
+CreateSection(ScrollFrame, "⚡ MOVEMENT")
+CreateToggle(ScrollFrame, "Speed Hack", function(v)
+    Settings.SpeedEnabled = v
+    if v then Threads.Speed = task.spawn(SpeedLoop) end
+end)
+CreateSlider(ScrollFrame, "Speed Value", 16, 250, 50, function(v)
+    Settings.SpeedValue = v
+    ApplySpeed()
+end)
+CreateToggle(ScrollFrame, "Infinite Jump", function(v)
+    Settings.InfiniteJump = v
+    SetupInfiniteJump()
+end)
+CreateToggle(ScrollFrame, "Infinite Stamina", function(v)
+    Settings.InfiniteStamina = v
+    if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
+end)
+
+CreateSection(ScrollFrame, "🔫 WEAPONS")
+CreateToggle(ScrollFrame, "No Recoil", function(v)
+    Settings.NoRecoil = v
+    UpdateWeaponMods()
+end)
+CreateToggle(ScrollFrame, "No Spread", function(v)
+    Settings.NoSpread = v
+    UpdateWeaponMods()
+end)
+
+CreateSection(ScrollFrame, "👤 VISUAL")
+CreateToggle(ScrollFrame, "Chams", function(v)
+    Settings.Chams = v
+    UpdateAllChams()
+end)
+CreateToggle(ScrollFrame, "Full Bright", function(v)
+    Settings.FullBright = v
+    SetFullBright()
+end)
+
+CreateSection(ScrollFrame, "👁️ ESP")
+CreateToggle(ScrollFrame, "Name ESP", function(v) Settings.NameESP = v end)
+CreateToggle(ScrollFrame, "Health ESP", function(v) Settings.HealthESP = v end)
+CreateToggle(ScrollFrame, "Distance ESP", function(v) Settings.DistanceESP = v end)
+
+CreateSection(ScrollFrame, "⚙️ MISC")
+CreateToggle(ScrollFrame, "Anti AFK", function(v)
+    Settings.AntiAFK = v
+    if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
+end)
+
+-- ============================================
+-- BOTONES
+-- ============================================
+CreateSection(ScrollFrame, "💀 CONTROL")
+
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Size = UDim2.new(1, -10, 0, 40)
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Parent = ScrollFrame
+
+local RejoinButton = Instance.new("TextButton")
+RejoinButton.Size = UDim2.new(0.5, -5, 1, 0)
+RejoinButton.BackgroundColor3 = Color3.fromRGB(0, 120, 180)
+RejoinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RejoinButton.TextSize = 12
+RejoinButton.Font = Enum.Font.GothamBold
+RejoinButton.Text = "Rejoin"
+RejoinButton.BorderSizePixel = 0
+RejoinButton.Parent = ButtonContainer
+
+RejoinButton.MouseButton1Click:Connect(function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end)
+
+local DestroyButton = Instance.new("TextButton")
+DestroyButton.Size = UDim2.new(0.5, -5, 1, 0)
+DestroyButton.Position = UDim2.new(0.5, 5, 0, 0)
+DestroyButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+DestroyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+DestroyButton.TextSize = 12
+DestroyButton.Font = Enum.Font.GothamBold
+DestroyButton.Text = "Destroy"
+DestroyButton.BorderSizePixel = 0
+DestroyButton.Parent = ButtonContainer
+
+DestroyButton.MouseButton1Click:Connect(function()
+    for name, thread in pairs(Threads) do
+        if type(thread) == "thread" then
+            pcall(function() task.cancel(thread) end)
+        end
+    end
+    
+    if InfiniteJumpConnection then
+        pcall(function() InfiniteJumpConnection:Disconnect() end)
+    end
+    
+    for player, data in pairs(ChamsObjects) do
+        CleanupChams(player)
+    end
+    
+    Settings = {}
+    SetFullBright()
+    
+    for _, esp in pairs(ESPs) do
+        pcall(function()
+            esp.Name:Destroy()
+            esp.HealthBg:Destroy()
+            esp.Distance:Destroy()
+        end)
+    end
+    
+    pcall(function() MainGui:Destroy() end)
+    if ESPGui then
+        pcall(function() ESPGui:Destroy() end)
+    end
+    
+    getgenv().WaterHubLoaded = false
+    print("✅ Water Hub Destruido")
+end)
+
+-- ============================================
+-- NOTIFICACIÓN FINAL
+-- ============================================
 print("✅ Water Hub v2.1 Cargado Completamente")
-print("🎮 Todas las funciones activas y operacionales")
-print("📍 Presiona F para abrir/cerrar la UI")
+print("🎮 UI Lista - Todas las funciones activas")
+print("📍 Usa el menú para controlar todas las opciones")
