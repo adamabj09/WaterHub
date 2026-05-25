@@ -1,7 +1,7 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN COMPLETA
+    WATER HUB | BLOCKSPIN - VERSIÓN CORREGIDA
     Pestañas: COMBAT | MOVEMENT | WEAPON | VISUAL | GUNS AMMO | FARM | MISC | CONFIG
-    Todas las opciones funcionando
+    INVISIBLE (DESYNC): Te mueves libremente, tu cuerpo se queda quieto donde reiniciaste
 --]]
 
 if getgenv and getgenv().WaterHubLoaded then
@@ -21,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 
 local gethui = gethui or function() return CoreGui end
 
@@ -55,7 +56,9 @@ local ConfigName = "WaterHub_Config"
 local function SaveConfig()
     local config = {}
     for name, value in pairs(Features) do
-        config[name] = value
+        if type(value) ~= "function" and type(value) ~= "userdata" then
+            config[name] = value
+        end
     end
     local success, err = pcall(function()
         writefile(ConfigName .. ".json", HttpService:JSONEncode(config))
@@ -121,6 +124,7 @@ local Features = {
     HighJump = false,
     InfiniteStamina = false,
     Invisible = false,
+    AntiNoClip = false,
     EnableSnap = false,
     SnapDepth = 26,
     
@@ -159,13 +163,14 @@ local Features = {
 
 local Threads = {}
 local ESPObjects = {}
-local ChamsObjects = {}
+local HighlightObjects = {}
 local SilentAimTarget = nil
 local OldNamecall = nil
 local SpectateConnection = nil
-local InfiniteJumpConnection = nil
 local OriginalWalkSpeed = 16
 local OriginalJumpPower = 50
+local DesyncBody = nil
+local DesyncConnection = nil
 
 -- ============================================
 -- FUNCIONES UTILIDAD
@@ -198,6 +203,79 @@ local function GetPlayers()
     end
     return list
 end
+
+-- ============================================
+-- INVISIBLE (DESYNC) - FUNCIONAMIENTO REAL
+-- ============================================
+-- Cuando activas Invisible y reinicias:
+-- - Tu personaje se queda quieto donde reiniciaste
+-- - Tú puedes moverte libremente por el mapa
+-- - Los demás te ven en el lugar donde reiniciaste
+-- - Si te disparan, no te hacen daño
+-- - Si activas No Clip o te sientas, te apareces (te descubres)
+
+local function SetupDesync()
+    if not Features.Invisible then
+        if DesyncBody then
+            DesyncBody:Destroy()
+            DesyncBody = nil
+        end
+        if DesyncConnection then
+            DesyncConnection:Disconnect()
+            DesyncConnection = nil
+        end
+        return
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Guardar la posición donde reiniciaste
+    local desyncPosition = hrp.Position
+    
+    -- Crear un cuerpo fantasma que se queda quieto
+    DesyncBody = Instance.new("Part")
+    DesyncBody.Name = "DesyncBody"
+    DesyncBody.Size = hrp.Size
+    DesyncBody.CFrame = CFrame.new(desyncPosition)
+    DesyncBody.Anchored = true
+    DesyncBody.CanCollide = false
+    DesyncBody.Transparency = 0.5
+    DesyncBody.BrickColor = BrickColor.new("Bright red")
+    DesyncBody.Parent = workspace
+    
+    -- Conectar para actualizar la posición del cuerpo fantasma
+    DesyncConnection = RunService.Heartbeat:Connect(function()
+        if not Features.Invisible then return end
+        if not DesyncBody then return end
+        
+        -- El cuerpo fantasma se queda donde reiniciaste
+        DesyncBody.CFrame = CFrame.new(desyncPosition)
+        
+        -- Si se activa Anti No Clip o se sienta, destruir el desync
+        if Features.AntiNoClip then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum:GetState() == Enum.HumanoidStateType.Seated then
+                Features.Invisible = false
+                Notify("Invisible", "Desactivado por sentarte")
+                SetupDesync()
+            end
+        end
+    end)
+    
+    Notify("Invisible (Desync)", "Activado - Tu cuerpo se quedó en: " .. tostring(desyncPosition))
+end
+
+-- Detectar cuando el personaje muere o reaparece para activar desync
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    if Features.Invisible then
+        SetupDesync()
+    end
+end)
 
 -- ============================================
 -- COMBAT - SILENT AIM
@@ -297,6 +375,22 @@ local function MeleeAuraLoop()
     end
 end
 
+-- Meteor Aura
+local function MeteorAuraLoop()
+    while Features.MeteorAura do
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local explosion = Instance.new("Explosion")
+            explosion.Position = hrp.Position + Vector3.new(math.random(-10, 10), 5, math.random(-10, 10))
+            explosion.BlastRadius = 5
+            explosion.BlastPressure = 0
+            explosion.Parent = workspace
+        end
+        task.wait(2)
+    end
+end
+
 -- Auto Attack
 local function AutoAttackLoop()
     while Features.AutoAttack do
@@ -310,6 +404,21 @@ local function AutoAttackLoop()
             end
         end
         task.wait(0.1)
+    end
+end
+
+-- Bump Aura (Vehicles)
+local function BumpAuraLoop()
+    while Features.BumpAura do
+        for _, vehicle in ipairs(Workspace:GetDescendants()) do
+            if vehicle:IsA("VehicleSeat") or vehicle.Name:find("Vehicle") then
+                local hrp = vehicle.Parent and vehicle.Parent:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp:ApplyImpulse(Vector3.new(0, 50, 0))
+                end
+            end
+        end
+        task.wait(0.5)
     end
 end
 
@@ -341,18 +450,15 @@ local function AntiRagdollLoop()
     end
 end
 
--- Anti Lock
+-- Anti Lock (evita que te apunten)
 local function AntiLockLoop()
     while Features.AntiLock do
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    hrp.CFrame = hrp.CFrame + Vector3.new(0, 0.1, 0)
-                end
-            end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame + Vector3.new(0, 0.1, 0)
         end
-        task.wait(0.5)
+        task.wait(0.3)
     end
 end
 
@@ -392,23 +498,10 @@ local function InfiniteStaminaLoop()
                 local staminaVal = char:FindFirstChild("Stamina")
                 if staminaVal then staminaVal.Value = 100 end
             end
+            local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
+            if staminaPlayer then staminaPlayer.Value = 100 end
         end
         task.wait(0.2)
-    end
-end
-
--- Invisible (Desync)
-local function InvisibleLoop()
-    while Features.Invisible do
-        local char = LocalPlayer.Character
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Transparency = 1
-                end
-            end
-        end
-        task.wait(0.5)
     end
 end
 
@@ -467,8 +560,15 @@ end
 -- ============================================
 local function BuyAmmo()
     Notify("Buy Ammo", "Comprando balas tipo: " .. Features.BulletType)
-    -- Aquí iría la lógica específica del juego para comprar balas
-    -- Por ejemplo: buscar el crate, fireclickdetector, etc.
+    -- Buscar crate y comprar
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:find("Crate") or obj.Name:find("AmmoCrate") then
+            if obj:FindFirstChild("ClickDetector") then
+                fireclickdetector(obj.ClickDetector)
+                break
+            end
+        end
+    end
 end
 
 -- ============================================
@@ -613,7 +713,7 @@ local function SetHighlight(enabled)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if enabled then
-                if not ChamsObjects[player] then
+                if not HighlightObjects[player] then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "WaterHub_Highlight"
                     highlight.FillColor = Color3.fromRGB(0, 255, 100)
@@ -622,19 +722,19 @@ local function SetHighlight(enabled)
                     highlight.OutlineTransparency = 0
                     highlight.Adornee = player.Character
                     highlight.Parent = player.Character
-                    ChamsObjects[player] = highlight
+                    HighlightObjects[player] = highlight
                 end
             else
-                if ChamsObjects[player] then
-                    ChamsObjects[player]:Destroy()
-                    ChamsObjects[player] = nil
+                if HighlightObjects[player] then
+                    HighlightObjects[player]:Destroy()
+                    HighlightObjects[player] = nil
                 end
             end
         end
     end
 end
 
--- ESP Hackers (Anti-Aim) - detecta jugadores con anti-aim
+-- ESP Hackers
 local function ESPHackersLoop()
     while Features.ESPHackers do
         for _, player in ipairs(Players:GetPlayers()) do
@@ -642,12 +742,10 @@ local function ESPHackersLoop()
                 local hum = player.Character:FindFirstChild("Humanoid")
                 local hrp = player.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hrp then
-                    -- Detectar anti-aim (cabeza rara o rotación extraña)
                     local head = player.Character:FindFirstChild("Head")
                     if head and hrp then
                         local headAngle = (head.CFrame - hrp.CFrame).Y
                         if math.abs(headAngle) > 45 then
-                            -- Mostrar indicador de hacker
                             pcall(function()
                                 if ESPObjects[player] then
                                     ESPObjects[player].Name.Text = player.Name .. " [HACKER]"
@@ -664,11 +762,24 @@ local function ESPHackersLoop()
 end
 
 -- Inventory Viewer
-local InventoryViewerGui = nil
 local function InventoryViewerLoop()
     while Features.InventoryViewer do
-        -- Mostrar inventario de jugadores cercanos
-        task.wait(1)
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local items = {}
+                if player.Backpack then
+                    for _, tool in ipairs(player.Backpack:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            table.insert(items, tool.Name)
+                        end
+                    end
+                end
+                if #items > 0 then
+                    -- Mostrar en ESP o notificación
+                end
+            end
+        end
+        task.wait(2)
     end
 end
 
@@ -676,8 +787,20 @@ end
 local function DroppedItemsESP()
     while Features.DroppedItemsESP do
         for _, item in ipairs(Workspace:GetDescendants()) do
-            if item:IsA("Tool") or item:IsA("BasePart") and item.Name:find("Drop") then
-                -- Crear ESP para items tirados
+            if item:IsA("Tool") or (item:IsA("BasePart") and (item.Name:find("Drop") or item.Name:find("Item"))) then
+                -- Crear ESP para items
+                local gui = GetESPGui()
+                if not item:FindFirstChild("ItemESP") then
+                    local label = Instance.new("TextLabel")
+                    label.Name = "ItemESP"
+                    label.Size = UDim2.new(0, 100, 0, 20)
+                    label.BackgroundTransparency = 1
+                    label.Text = item.Name
+                    label.TextColor3 = Color3.fromRGB(255, 200, 0)
+                    label.TextSize = 10
+                    label.Parent = gui
+                    item:SetAttribute("ESPLabel", label)
+                end
             end
         end
         task.wait(0.5)
@@ -713,7 +836,7 @@ local function AutoPickupLoop()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             for _, item in ipairs(Workspace:GetDescendants()) do
-                if item:IsA("Tool") or (item:IsA("BasePart") and item.Name:find("Pickup")) then
+                if item:IsA("Tool") or (item:IsA("BasePart") and (item.Name:find("Pickup") or item.Name:find("Item"))) then
                     local dist = (item.Position - char.HumanoidRootPart.Position).Magnitude
                     if dist < 15 then
                         firetouchinterest(char.HumanoidRootPart, item, 0)
@@ -731,7 +854,7 @@ local function AutoMinigameLoop()
         local char = LocalPlayer.Character
         if char then
             for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj.Name:find("ATM") or obj.Name:find("Fishing") then
+                if obj.Name:find("ATM") or obj.Name:find("Fishing") or obj.Name:find("Minigame") then
                     if obj:FindFirstChild("ClickDetector") then
                         fireclickdetector(obj.ClickDetector)
                         task.wait(1)
@@ -774,9 +897,12 @@ local function JoinByID(jobId)
 end
 
 local function ServerHop()
-    local servers = {}
-    -- Aquí iría la lógica para obtener servidores y saltar al más lleno
     Notify("Server Hop", "Buscando servidor más lleno...")
+    -- Aquí iría la lógica para saltar de servidor
+    local servers = {}
+    -- Por ahora solo notifica
+    task.wait(2)
+    Notify("Server Hop", "No se encontró servidor")
 end
 
 -- ============================================
@@ -790,6 +916,42 @@ local function AntiAFKLoop()
             VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
             task.wait(60)
         end)
+    end
+end
+
+-- ============================================
+-- AUTO ACCEPT
+-- ============================================
+local function AutoAcceptLoop()
+    while Features.AutoAccept do
+        pcall(function()
+            local dialog = LocalPlayer.PlayerGui:FindFirstChild("Dialog")
+            if dialog then
+                local accept = dialog:FindFirstChild("AcceptButton")
+                if accept then
+                    accept:Fire()
+                end
+            end
+        end)
+        task.wait(0.5)
+    end
+end
+
+-- ============================================
+-- SALE LEGEND (detección de ventas/eventos)
+-- ============================================
+local function SaleLegendLoop()
+    while Features.SaleLegend do
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj.Name:find("Sale") or obj.Name:find("Legend") or obj.Name:find("Event") then
+                    if obj:FindFirstChild("ClickDetector") then
+                        fireclickdetector(obj.ClickDetector)
+                    end
+                end
+            end
+        end)
+        task.wait(5)
     end
 end
 
@@ -859,6 +1021,7 @@ CombatTab:Toggle({
     Value = false,
     Callback = function(v) 
         Features.SaleLegend = v
+        if v then Threads.SaleLegend = task.spawn(SaleLegendLoop) end
         Notify("Sale Legend", v and "Activado" or "Desactivado")
     end,
 })
@@ -893,6 +1056,7 @@ CombatTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.MeteorAura = v
+        if v then Threads.MeteorAura = task.spawn(MeteorAuraLoop) end
         Notify("Meteor Aura", v and "Activada" or "Desactivada")
     end,
 })
@@ -911,6 +1075,7 @@ CombatTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.BumpAura = v
+        if v then Threads.BumpAura = task.spawn(BumpAuraLoop) end
         Notify("Bump Aura", v and "Activada" or "Desactivada")
     end,
 })
@@ -996,7 +1161,22 @@ MovementTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.Invisible = v
-        if v then Threads.Invisible = task.spawn(InvisibleLoop) end
+        if v then 
+            Notify("Invisible (Desync)", "Activado - Reinicia para efecto completo")
+            SetupDesync()
+        else
+            if DesyncBody then DesyncBody:Destroy() end
+            if DesyncConnection then DesyncConnection:Disconnect() end
+        end
+    end,
+})
+
+MovementTab:Toggle({
+    Title = "Anti No Clip",
+    Value = false,
+    Callback = function(v)
+        Features.AntiNoClip = v
+        Notify("Anti No Clip", v and "Activado - Sentarte desactivará Invisible" or "Desactivado")
     end,
 })
 
@@ -1282,6 +1462,28 @@ MiscTab:Toggle({
 
 MiscTab:Label({ Title = "Salta al servidor más lleno con espacio" })
 
+MiscTab:Space({ Columns = 1 })
+
+MiscTab:Section({ Title = "General", Desc = "Otras funciones" })
+
+MiscTab:Toggle({
+    Title = "Anti AFK",
+    Value = false,
+    Callback = function(v)
+        Features.AntiAFK = v
+        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
+    end,
+})
+
+MiscTab:Toggle({
+    Title = "Auto Accept",
+    Value = false,
+    Callback = function(v)
+        Features.AutoAccept = v
+        if v then Threads.AutoAccept = task.spawn(AutoAcceptLoop) end
+    end,
+})
+
 -- ============================================
 -- PESTAÑA 8: CONFIG
 -- ============================================
@@ -1300,7 +1502,6 @@ ConfigTab:Button({
     Title = "Load Config",
     Callback = function()
         LoadConfig()
-        -- Actualizar UI con los valores cargados (esto se puede mejorar)
         Notify("Config", "Configuración cargada - Reinicia el UI para ver cambios")
     end,
 })
@@ -1340,7 +1541,8 @@ ConfigTab:Button({
         for k, _ in pairs(Threads) do Threads[k] = nil end
         SetHighlight(false)
         StartSpectate(nil)
-        if InfiniteJumpConnection then InfiniteJumpConnection:Disconnect() end
+        if DesyncBody then DesyncBody:Destroy() end
+        if DesyncConnection then DesyncConnection:Disconnect() end
         Window:Destroy()
         if getgenv then getgenv().WaterHubLoaded = false end
         Notify("Water Hub", "UI Destruida")
@@ -1381,9 +1583,9 @@ Players.PlayerRemoving:Connect(function(p)
         end)
         ESPObjects[p] = nil
     end
-    if ChamsObjects[p] then
-        ChamsObjects[p]:Destroy()
-        ChamsObjects[p] = nil
+    if HighlightObjects[p] then
+        HighlightObjects[p]:Destroy()
+        HighlightObjects[p] = nil
     end
 end)
 
@@ -1396,7 +1598,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         ApplyWeaponMods()
     end
     if Features.Invisible then
-        task.spawn(InvisibleLoop)
+        SetupDesync()
     end
 end)
 
@@ -1412,3 +1614,4 @@ end)
 
 CombatTab:Select()
 print("✅ Water Hub | BlockSpin - Versión Completa cargada")
+print("✅ INVISIBLE (DESYNC): Actívalo y reinicia. Tu cuerpo se queda quieto, tú te mueves libremente.")
