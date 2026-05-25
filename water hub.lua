@@ -5,7 +5,6 @@
     ✓ Todas las tabs completas y funcionando
     ✓ Sin Fly/NoClip (anti-cheat del juego)
     ✓ Tema Verde/Azul profesional
-    ✓ Chams, ESP, Weapon Mods
     By: AdamABJ
 --]]
 
@@ -18,20 +17,15 @@ if getgenv then getgenv().WaterHubLoaded = true end
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
-local TweenService = game:GetService("TweenService")
 
 local gethui = gethui or function() return CoreGui end
 
--- ============================================
 -- CARGAR WINDUI
--- ============================================
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 if not WindUI then
@@ -39,9 +33,7 @@ if not WindUI then
     return
 end
 
--- ============================================
 -- NOTIFICACIONES
--- ============================================
 local function Notify(title, message)
     pcall(function()
         WindUI:Notify({
@@ -52,11 +44,8 @@ local function Notify(title, message)
     end)
 end
 
--- ============================================
--- VARIABLES Y ESTADO
--- ============================================
+-- VARIABLES
 local Features = {
-    -- Combat
     SilentAim = false,
     ShowFOV = false,
     FOV = 200,
@@ -66,21 +55,18 @@ local Features = {
     AutoHit = false,
     ShootingDistance = 1500,
     
-    -- Movement (sin Fly/NoClip por anti-cheat)
     SpeedEnabled = false,
     SpeedValue = 50,
     InfiniteJump = false,
     JumpMode = "Fly Jump",
     InfiniteStamina = false,
     
-    -- Weapon
     Automatic = false,
     FireRate = 1000,
     NoRecoil = false,
     NoSpread = false,
     InstantReload = false,
     
-    -- Visual
     ESPName = false,
     ESPHealth = false,
     ESPDistance = false,
@@ -89,7 +75,6 @@ local Features = {
     FullBright = false,
     NoFog = false,
     
-    -- Misc
     AntiAFK = false,
 }
 
@@ -101,53 +86,12 @@ local OldNamecall = nil
 local InfiniteJumpConnection = nil
 local FOVCircle = nil
 
--- ============================================
--- IDS DE ARMAS (PARA GUI DE ARMAS)
--- ============================================
-local WeaponImages = {
-    ["AK47"] = "rbxassetid://124555430577178",
-    ["AUG"] = "rbxassetid://83729841153733",
-    ["AWP"] = "rbxassetid://126356167274927",
-    ["Anaconda"] = "rbxassetid://121547020534134",
-    ["C9"] = "rbxassetid://79659079988022",
-    ["Crossbow"] = "rbxassetid://89240642376715",
-    ["Double Barrel"] = "rbxassetid://83625765638039",
-    ["Draco"] = "rbxassetid://120937616266903",
-    ["Firework Launcher"] = "rbxassetid://88284317820274",
-    ["G3"] = "rbxassetid://133411291398002",
-    ["Glock"] = "rbxassetid://97846154366870",
-    ["Hunting Rifle"] = "rbxassetid://81547704965153",
-    ["M16"] = "rbxassetid://74321352408872",
-    ["M24"] = "rbxassetid://73387965982603",
-    ["M249"] = "rbxassetid://80044343904275",
-    ["MP5"] = "rbxassetid://80501079489777",
-    ["P226"] = "rbxassetid://92521100297776",
-    ["P90"] = "rbxassetid://110565990980804",
-    ["RPG"] = "rbxassetid://138426000142807",
-    ["Remington"] = "rbxassetid://101271375930409",
-    ["Sawnoff"] = "rbxassetid://90588305892707",
-    ["Skorpion"] = "rbxassetid://105318377951686",
-    ["Uzi"] = "rbxassetid://109290695652338",
-}
-
--- ============================================
 -- FUNCIONES UTILIDAD
--- ============================================
 local function GetEquippedTool(player)
     local char = player.Character
     if not char then return nil end
     local tool = char:FindFirstChildOfClass("Tool")
     return tool and tool.Name or nil
-end
-
-local function GetPlayers()
-    local list = {"--"}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
-    end
-    return list
 end
 
 local function GetMoney()
@@ -162,9 +106,7 @@ local function GetMoney()
     return cash, bank
 end
 
--- ============================================
--- FOV CIRCLE (CÍRCULO VISIBLE)
--- ============================================
+-- FOV CIRCLE
 local function CreateFOVCircle()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "FOVCircle"
@@ -182,9 +124,8 @@ local function CreateFOVCircle()
     circle.Visible = false
     circle.Parent = screenGui
     
-    -- Círculo verde
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 255, 136) -- Verde
+    stroke.Color = Color3.fromRGB(0, 255, 136)
     stroke.Thickness = 2
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     stroke.Parent = circle
@@ -193,7 +134,6 @@ local function CreateFOVCircle()
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = circle
     
-    -- Fill transparente verde
     local bg = Instance.new("Frame")
     bg.Name = "BG"
     bg.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
@@ -206,10 +146,9 @@ local function CreateFOVCircle()
     bgCorner.CornerRadius = UDim.new(1, 0)
     bgCorner.Parent = bg
     
-    -- Centro del círculo
     local center = Instance.new("Frame")
     center.Name = "Center"
-    center.BackgroundColor3 = Color3.fromRGB(0, 242, 254) -- Azul
+    center.BackgroundColor3 = Color3.fromRGB(0, 242, 254)
     center.BorderSizePixel = 0
     center.AnchorPoint = Vector2.new(0.5, 0.5)
     center.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -232,9 +171,7 @@ local function UpdateFOV()
     end
 end
 
--- ============================================
--- SILENT AIM (CON FOV FUNCIONAL)
--- ============================================
+-- SILENT AIM
 RunService.RenderStepped:Connect(function()
     UpdateFOV()
     
@@ -256,13 +193,11 @@ RunService.RenderStepped:Connect(function()
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local targetPart = player.Character:FindFirstChild(Features.AimPart) 
-                or player.Character:FindFirstChild("Head")
+            local targetPart = player.Character:FindFirstChild(Features.AimPart) or player.Character:FindFirstChild("Head")
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             
             if targetPart and humanoid and humanoid.Health > 0 and hrp then
-                -- Verificar distancia de disparo
                 local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if localHRP then
                     local dist = (hrp.Position - localHRP.Position).Magnitude
@@ -285,17 +220,15 @@ RunService.RenderStepped:Connect(function()
     
     SilentAimTarget = closest
     
-    -- Cambiar color del círculo si hay target
     if FOVCircle and Features.ShowFOV then
         if closest then
-            FOVCircle.Stroke.Color = Color3.fromRGB(255, 50, 50) -- Rojo cuando hay target
+            FOVCircle.Stroke.Color = Color3.fromRGB(255, 50, 50)
         else
-            FOVCircle.Stroke.Color = Color3.fromRGB(0, 255, 136) -- Verde normal
+            FOVCircle.Stroke.Color = Color3.fromRGB(0, 255, 136)
         end
     end
 end)
 
--- Hook para Silent Aim
 local function SetupSilentAim()
     if OldNamecall then return end
     
@@ -308,8 +241,7 @@ local function SetupSilentAim()
             if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") or name:find("bullet") then
                 local targetChar = SilentAimTarget.Character
                 if targetChar then
-                    local targetPart = targetChar:FindFirstChild(Features.AimPart) 
-                        or targetChar:FindFirstChild("Head")
+                    local targetPart = targetChar:FindFirstChild(Features.AimPart) or targetChar:FindFirstChild("Head")
                     if targetPart then
                         for i = 1, #args do
                             if typeof(args[i]) == "Vector3" then
@@ -331,9 +263,7 @@ local function SetupSilentAim()
     end)
 end
 
--- ============================================
--- AUTO HEAL / HIT
--- ============================================
+-- AUTO HEAL/HIT
 local function AutoHealLoop()
     while Features.AutoHeal do
         pcall(function()
@@ -359,9 +289,7 @@ local function AutoHitLoop()
                 local char = LocalPlayer.Character
                 if char then
                     local tool = char:FindFirstChildOfClass("Tool")
-                    if tool then
-                        tool:Activate()
-                    end
+                    if tool then tool:Activate() end
                 end
             end
         end)
@@ -369,18 +297,14 @@ local function AutoHitLoop()
     end
 end
 
--- ============================================
--- MOVEMENT (SIN FLY/NOCLIP)
--- ============================================
+-- MOVEMENT
 local function SpeedLoop()
     while Features.SpeedEnabled do
         pcall(function()
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum.WalkSpeed = Features.SpeedValue
-                end
+                if hum then hum.WalkSpeed = Features.SpeedValue end
             end
         end)
         task.wait(0.1)
@@ -399,19 +323,15 @@ local function SetupInfiniteJump()
     end
     
     if Features.InfiniteJump then
-        if Features.JumpMode == "Fly Jump" then
-            InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
-                pcall(function()
-                    local char = LocalPlayer.Character
-                    if char then
-                        local hum = char:FindFirstChild("Humanoid")
-                        if hum then
-                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                        end
-                    end
-                end)
+        InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChild("Humanoid")
+                    if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+                end
             end)
-        end
+        end)
     end
 end
 
@@ -432,9 +352,7 @@ local function InfiniteStaminaLoop()
     end
 end
 
--- ============================================
 -- WEAPON MODS
--- ============================================
 local function ApplyWeaponMods()
     pcall(function()
         local char = LocalPlayer.Character
@@ -461,9 +379,7 @@ local function ApplyWeaponMods()
     end)
 end
 
--- ============================================
--- ESP VISUAL
--- ============================================
+-- ESP
 local ESPGui = nil
 
 local function GetESPGui()
@@ -598,7 +514,7 @@ local function UpdateESP()
     end
 end
 
--- Chams
+-- CHAMS
 local function SetChams(enabled)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -626,7 +542,7 @@ local function SetChams(enabled)
     end
 end
 
--- Full Bright / No Fog
+-- LIGHTING
 local function SetFullBright(enabled)
     if enabled then
         Lighting.Brightness = 10
@@ -647,9 +563,7 @@ local function SetNoFog(enabled)
     end
 end
 
--- ============================================
 -- ANTI AFK
--- ============================================
 local function AntiAFKLoop()
     while Features.AntiAFK do
         pcall(function()
@@ -662,9 +576,7 @@ local function AntiAFKLoop()
     end
 end
 
--- ============================================
--- VENTANA PRINCIPAL - COLORES VERDE/AZUL
--- ============================================
+-- WINDOW
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
@@ -697,13 +609,11 @@ Window:Tag({
     Border = true 
 })
 
-Notify("Water Hub", "✓ FOV Circle + All Features cargado!")
+Notify("Water Hub", "✓ Script cargado correctamente")
 
--- ============================================
--- PESTAÑAS
--- ============================================
+-- TABS
 
--- 1. COMBAT (CON FOV CIRCLE)
+-- COMBAT TAB
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "target" })
 
 CombatTab:Section({ Title = "Aimbot", Desc = "Silent Aim con FOV" })
@@ -715,7 +625,7 @@ CombatTab:Toggle({
         Features.SilentAim = v
         if v then SetupSilentAim() end
         UpdateFOV()
-        Notify("Silent Aim", v and "✓ ON - Apunta dentro del círculo" or "✗ OFF")
+        Notify("Silent Aim", v and "✓ ON" or "✗ OFF")
     end,
 })
 
@@ -732,10 +642,7 @@ CombatTab:Slider({
     Title = "FOV Size",
     Step = 10,
     Value = { Min = 50, Max = 400, Default = 200 },
-    Callback = function(v)
-        Features.FOV = v
-        UpdateFOV()
-    end,
+    Callback = function(v) Features.FOV = v UpdateFOV() end,
 })
 
 CombatTab:Slider({
@@ -754,7 +661,7 @@ CombatTab:Dropdown({
 
 CombatTab:Space({ Columns = 1 })
 
-CombatTab:Section({ Title = "Auto Combat", Desc = "Automatización de combate" })
+CombatTab:Section({ Title = "Auto Combat", Desc = "Automatización" })
 
 CombatTab:Toggle({
     Title = "Auto Heal",
@@ -783,10 +690,10 @@ CombatTab:Toggle({
     end,
 })
 
--- 2. MOVEMENT (SIN FLY/NOCLIP)
+-- MOVEMENT TAB
 local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
 
-MovementTab:Section({ Title = "Speed", Desc = "Velocidad de movimiento" })
+MovementTab:Section({ Title = "Speed", Desc = "Velocidad" })
 
 MovementTab:Toggle({
     Title = "Speed Hack",
@@ -836,10 +743,10 @@ MovementTab:Toggle({
     end,
 })
 
--- 3. WEAPON
+-- WEAPON TAB
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "crosshair" })
 
-WeaponTab:Section({ Title = "Weapon Mods", Desc = "Modificaciones de armas" })
+WeaponTab:Section({ Title = "Weapon Mods", Desc = "Modificaciones" })
 
 WeaponTab:Toggle({
     Title = "No Recoil",
@@ -875,25 +782,13 @@ WeaponTab:Slider({
     Title = "Fire Rate (RPM)",
     Step = 50,
     Value = { Min = 100, Max = 3000, Default = 1000 },
-    Callback = function(v)
-        Features.FireRate = v
-        ApplyWeaponMods()
-    end,
+    Callback = function(v) Features.FireRate = v ApplyWeaponMods() end,
 })
 
-WeaponTab:Toggle({
-    Title = "Instant Reload",
-    Value = false,
-    Callback = function(v)
-        Features.InstantReload = v
-        Notify("Instant Reload", v and "✓ ON" or "✗ OFF")
-    end,
-})
-
--- 4. VISUAL
+-- VISUAL TAB
 local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "eye" })
 
-VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores en el mapa" })
+VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores" })
 
 VisualTab:Toggle({
     Title = "Name ESP",
@@ -933,10 +828,10 @@ VisualTab:Toggle({
 
 VisualTab:Space({ Columns = 1 })
 
-VisualTab:Section({ Title = "Chams", Desc = "Resaltar jugadores" })
+VisualTab:Section({ Title = "Chams", Desc = "Resaltar" })
 
 VisualTab:Toggle({
-    Title = "Chams (Verde/Azul)",
+    Title = "Chams",
     Value = false,
     Callback = function(v)
         Features.Chams = v
@@ -947,7 +842,7 @@ VisualTab:Toggle({
 
 VisualTab:Space({ Columns = 1 })
 
-VisualTab:Section({ Title = "World Mods", Desc = "Modificar el mundo" })
+VisualTab:Section({ Title = "World", Desc = "Mundo" })
 
 VisualTab:Toggle({
     Title = "Full Bright",
@@ -969,10 +864,10 @@ VisualTab:Toggle({
     end,
 })
 
--- 5. MISC
+-- MISC TAB
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
-MiscTab:Section({ Title = "Utilities", Desc = "Herramientas varias" })
+MiscTab:Section({ Title = "General", Desc = "Funciones" })
 
 MiscTab:Toggle({
     Title = "Anti AFK",
@@ -986,7 +881,7 @@ MiscTab:Toggle({
 
 MiscTab:Space({ Columns = 1 })
 
-MiscTab:Section({ Title = "Account Info", Desc = "Tu información de cuenta" })
+MiscTab:Section({ Title = "Account Info", Desc = "Tu cuenta" })
 
 local CashLabel = MiscTab:Label({ Title = "💵 Cash: Loading..." })
 local BankLabel = MiscTab:Label({ Title = "🏦 Bank: Loading..." })
@@ -1004,10 +899,10 @@ end)
 
 MiscTab:Space({ Columns = 1 })
 
-MiscTab:Section({ Title = "Script Control", Desc = "Control del hub" })
+MiscTab:Section({ Title = "Script", Desc = "Control" })
 
 MiscTab:Button({
-    Title = "🔴 Destroy UI",
+    Title = "Destroy UI",
     Callback = function()
         Features.SilentAim = false
         Features.ShowFOV = false
@@ -1031,20 +926,18 @@ MiscTab:Button({
         
         Window:Destroy()
         if getgenv then getgenv().WaterHubLoaded = false end
-        Notify("Water Hub", "✓ Script destruido correctamente")
+        Notify("Water Hub", "✓ Destruido")
     end,
 })
 
 MiscTab:Button({
-    Title = "🔄 Rejoin Server",
+    Title = "Rejoin Server",
     Callback = function()
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end,
 })
 
--- ============================================
 -- INICIALIZACIÓN
--- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then CreateESP(player) end
 end
@@ -1084,5 +977,4 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 CombatTab:Select()
-print("✅ Water Hub | BlockSpin v3.0 - FOV Edition COMPLETO Y LISTO")
-print("📌 Presiona 'F' para abrir/cerrar el Hub")
+print("✅ Water Hub v3.0 - FUNCIONAL")
