@@ -1,8 +1,14 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN DELTA (OPTIMIZADA)
-    Bugs arreglados: Infinite Jump, Chams, WeaponMods, Speed, Stamina, Silent Aim
+    WATER HUB | BLOCKSPIN - VERSIÓN DELTA EJECUTABLE
+    Compatible con Delta Executor
     By: AdamABJ
 --]]
+
+-- Verificar si es Delta
+if not getgenv or not hookmetamethod then
+    warn("⚠️ Este script requiere Delta Executor o similar")
+    return
+end
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -16,6 +22,17 @@ local StarterGui = game:GetService("StarterGui")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
+-- Evitar múltiples ejecuciones
+if getgenv().WaterHubLoaded then
+    StarterGui:SetCore("SendNotification", {
+        Title = "Water Hub",
+        Text = "⚠️ Ya está cargado",
+        Duration = 2
+    })
+    return
+end
+getgenv().WaterHubLoaded = true
+
 -- ============================================
 -- CARGAR WINDUI
 -- ============================================
@@ -27,7 +44,12 @@ end)
 if ok then
     WindUI = result
 else
-    StarterGui:SetCore("SendNotification", {Title = "Error", Text = "No se pudo cargar WindUI", Duration = 3})
+    StarterGui:SetCore("SendNotification", {
+        Title = "Error",
+        Text = "No se pudo cargar WindUI",
+        Duration = 3
+    })
+    getgenv().WaterHubLoaded = false
     return
 end
 
@@ -112,19 +134,18 @@ local Settings = {
 local SilentTarget = nil
 local ESPs = {}
 local ChamsObjects = {}
-local Connections = {} -- Almacenar conexiones para limpiarlas
 local Threads = {}
 
 -- ============================================
--- CHAMS (ARREGLADO - SIN MEMORY LEAKS)
+-- CHAMS (SIN MEMORY LEAKS)
 -- ============================================
 local function CleanupChams(player)
     if ChamsObjects[player] then
         if ChamsObjects[player].highlight then
-            ChamsObjects[player].highlight:Destroy()
+            pcall(function() ChamsObjects[player].highlight:Destroy() end)
         end
         if ChamsObjects[player].connection then
-            ChamsObjects[player].connection:Disconnect()
+            pcall(function() ChamsObjects[player].connection:Disconnect() end)
         end
         ChamsObjects[player] = nil
     end
@@ -135,7 +156,7 @@ local function ApplyChams(player, enabled)
         local char = player.Character
         if not char then return end
         
-        CleanupChams(player) -- Limpiar existentes primero
+        CleanupChams(player)
         
         local highlight = Instance.new("Highlight")
         highlight.Name = "WaterHubChams"
@@ -146,7 +167,6 @@ local function ApplyChams(player, enabled)
         highlight.Adornee = char
         highlight.Parent = char
         
-        -- Conexión que se limpia automáticamente
         local conn = char.AncestryChanged:Connect(function(_, parent)
             if not parent then
                 CleanupChams(player)
@@ -171,10 +191,9 @@ local function UpdateAllChams()
 end
 
 -- ============================================
--- SILENT AIM (OPTIMIZADO - EARLY RETURN)
+-- SILENT AIM (DELTA COMPATIBLE)
 -- ============================================
 local function UpdateSilentAim()
-    -- Early return si está desactivado (ahorra recursos)
     if not Settings.SilentAim then 
         SilentTarget = nil
         return 
@@ -210,9 +229,9 @@ local function UpdateSilentAim()
     SilentTarget = closest
 end
 
--- Hook para Silent Aim
+-- Silent Aim Hook
 local oldNamecall
-if hookmetamethod and getnamecallmethod then
+pcall(function()
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         if not Settings.SilentAim or not SilentTarget then
             return oldNamecall(self, ...)
@@ -246,7 +265,7 @@ if hookmetamethod and getnamecallmethod then
         
         return oldNamecall(self, unpack(args))
     end)
-end
+end)
 
 -- ============================================
 -- AUTO HEAL
@@ -278,10 +297,8 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- SPEED (ARREGLADO - RESET CORRECTO)
+-- SPEED (CORREGIDO)
 -- ============================================
-local CurrentSpeedConnection = nil
-
 local function ApplySpeed()
     if not Settings.SpeedEnabled then return end
     local char = LocalPlayer.Character
@@ -293,16 +310,12 @@ local function ApplySpeed()
 end
 
 local function SpeedLoop()
-    -- Aplicar inmediatamente
     ApplySpeed()
-    
-    -- Reaplicar cada 0.5 segundos si cambia
     while Settings.SpeedEnabled do
         task.wait(0.5)
         ApplySpeed()
     end
     
-    -- Reset al desactivar
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChild("Humanoid")
@@ -311,13 +324,13 @@ local function SpeedLoop()
 end
 
 -- ============================================
--- INFINITE JUMP (ARREGLADO)
+-- INFINITE JUMP (CORREGIDO)
 -- ============================================
 local InfiniteJumpConnection = nil
 
 local function SetupInfiniteJump()
     if InfiniteJumpConnection then
-        InfiniteJumpConnection:Disconnect()
+        pcall(function() InfiniteJumpConnection:Disconnect() end)
         InfiniteJumpConnection = nil
     end
     
@@ -335,27 +348,23 @@ local function SetupInfiniteJump()
 end
 
 -- ============================================
--- INFINITE STAMINA (ARREGLADO - MÁS SIMPLE)
+-- INFINITE STAMINA (CORREGIDO)
 -- ============================================
 local function InfiniteStaminaLoop()
     while Settings.InfiniteStamina do
-        task.wait(0.1) -- Más frecuente para mejor efecto
+        task.wait(0.1)
         
         local char = LocalPlayer.Character
         if char then
-            -- Intentar múltiples métodos
             local hum = char:FindFirstChild("Humanoid")
             if hum then
-                -- Método 1: Atributo
                 pcall(function() hum:SetAttribute("Stamina", 100) end)
-                -- Método 2: Value object
                 local staminaVal = char:FindFirstChild("Stamina")
                 if staminaVal then
                     staminaVal.Value = 100
                 end
             end
             
-            -- Método 3: Value en player
             local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
             if staminaPlayer then
                 staminaPlayer.Value = 100
@@ -365,7 +374,7 @@ local function InfiniteStaminaLoop()
 end
 
 -- ============================================
--- WEAPON MODS (ARREGLADO - LOOP TERMINABLE)
+-- WEAPON MODS (CORREGIDO)
 -- ============================================
 local WeaponModsRunning = false
 
@@ -384,7 +393,7 @@ local function ApplyWeaponMods()
 end
 
 local function WeaponModsLoop()
-    if WeaponModsRunning then return end -- Evitar múltiples loops
+    if WeaponModsRunning then return end
     WeaponModsRunning = true
     
     while Settings.NoRecoil or Settings.NoSpread do
@@ -415,10 +424,7 @@ local function GetESP()
     ESPGui.ResetOnSpawn = false
     ESPGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    pcall(function()
-        ESPGui.Parent = CoreGui
-    end)
-    
+    pcall(function() ESPGui.Parent = CoreGui end)
     if not ESPGui.Parent then
         ESPGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
@@ -638,10 +644,9 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ============================================
--- RESPAWN HANDLER (MEJORADO)
+-- RESPAWN HANDLER
 -- ============================================
 LocalPlayer.CharacterAdded:Connect(function(char)
-    -- Aplicar speed si está activado
     if Settings.SpeedEnabled then
         task.wait(0.3)
         local hum = char:FindFirstChild("Humanoid")
@@ -650,14 +655,12 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         end
     end
     
-    -- Aplicar weapon mods
     if Settings.NoRecoil or Settings.NoSpread then
         task.wait(0.5)
         ApplyWeaponMods()
         UpdateWeaponMods()
     end
     
-    -- Reaplicar chams
     if Settings.Chams then
         task.wait(1)
         UpdateAllChams()
@@ -673,29 +676,28 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- UI - VENTANA PRINCIPAL
+-- UI - WINDUI
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
-    Folder = "WaterHub_Fixed",
+    Folder = "WaterHub_Delta",
     Icon = "solar:water-drops-bold-duotone",
     NewElements = true,
     HideSearchBar = false,
     OpenButton = {
-        Title = "Open Water Hub",
+        Title = "Water Hub",
         CornerRadius = UDim.new(1, 0),
         StrokeThickness = 2,
         Enabled = true,
         Draggable = true,
-        OnlyMobile = false,
         Scale = 0.5,
         Color = ColorSequence.new(Color3.fromHex("#00F2FE"), Color3.fromHex("#4FACFE")),
     },
     Topbar = { Height = 44, ButtonsType = "Mac" },
 })
 
-Window:Tag({ Title = "v2.1 | Fixed", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
+Window:Tag({ Title = "v2.1 Delta", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
 
 -- ============================================
 -- PESTAÑAS
@@ -767,7 +769,7 @@ AutoGroup:Toggle({
 })
 
 -- ============================================
--- MOVEMENT TAB (ARREGLADO)
+-- MOVEMENT TAB
 -- ============================================
 local MoveGroup = MovementTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚡ Movement" })
 
@@ -778,7 +780,6 @@ MoveGroup:Toggle({
         if v then 
             Threads.Speed = task.spawn(SpeedLoop) 
         else
-            -- Reset inmediato
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChild("Humanoid")
@@ -825,7 +826,7 @@ MoveGroup:Toggle({
 })
 
 -- ============================================
--- WEAPONS TAB (ARREGLADO)
+-- WEAPONS TAB
 -- ============================================
 local WeaponGroup = WeaponsTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🔫 Mods" })
 
@@ -891,7 +892,7 @@ EspGroup:Space()
 
 EspGroup:Toggle({
     Flag = "WeaponESP", Title = "Weapon Name ESP", Value = false,
-    Callback = function(v) Settings.NameESP = v end,
+    Callback = function(v) Settings.WeaponESP = v end,
 })
 
 EspGroup:Space()
@@ -950,24 +951,28 @@ ConfigGroup:Button({
     Justify = "Left",
     Color = Color3.fromRGB(255, 70, 70),
     Callback = function()
-        -- Limpiar todo
+        -- Parar threads
         for name, thread in pairs(Threads) do
             if type(thread) == "thread" then
                 pcall(function() task.cancel(thread) end)
             end
         end
         
+        -- Parar infinite jump
         if InfiniteJumpConnection then
-            InfiniteJumpConnection:Disconnect()
+            pcall(function() InfiniteJumpConnection:Disconnect() end)
         end
         
+        -- Limpiar chams
         for player, data in pairs(ChamsObjects) do
             CleanupChams(player)
         end
         
+        -- Reset
         Settings = {}
         SetFullBright()
         
+        -- Destruir ESP
         for _, esp in pairs(ESPs) do
             pcall(function()
                 esp.Name:Destroy()
@@ -978,12 +983,19 @@ ConfigGroup:Button({
             end)
         end
         
+        -- Destruir UI
         pcall(function() Window:Destroy() end)
         if ESPGui then
             pcall(function() ESPGui:Destroy() end)
         end
         
-        StarterGui:SetCore("SendNotification", {Title = "Water Hub", Text = "UI Destruida", Duration = 2})
+        getgenv().WaterHubLoaded = false
+        
+        StarterGui:SetCore("SendNotification", {
+            Title = "Water Hub",
+            Text = "✅ UI Destruida",
+            Duration = 2
+        })
     end,
 })
 
@@ -993,7 +1005,7 @@ ConfigGroup:Button({
 local CreditsGroup = ConfigTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "📝 Credits" })
 
 CreditsGroup:Button({
-    Title = "Water Hub Created By AdamABJ",
+    Title = "Water Hub By AdamABJ",
     Icon = "solar:star-bold-duotone",
     Color = Color3.fromHex("#EF4F1D"),
     Justify = "Center",
@@ -1001,8 +1013,9 @@ CreditsGroup:Button({
 })
 
 CreditsGroup:Space()
+
 CreditsGroup:Button({
-    Title = "v2.1 | Bugs Fixed",
+    Title = "v2.1 Delta Executable",
     Icon = "solar:check-circle-bold",
     Color = Color3.fromHex("#00F2FE"),
     Justify = "Center",
@@ -1010,21 +1023,16 @@ CreditsGroup:Button({
 })
 
 -- ============================================
--- NOTIFICACIÓN
+-- NOTIFICACIONES
 -- ============================================
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub | BlockSpin",
-        Content = "¡Todos los bugs arreglados!",
+        Content = "✅ Cargado para Delta Executor",
         Icon = "solar:water-drops-bold-duotone",
         Duration = 3,
     })
 end)
 
-StarterGui:SetCore("SendNotification", {
-    Title = "Water Hub",
-    Text = "✅ v2.1 Cargado - Bugs Fixed",
-    Duration = 3,
-})
-
-print("✅ Water Hub v2.1 | Todos los bugs arreglados")
+print("✅ Water Hub v2.1 Delta | Cargado correctamente")
+print("🔧 Todas las opciones optimizadas para Delta Executor")
