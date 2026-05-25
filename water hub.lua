@@ -1,15 +1,21 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN DELTA FINAL (FUNCIONAL)
-    Bugs arreglados: Infinite Jump, Chams, WeaponMods, Speed, Stamina, Silent Aim
+    WATER HUB | BLOCKSPIN - DELTA COMPATIBLE v2.1 FINAL
+    Optimizado para Delta Executor con todas las correcciones
     By: AdamABJ
 --]]
 
-if getgenv and getgenv().WaterHubLoaded then
-    print("⚠️ Water Hub ya está cargado")
+-- ============================================
+-- ANTI-RELOAD
+-- ============================================
+if _G.WaterHubLoaded then
+    warn("⚠️ Water Hub ya está cargado")
     return
 end
-getgenv().WaterHubLoaded = true
+_G.WaterHubLoaded = true
 
+-- ============================================
+-- SERVICIOS
+-- ============================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,20 +29,106 @@ local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
 -- ============================================
--- CARGAR WINDUI
+-- FUNCIONES DE COMPATIBILIDAD DELTA (CORREGIDO)
+-- ============================================
+local function spawnThread(func)
+    if typeof(task) == "table" and typeof(task.spawn) == "function" then
+        return task.spawn(func)
+    else
+        -- Fallback: usar coroutine.create en lugar de coroutine.wrap
+        local co = coroutine.create(func)
+        coroutine.resume(co)
+        return co  -- Retorna el coroutine para poder cerrarlo
+    end
+end
+
+local function killThread(thread)
+    if typeof(thread) == "thread" then
+        if typeof(task) == "table" and typeof(task.cancel) == "function" then
+            pcall(function() task.cancel(thread) end)
+        else
+            -- Cerrar coroutine
+            pcall(function() coroutine.close(thread) end)
+        end
+    end
+end
+
+local function waitFrame(n)
+    n = n or 1
+    if typeof(task) == "table" and typeof(task.wait) == "function" then
+        task.wait(n * (1/60))
+    else
+        wait(n * (1/60))
+    end
+end
+
+-- ============================================
+-- CARGAR WINDUI CON FALLBACK
 -- ============================================
 local WindUI
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
+local UILoaded = false
 
-if ok then
-    WindUI = result
-else
-    StarterGui:SetCore("SendNotification", {Title = "Error", Text = "No se pudo cargar WindUI", Duration = 3})
-    getgenv().WaterHubLoaded = false
+local function loadWindUI()
+    local attempts = 0
+    local maxAttempts = 3
+    
+    while attempts < maxAttempts and not UILoaded do
+        attempts = attempts + 1
+        
+        local success, result = pcall(function()
+            if syn and syn.request then
+                local response = syn.request({
+                    Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
+                    Method = "GET"
+                })
+                if response.StatusCode == 200 then
+                    return loadstring(response.Body)()
+                end
+            else
+                return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua", true))()
+            end
+        end)
+        
+        if success and result then
+            WindUI = result
+            UILoaded = true
+            print("✅ WindUI Cargado Exitosamente")
+            return true
+        else
+            warn("Intento " .. attempts .. " falló: " .. tostring(result))
+            waitFrame(30)
+        end
+    end
+    
+    if not UILoaded then
+        StarterGui:SetCore("SendNotification", {
+            Title = "Error",
+            Text = "No se pudo cargar la interfaz. Delta puede tener bloqueos.",
+            Duration = 5
+        })
+        _G.WaterHubLoaded = false
+        return false
+    end
+end
+
+if not loadWindUI() then
     return
 end
+
+-- ============================================
+-- VERIFICAR WINDUI CARGADO CORRECTAMENTE
+-- ============================================
+if not WindUI or typeof(WindUI.CreateWindow) ~= "function" then
+    StarterGui:SetCore("SendNotification", {
+        Title = "Error Crítico",
+        Text = "WindUI no cargó correctamente",
+        Duration = 5
+    })
+    _G.WaterHubLoaded = false
+    return
+end
+
+print("✅ WindUI verificado correctamente")
 
 -- ============================================
 -- REMOTES
@@ -119,11 +211,10 @@ local Settings = {
 local SilentTarget = nil
 local ESPs = {}
 local ChamsObjects = {}
-local Connections = {}
 local Threads = {}
 
 -- ============================================
--- CHAMS (ARREGLADO - SIN MEMORY LEAKS)
+-- CHAMS
 -- ============================================
 local function CleanupChams(player)
     if ChamsObjects[player] then
@@ -177,7 +268,7 @@ local function UpdateAllChams()
 end
 
 -- ============================================
--- SILENT AIM (OPTIMIZADO)
+-- SILENT AIM
 -- ============================================
 local function UpdateSilentAim()
     if not Settings.SilentAim then 
@@ -215,42 +306,50 @@ local function UpdateSilentAim()
     SilentTarget = closest
 end
 
--- Hook para Silent Aim
+-- Silent Aim Hook (Delta Compatible)
 local oldNamecall
-if hookmetamethod and getnamecallmethod then
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if not Settings.SilentAim or not SilentTarget then
-            return oldNamecall(self, ...)
-        end
-        
-        local method = getnamecallmethod()
-        if method ~= "FireServer" then
-            return oldNamecall(self, ...)
-        end
-        
-        local name = tostring(self.Name):lower()
-        if not (name:find("hit") or name:find("damage") or name:find("shoot")) then
-            return oldNamecall(self, ...)
-        end
-        
-        local args = {...}
-        if SilentTarget and SilentTarget.Character then
-            local targetPart = SilentTarget.Character:FindFirstChild(Settings.AimPart) or SilentTarget.Character:FindFirstChild("Head")
-            if targetPart then
-                for i = 1, #args do
-                    if typeof(args[i]) == "Vector3" then
-                        args[i] = targetPart.Position
-                    elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
-                        args[i] = targetPart
-                    elseif typeof(args[i]) == "Player" then
-                        args[i] = SilentTarget
+if typeof(hookmetamethod) == "function" and typeof(getnamecallmethod) == "function" then
+    local success = pcall(function()
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if not Settings.SilentAim or not SilentTarget then
+                return oldNamecall(self, ...)
+            end
+            
+            local method = getnamecallmethod()
+            if method ~= "FireServer" then
+                return oldNamecall(self, ...)
+            end
+            
+            local name = tostring(self.Name):lower()
+            if not (name:find("hit") or name:find("damage") or name:find("shoot")) then
+                return oldNamecall(self, ...)
+            end
+            
+            local args = {...}
+            if SilentTarget and SilentTarget.Character then
+                local targetPart = SilentTarget.Character:FindFirstChild(Settings.AimPart) or SilentTarget.Character:FindFirstChild("Head")
+                if targetPart then
+                    for i = 1, #args do
+                        if typeof(args[i]) == "Vector3" then
+                            args[i] = targetPart.Position
+                        elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
+                            args[i] = targetPart
+                        elseif typeof(args[i]) == "Player" then
+                            args[i] = SilentTarget
+                        end
                     end
                 end
             end
-        end
-        
-        return oldNamecall(self, unpack(args))
+            
+            return oldNamecall(self, unpack(args))
+        end)
     end)
+    
+    if not success then
+        warn("⚠️ Silent Aim hook falló en Delta")
+    end
+else
+    warn("⚠️ hookmetamethod no soportado - Silent Aim desactivado")
 end
 
 -- ============================================
@@ -258,7 +357,7 @@ end
 -- ============================================
 local function AutoHealLoop()
     while Settings.AutoHeal do
-        task.wait(1)
+        waitFrame(60)
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
@@ -275,7 +374,7 @@ end
 -- ============================================
 local function AutoHitLoop()
     while Settings.AutoHit do
-        task.wait(0.2)
+        waitFrame(12)
         if SilentTarget then
             FireSend("Hit", SilentTarget, Settings.AimPart)
         end
@@ -283,7 +382,7 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- SPEED (ARREGLADO)
+-- SPEED
 -- ============================================
 local function ApplySpeed()
     if not Settings.SpeedEnabled then return end
@@ -299,7 +398,7 @@ local function SpeedLoop()
     ApplySpeed()
     
     while Settings.SpeedEnabled do
-        task.wait(0.5)
+        waitFrame(30)
         ApplySpeed()
     end
     
@@ -311,7 +410,7 @@ local function SpeedLoop()
 end
 
 -- ============================================
--- INFINITE JUMP (ARREGLADO)
+-- INFINITE JUMP (CORREGIDO - SIN DOBLE PCALL)
 -- ============================================
 local InfiniteJumpConnection = nil
 
@@ -327,7 +426,15 @@ local function SetupInfiniteJump()
             if char then
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
-                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    -- ✅ CORREGIDO: Solo un pcall
+                    local success = pcall(function()
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end)
+                    
+                    -- Si falla, usar fallback
+                    if not success then
+                        hum.Jump = true
+                    end
                 end
             end
         end)
@@ -335,11 +442,11 @@ local function SetupInfiniteJump()
 end
 
 -- ============================================
--- INFINITE STAMINA (ARREGLADO)
+-- INFINITE STAMINA
 -- ============================================
 local function InfiniteStaminaLoop()
     while Settings.InfiniteStamina do
-        task.wait(0.1)
+        waitFrame(6)
         
         local char = LocalPlayer.Character
         if char then
@@ -361,7 +468,7 @@ local function InfiniteStaminaLoop()
 end
 
 -- ============================================
--- WEAPON MODS (ARREGLADO)
+-- WEAPON MODS
 -- ============================================
 local WeaponModsRunning = false
 
@@ -385,7 +492,7 @@ local function WeaponModsLoop()
     
     while Settings.NoRecoil or Settings.NoSpread do
         ApplyWeaponMods()
-        task.wait(0.5)
+        waitFrame(30)
     end
     
     WeaponModsRunning = false
@@ -394,7 +501,7 @@ end
 local function UpdateWeaponMods()
     if Settings.NoRecoil or Settings.NoSpread then
         if not WeaponModsRunning then
-            Threads.WeaponMods = task.spawn(WeaponModsLoop)
+            Threads.WeaponMods = spawnThread(WeaponModsLoop)
         end
     end
 end
@@ -411,10 +518,7 @@ local function GetESP()
     ESPGui.ResetOnSpawn = false
     ESPGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    pcall(function()
-        ESPGui.Parent = CoreGui
-    end)
-    
+    pcall(function() ESPGui.Parent = CoreGui end)
     if not ESPGui.Parent then
         ESPGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
@@ -590,10 +694,10 @@ local function AntiAFKLoop()
     while Settings.AntiAFK do
         pcall(function()
             VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-            task.wait(0.1)
+            waitFrame(6)
             VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
         end)
-        task.wait(60)
+        waitFrame(3600)
     end
 end
 
@@ -638,7 +742,7 @@ end)
 -- ============================================
 LocalPlayer.CharacterAdded:Connect(function(char)
     if Settings.SpeedEnabled then
-        task.wait(0.3)
+        waitFrame(18)
         local hum = char:FindFirstChild("Humanoid")
         if hum then 
             hum.WalkSpeed = Settings.SpeedValue 
@@ -646,13 +750,13 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
     
     if Settings.NoRecoil or Settings.NoSpread then
-        task.wait(0.5)
+        waitFrame(30)
         ApplyWeaponMods()
         UpdateWeaponMods()
     end
     
     if Settings.Chams then
-        task.wait(1)
+        waitFrame(60)
         UpdateAllChams()
     end
 end)
@@ -671,7 +775,7 @@ end)
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
-    Folder = "WaterHub_Fixed",
+    Folder = "WaterHub_Delta",
     Icon = "solar:water-drops-bold-duotone",
     NewElements = true,
     HideSearchBar = false,
@@ -688,7 +792,7 @@ local Window = WindUI:CreateWindow({
     Topbar = { Height = 44, ButtonsType = "Mac" },
 })
 
-Window:Tag({ Title = "v2.1 | Fixed", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
+Window:Tag({ Title = "v2.1 | Delta Fixed", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
 
 -- ============================================
 -- PESTAÑAS
@@ -735,7 +839,7 @@ AutoGroup:Toggle({
     Flag = "AutoHeal", Title = "Auto Heal", Value = false,
     Callback = function(v)
         Settings.AutoHeal = v
-        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
+        if v then Threads.AutoHeal = spawnThread(AutoHealLoop) end
     end,
 })
 
@@ -755,7 +859,7 @@ AutoGroup:Toggle({
     Flag = "AutoHit", Title = "Auto Hit", Value = false,
     Callback = function(v)
         Settings.AutoHit = v
-        if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
+        if v then Threads.AutoHit = spawnThread(AutoHitLoop) end
     end,
 })
 
@@ -769,7 +873,7 @@ MoveGroup:Toggle({
     Callback = function(v)
         Settings.SpeedEnabled = v
         if v then 
-            Threads.Speed = task.spawn(SpeedLoop) 
+            Threads.Speed = spawnThread(SpeedLoop) 
         else
             local char = LocalPlayer.Character
             if char then
@@ -812,7 +916,7 @@ MoveGroup:Toggle({
     Flag = "InfiniteStamina", Title = "Infinite Stamina", Value = false,
     Callback = function(v)
         Settings.InfiniteStamina = v
-        if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
+        if v then Threads.Stamina = spawnThread(InfiniteStaminaLoop) end
     end,
 })
 
@@ -915,7 +1019,7 @@ MiscGroup:Toggle({
     Flag = "AntiAFK", Title = "Anti AFK", Value = false,
     Callback = function(v)
         Settings.AntiAFK = v
-        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
+        if v then Threads.AntiAFK = spawnThread(AntiAFKLoop) end
     end,
 })
 
@@ -943,9 +1047,7 @@ ConfigGroup:Button({
     Color = Color3.fromRGB(255, 70, 70),
     Callback = function()
         for name, thread in pairs(Threads) do
-            if type(thread) == "thread" then
-                pcall(function() task.cancel(thread) end)
-            end
+            killThread(thread)
         end
         
         if InfiniteJumpConnection then
@@ -974,7 +1076,7 @@ ConfigGroup:Button({
             pcall(function() ESPGui:Destroy() end)
         end
         
-        getgenv().WaterHubLoaded = false
+        _G.WaterHubLoaded = false
         StarterGui:SetCore("SendNotification", {Title = "Water Hub", Text = "UI Destruida", Duration = 2})
     end,
 })
@@ -995,7 +1097,7 @@ CreditsGroup:Button({
 CreditsGroup:Space()
 
 CreditsGroup:Button({
-    Title = "v2.1 | Bugs Fixed",
+    Title = "v2.1 | Delta Compatible Fixed",
     Icon = "solar:check-circle-bold",
     Color = Color3.fromHex("#00F2FE"),
     Justify = "Center",
@@ -1008,7 +1110,7 @@ CreditsGroup:Button({
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub | BlockSpin",
-        Content = "¡Todos los bugs arreglados!",
+        Content = "✅ v2.1 Cargado - Delta Compatible!",
         Icon = "solar:water-drops-bold-duotone",
         Duration = 3,
     })
@@ -1016,8 +1118,8 @@ end)
 
 StarterGui:SetCore("SendNotification", {
     Title = "Water Hub",
-    Text = "✅ v2.1 Cargado - Bugs Fixed",
+    Text = "✅ v2.1 Cargado - Delta Compatible",
     Duration = 3,
 })
 
-print("✅ Water Hub v2.1 | Todos los bugs arreglados")
+print("✅ Water Hub v2.1 | Delta Executor Compatible - FINAL EDITION")
