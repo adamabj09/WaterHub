@@ -1,6 +1,6 @@
 --[[
     WATER HUB | BLOCKSPIN - VERSIÓN DELTA FINAL
-    Con WindUI funcional
+    Librería WindUI Oficial
     By: AdamABJ
 --]]
 
@@ -23,28 +23,40 @@ local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
 -- ============================================
--- CARGAR WINDUI FUNCIONAL
+-- CARGAR WINDUI OFICIAL
 -- ============================================
-local WindUI
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet('https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/main_example.lua'))()
+local cloneref = (cloneref or clonereference or function(instance)
+    return instance
 end)
 
-if not ok or not result then
+local ReplicatedStorageClone = cloneref(game:GetService("ReplicatedStorage"))
+local RunServiceClone = cloneref(game:GetService("RunService"))
+
+local WindUI
+
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+
+    if ok then
+        WindUI = result
+    else
+        if RunServiceClone:IsStudio() or not writefile then
+            WindUI = require(ReplicatedStorageClone:WaitForChild("WindUI"):WaitForChild("Init"))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+        end
+    end
+end
+
+if not WindUI then
     warn("❌ Error cargando WindUI")
     getgenv().WaterHubLoaded = false
     return
 end
 
-WindUI = result
-
-if not WindUI then
-    warn("❌ WindUI es nil")
-    getgenv().WaterHubLoaded = false
-    return
-end
-
-print("✅ WindUI cargado correctamente")
+print("✅ WindUI Cargado Correctamente")
 
 -- ============================================
 -- REMOTES
@@ -668,7 +680,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- UI - WINDUI
+-- UI - WINDUI OFICIAL
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
@@ -677,30 +689,58 @@ local Window = WindUI:CreateWindow({
     Icon = "solar:water-drops-bold-duotone",
     Theme = "Dark",
     NewElements = true,
+    Transparent = true,
+    ToggleKey = Enum.KeyCode.F,
+    Acrylic = true,
 })
 
-Window:Tag({ 
-    Title = "v2.1 Final | Delta Ready", 
-    Icon = "github", 
-    Color = Color3.fromHex("#00F2FE"), 
+local Tag = Window:Tag({
+    Title = "v2.1 | Delta Ready",
+    Color = "Text",
 })
 
 -- ============================================
 -- PESTAÑAS
 -- ============================================
-local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "solar:swords-bold-duotone" })
-local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "solar:user-bold-duotone" })
-local WeaponsTab = Window:Tab({ Title = "WEAPON", Icon = "solar:tuning-bold-duotone" })
-local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "solar:eye-bold-duotone" })
-local MiscTab = Window:Tab({ Title = "MISC", Icon = "solar:slider-minimalistic-horizontal-bold-duotone" })
-local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "solar:settings-bold-duotone" })
+local CombatTab = Window:Tab({
+    Title = "COMBAT",
+    Icon = "solar:swords-bold-duotone",
+})
+
+local MovementTab = Window:Tab({
+    Title = "MOVEMENT",
+    Icon = "solar:user-bold-duotone",
+})
+
+local WeaponsTab = Window:Tab({
+    Title = "WEAPON",
+    Icon = "solar:tuning-bold-duotone",
+})
+
+local VisualTab = Window:Tab({
+    Title = "VISUAL",
+    Icon = "solar:eye-bold-duotone",
+})
+
+local MiscTab = Window:Tab({
+    Title = "MISC",
+    Icon = "solar:slider-minimalistic-horizontal-bold-duotone",
+})
+
+local ConfigTab = Window:Tab({
+    Title = "CONFIG",
+    Icon = "solar:settings-bold-duotone",
+})
 
 CombatTab:Select()
 
 -- ============================================
 -- COMBAT TAB
 -- ============================================
-CombatTab:Section({ Title = "⚔️ Combat" })
+CombatTab:Section({
+    Title = "⚔️ Combat",
+    Desc = "Sistemas de combate",
+})
 
 local CombatGroup = CombatTab:Group()
 
@@ -710,7 +750,7 @@ CombatGroup:Toggle({
     Callback = function(v) Settings.SilentAim = v end,
 })
 
-CombatGroup:Space()
+CombatGroup:Space({ Columns = 0.5 })
 
 CombatGroup:Slider({
     Title = "FOV Radius",
@@ -720,7 +760,7 @@ CombatGroup:Slider({
     Callback = function(v) Settings.FOV = v end,
 })
 
-CombatGroup:Space()
+CombatGroup:Space({ Columns = 0.5 })
 
 CombatGroup:Dropdown({
     Title = "Aim Part",
@@ -731,7 +771,10 @@ CombatGroup:Dropdown({
 
 CombatTab:Space({ Columns = 2 })
 
-CombatTab:Section({ Title = "🤖 Auto" })
+CombatTab:Section({
+    Title = "🤖 Auto",
+    Desc = "Automatizaciones",
+})
 
 local AutoGroup = CombatTab:Group()
 
@@ -744,7 +787,7 @@ AutoGroup:Toggle({
     end,
 })
 
-AutoGroup:Space()
+AutoGroup:Space({ Columns = 0.5 })
 
 AutoGroup:Slider({
     Title = "Heal at HP%",
@@ -754,7 +797,7 @@ AutoGroup:Slider({
     Callback = function(v) Settings.HealPercent = v end,
 })
 
-AutoGroup:Space()
+AutoGroup:Space({ Columns = 0.5 })
 
 AutoGroup:Toggle({
     Title = "Auto Hit",
@@ -768,7 +811,10 @@ AutoGroup:Toggle({
 -- ============================================
 -- MOVEMENT TAB
 -- ============================================
-MovementTab:Section({ Title = "⚡ Movement" })
+MovementTab:Section({
+    Title = "⚡ Movement",
+    Desc = "Sistemas de movimiento",
+})
 
 local MoveGroup = MovementTab:Group()
 
@@ -789,7 +835,7 @@ MoveGroup:Toggle({
     end,
 })
 
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Slider({
     Title = "Speed Amount",
@@ -804,7 +850,7 @@ MoveGroup:Slider({
     end,
 })
 
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Toggle({
     Title = "Infinite Jump",
@@ -815,7 +861,7 @@ MoveGroup:Toggle({
     end,
 })
 
-MoveGroup:Space()
+MoveGroup:Space({ Columns = 0.5 })
 
 MoveGroup:Toggle({
     Title = "Infinite Stamina",
@@ -829,7 +875,10 @@ MoveGroup:Toggle({
 -- ============================================
 -- WEAPONS TAB
 -- ============================================
-WeaponsTab:Section({ Title = "🔫 Weapon Mods" })
+WeaponsTab:Section({
+    Title = "🔫 Weapon Mods",
+    Desc = "Modificaciones",
+})
 
 local WeaponGroup = WeaponsTab:Group()
 
@@ -842,7 +891,7 @@ WeaponGroup:Toggle({
     end,
 })
 
-WeaponGroup:Space()
+WeaponGroup:Space({ Columns = 0.5 })
 
 WeaponGroup:Toggle({
     Title = "No Spread",
@@ -856,7 +905,10 @@ WeaponGroup:Toggle({
 -- ============================================
 -- VISUAL TAB
 -- ============================================
-VisualTab:Section({ Title = "👤 Chams" })
+VisualTab:Section({
+    Title = "👤 Chams",
+    Desc = "Resaltar jugadores",
+})
 
 local ChamsGroup = VisualTab:Group()
 
@@ -871,7 +923,10 @@ ChamsGroup:Toggle({
 
 VisualTab:Space({ Columns = 2 })
 
-VisualTab:Section({ Title = "👁️ ESP" })
+VisualTab:Section({
+    Title = "👁️ ESP",
+    Desc = "Información en pantalla",
+})
 
 local EspGroup = VisualTab:Group()
 
@@ -881,7 +936,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.NameESP = v end,
 })
 
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
     Title = "Health ESP",
@@ -889,7 +944,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.HealthESP = v end,
 })
 
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
     Title = "Distance ESP",
@@ -897,7 +952,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.DistanceESP = v end,
 })
 
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
     Title = "Weapon ESP",
@@ -905,7 +960,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.WeaponESP = v end,
 })
 
-EspGroup:Space()
+EspGroup:Space({ Columns = 0.5 })
 
 EspGroup:Toggle({
     Title = "Weapon Icon ESP",
@@ -915,7 +970,10 @@ EspGroup:Toggle({
 
 VisualTab:Space({ Columns = 2 })
 
-VisualTab:Section({ Title = "🌍 World" })
+VisualTab:Section({
+    Title = "🌍 World",
+    Desc = "Efectos globales",
+})
 
 local WorldGroup = VisualTab:Group()
 
@@ -931,7 +989,10 @@ WorldGroup:Toggle({
 -- ============================================
 -- MISC TAB
 -- ============================================
-MiscTab:Section({ Title = "⚙️ Miscellaneous" })
+MiscTab:Section({
+    Title = "⚙️ Miscellaneous",
+    Desc = "Otras opciones",
+})
 
 local MiscGroup = MiscTab:Group()
 
@@ -947,7 +1008,10 @@ MiscGroup:Toggle({
 -- ============================================
 -- CONFIG TAB
 -- ============================================
-ConfigTab:Section({ Title = "⚙️ Server" })
+ConfigTab:Section({
+    Title = "⚙️ Server",
+    Desc = "Servidor",
+})
 
 local ServerGroup = ConfigTab:Group()
 
@@ -959,15 +1023,35 @@ ServerGroup:Button({
     end,
 })
 
+ServerGroup:Space({ Columns = 0.5 })
+
+ServerGroup:Button({
+    Title = "Copy Game ID",
+    Icon = "solar:copy-bold",
+    Callback = function()
+        setclipboard(tostring(game.PlaceId))
+        WindUI:Notify({
+            Title = "Copiado",
+            Content = "Game ID copiado al portapapeles",
+            Icon = "solar:copy-bold",
+            Duration = 2,
+        })
+    end,
+})
+
 ConfigTab:Space({ Columns = 2 })
 
-ConfigTab:Section({ Title = "💀 Danger Zone" })
+ConfigTab:Section({
+    Title = "💀 Danger Zone",
+    Desc = "Opciones peligrosas",
+})
 
 local DangerGroup = ConfigTab:Group()
 
 DangerGroup:Button({
     Title = "Destroy UI",
     Icon = "solar:logout-3-bold",
+    Size = "Small",
     Color = Color3.fromRGB(255, 70, 70),
     Callback = function()
         -- Parar threads
@@ -1016,22 +1100,27 @@ DangerGroup:Button({
 
 ConfigTab:Space({ Columns = 2 })
 
-ConfigTab:Section({ Title = "📝 About" })
+ConfigTab:Section({
+    Title = "📝 About",
+    Desc = "Acerca de",
+})
 
 local AboutGroup = ConfigTab:Group()
 
 AboutGroup:Button({
     Title = "Water Hub v2.1",
     Icon = "solar:star-bold-duotone",
+    Size = "Small",
     Color = Color3.fromHex("#EF4F1D"),
     Callback = function() end,
 })
 
-AboutGroup:Space()
+AboutGroup:Space({ Columns = 0.5 })
 
 AboutGroup:Button({
     Title = "By: AdamABJ",
     Icon = "solar:check-circle-bold",
+    Size = "Small",
     Color = Color3.fromHex("#00F2FE"),
     Callback = function() end,
 })
@@ -1049,5 +1138,5 @@ pcall(function()
 end)
 
 print("✅ Water Hub v2.1 Cargado Completamente")
-print("🎮 Todas las funciones activas")
-print("📍 Presiona F para abrir/cerrar")
+print("🎮 Todas las funciones activas y operacionales")
+print("📍 Presiona F para abrir/cerrar la UI")
