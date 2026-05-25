@@ -1,32 +1,72 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSION FINAL FUNCIONAL
-    Pestañas: COMBAT, MOVEMENT, WEAPON, VISUAL, AUTOFARM, GUNS AMMO, SPECTATE, MISC, CONFIG
-]]
+    WATER HUB | BLOCKSPIN - VERSIÓN FINAL
+    By: AdamABJ
+    Con ESP de inventario (iconos reales de armas)
+--]]
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
-local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
-
-local gethui = gethui or function() return CoreGui end
+local Lighting = game:GetService("Lighting")
 
 -- ============================================
 -- CARGAR WINDUI
 -- ============================================
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+if not WindUI then return end
 
-if not WindUI then
-    warn("Error cargando WindUI")
-    return
+-- ============================================
+-- REMOTES REALES DE BLOCKSPIN
+-- ============================================
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+local SendRemote = Remotes and Remotes:FindFirstChild("Send")
+local HitDetection = ReplicatedStorage:FindFirstChild("HitDetection")
+
+local function FireSend(action, ...)
+    if SendRemote then
+        pcall(function() SendRemote:FireServer(action, ...) end)
+    end
 end
 
 -- ============================================
--- VARIABLES Y ESTADO
+-- IDs DE IMÁGENES DE ARMAS (PARA ESP)
+-- ============================================
+local WeaponImages = {
+    ["AK47"] = "rbxassetid://124555430577178",
+    ["AUG"] = "rbxassetid://83729841153733",
+    ["AWP"] = "rbxassetid://126356167274927",
+    ["Anaconda"] = "rbxassetid://121547020534134",
+    ["C9"] = "rbxassetid://79659079988022",
+    ["Crossbow"] = "rbxassetid://89240642376715",
+    ["Double Barrel"] = "rbxassetid://83625765638039",
+    ["Draco"] = "rbxassetid://120937616266903",
+    ["Firework Launcher"] = "rbxassetid://88284317820274",
+    ["G3"] = "rbxassetid://133411291398002",
+    ["Glock"] = "rbxassetid://97846154366870",
+    ["Hunting Rifle"] = "rbxassetid://81547704965153",
+    ["M16"] = "rbxassetid://74321352408872",
+    ["M24"] = "rbxassetid://73387965982603",
+    ["M249"] = "rbxassetid://80044343904275",
+    ["MP5"] = "rbxassetid://80501079489777",
+    ["P226"] = "rbxassetid://92521100297776",
+    ["P90"] = "rbxassetid://110565990980804",
+    ["RPG"] = "rbxassetid://138426000142807",
+    ["Remington"] = "rbxassetid://101271375930409",
+    ["Sawnoff"] = "rbxassetid://90588305892707",
+    ["Skorpion"] = "rbxassetid://105318377951686",
+    ["Uzi"] = "rbxassetid://109290695652338",
+}
+
+local function GetWeaponImage(weaponName)
+    return WeaponImages[weaponName] or "rbxassetid://0"
+end
+
+-- ============================================
+-- VARIABLES GLOBALES
 -- ============================================
 local Features = {
     -- Combat
@@ -36,249 +76,325 @@ local Features = {
     AutoHeal = false,
     HealPercent = 70,
     AutoHit = false,
-    HitboxExpander = false,
     
     -- Movement
     SpeedEnabled = false,
     SpeedValue = 50,
     InfiniteJump = false,
-    InfiniteStamina = false,
     NoClip = false,
     Fly = false,
     
-    -- Weapon
+    -- Weapons
     NoRecoil = false,
     NoSpread = false,
     RapidFire = false,
-    InstantReload = false,
     
-    -- Visual
+    -- ESP
     ESPName = false,
     ESPHealth = false,
     ESPDistance = false,
     ESPWeapon = false,
-    Chams = false,
-    Tracers = false,
+    ESPWeaponIcon = false,
     FullBright = false,
-    NoFog = false,
     
-    -- AutoFarm
-    AutoFarm = false,
-    AutoATM = false,
-    AutoDeposit = false,
-    SelectedJob = "None",
-    
-    -- Guns Ammo
-    InfiniteAmmo = false,
-    NoReload = false,
-    
-    -- Spectate
-    SpectateTarget = nil,
-    Freecam = false,
+    -- Magneto
+    Magneto = false,
+    MagnetoRadius = 50,
     
     -- Misc
     AntiAFK = false,
-    AutoAccept = false
 }
 
-local Threads = {}
-local ESPObjects = {}
-local ChamsObjects = {}
+local ESPs = {}
+local SilentAimTarget = nil
 local MagnetoItems = {}
 local NoClipConnection = nil
-local SilentAimTarget = nil
-local OldNamecall = nil
-local SpectateConnection = nil
 local FlyConnection = nil
+local Threads = {}
 
 -- ============================================
--- NOTIFICACIONES
+-- FUNCIONES DE UTILIDAD
 -- ============================================
-local function Notify(title, message)
-    pcall(function()
-        WindUI:Notify({
-            Title = title,
-            Content = message,
-            Duration = 3
-        })
-    end)
-end
-
--- ============================================
--- FUNCIONES UTILIDAD
--- ============================================
-local function GetMoney()
-    local cash, bank = 0, 0
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats then
-        local cashObj = leaderstats:FindFirstChild("Cash")
-        local bankObj = leaderstats:FindFirstChild("Bank")
-        if cashObj then cash = tonumber(cashObj.Value) or 0 end
-        if bankObj then bank = tonumber(bankObj.Value) or 0 end
-    end
-    return cash, bank
-end
-
-local function GetEquippedTool(player)
+local function GetEquippedWeapon(player)
     local char = player.Character
-    if not char then return nil end
+    if not char then return nil, nil end
+    
     local tool = char:FindFirstChildOfClass("Tool")
-    return tool and tool.Name or nil
+    if tool then
+        return tool.Name, GetWeaponImage(tool.Name)
+    end
+    
+    return nil, nil
 end
 
-local function GetPlayers()
-    local list = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
+local function ApplyWeaponMods()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    
+    if Features.NoRecoil then
+        tool:SetAttribute("recoil", 0)
     end
-    return list
+    
+    if Features.NoSpread then
+        tool:SetAttribute("accuracy", 1)
+    end
+    
+    if Features.RapidFire then
+        tool:SetAttribute("fire_rate", 0)
+    end
 end
 
 -- ============================================
--- COMBAT - SILENT AIM
+-- ESP DE JUGADORES (CON ARMAS)
 -- ============================================
-RunService.RenderStepped:Connect(function()
-    if not Features.SilentAim then
-        SilentAimTarget = nil
-        return
-    end
-    
-    local mouse = LocalPlayer:GetMouse()
-    local cam = Workspace.CurrentCamera
-    if not mouse or not cam then return end
-    
-    local closest = nil
-    local shortestDist = Features.FOV
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local targetPart = player.Character:FindFirstChild(Features.AimPart) 
-                or player.Character:FindFirstChild("Head")
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            
-            if targetPart and humanoid and humanoid.Health > 0 then
-                local pos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
-                if onScreen then
-                    local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                    if dist < shortestDist then
-                        shortestDist = dist
-                        closest = player
-                    end
-                end
-            end
-        end
-    end
-    
-    SilentAimTarget = closest
-end)
+local ESPGui = nil
 
-local function SetupSilentAim()
-    if OldNamecall then return end
+local function GetESP()
+    if ESPGui and ESPGui.Parent then return ESPGui end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "WaterHubESP"
+    sg.ResetOnSpawn = false
+    sg.Parent = CoreGui
+    ESPGui = sg
+    return sg
+end
+
+local function CreateESP(player)
+    if ESPs[player] then return end
     
-    OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
+    local gui = GetESP()
+    local esp = {}
+    
+    -- Nombre
+    esp.Name = Instance.new("TextLabel")
+    esp.Name.Size = UDim2.new(0, 200, 0, 20)
+    esp.Name.BackgroundTransparency = 1
+    esp.Name.TextColor3 = Color3.fromRGB(255, 255, 255)
+    esp.Name.TextSize = 12
+    esp.Name.Font = Enum.Font.GothamBold
+    esp.Name.Parent = gui
+    
+    -- Barra de vida
+    esp.HealthBg = Instance.new("Frame")
+    esp.HealthBg.Size = UDim2.new(0, 100, 0, 6)
+    esp.HealthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    esp.HealthBg.BorderSizePixel = 0
+    esp.HealthBg.Parent = gui
+    
+    esp.HealthBar = Instance.new("Frame")
+    esp.HealthBar.Size = UDim2.new(1, 0, 1, 0)
+    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    esp.HealthBar.BorderSizePixel = 0
+    esp.HealthBar.Parent = esp.HealthBg
+    
+    -- Distancia
+    esp.Distance = Instance.new("TextLabel")
+    esp.Distance.Size = UDim2.new(0, 100, 0, 15)
+    esp.Distance.BackgroundTransparency = 1
+    esp.Distance.TextColor3 = Color3.fromRGB(200, 200, 200)
+    esp.Distance.TextSize = 10
+    esp.Distance.Font = Enum.Font.Gotham
+    esp.Distance.Parent = gui
+    
+    -- Arma (texto)
+    esp.Weapon = Instance.new("TextLabel")
+    esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
+    esp.Weapon.BackgroundTransparency = 1
+    esp.Weapon.TextColor3 = Color3.fromRGB(255, 200, 100)
+    esp.Weapon.TextSize = 10
+    esp.Weapon.Font = Enum.Font.GothamBold
+    esp.Weapon.Parent = gui
+    
+    -- Icono del arma
+    esp.WeaponIcon = Instance.new("ImageLabel")
+    esp.WeaponIcon.Size = UDim2.new(0, 20, 0, 20)
+    esp.WeaponIcon.BackgroundTransparency = 1
+    esp.WeaponIcon.Parent = gui
+    
+    esp.LastWeapon = nil
+    ESPs[player] = esp
+end
+
+local function UpdateESP()
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    
+    local myChar = LocalPlayer.Character
+    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if myPos then myPos = myPos.Position end
+    
+    for player, esp in pairs(ESPs) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
         
-        if Features.SilentAim and method == "FireServer" and SilentAimTarget then
-            local name = self.Name:lower()
-            if name:find("hit") or name:find("damage") or name:find("shoot") or name:find("fire") then
-                local targetChar = SilentAimTarget.Character
-                if targetChar then
-                    local targetPart = targetChar:FindFirstChild(Features.AimPart) 
-                        or targetChar:FindFirstChild("Head")
-                    if targetPart then
-                        for i = 1, #args do
-                            if typeof(args[i]) == "Vector3" then
-                                args[i] = targetPart.Position
-                            elseif typeof(args[i]) == "CFrame" then
-                                args[i] = CFrame.new(targetPart.Position)
-                            elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
-                                args[i] = targetPart
+        if hrp and hum and hum.Health > 0 then
+            local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            
+            if onScreen then
+                local distance = myPos and (myPos - hrp.Position).Magnitude or 0
+                local healthPercent = hum.Health / hum.MaxHealth
+                
+                -- Nombre
+                if Features.ESPName then
+                    esp.Name.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 50)
+                    esp.Name.Text = player.Name
+                    esp.Name.Visible = true
+                else
+                    esp.Name.Visible = false
+                end
+                
+                -- Barra de vida
+                if Features.ESPHealth then
+                    esp.HealthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+                    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+                    esp.HealthBg.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 30)
+                    esp.HealthBg.Visible = true
+                else
+                    esp.HealthBg.Visible = false
+                end
+                
+                -- Distancia
+                if Features.ESPDistance then
+                    esp.Distance.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 20)
+                    esp.Distance.Text = math.floor(distance) .. "m"
+                    esp.Distance.Visible = true
+                else
+                    esp.Distance.Visible = false
+                end
+                
+                -- Arma equipada (con icono)
+                if Features.ESPWeapon or Features.ESPWeaponIcon then
+                    local weaponName, weaponIcon = GetEquippedWeapon(player)
+                    
+                    if weaponName and weaponName ~= esp.LastWeapon then
+                        esp.LastWeapon = weaponName
+                        if Features.ESPWeapon then
+                            esp.Weapon.Text = "🔫 " .. weaponName
+                        end
+                        if Features.ESPWeaponIcon and weaponIcon then
+                            esp.WeaponIcon.Image = weaponIcon
+                        end
+                    end
+                    
+                    if weaponName then
+                        local yOffset = 0
+                        
+                        if Features.ESPWeapon then
+                            esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y + 10)
+                            esp.Weapon.Visible = true
+                            yOffset = 25
+                        else
+                            esp.Weapon.Visible = false
+                        end
+                        
+                        if Features.ESPWeaponIcon and weaponIcon then
+                            esp.WeaponIcon.Position = UDim2.new(0, pos.X - 95, 0, pos.Y + 10)
+                            esp.WeaponIcon.Visible = true
+                        else
+                            esp.WeaponIcon.Visible = false
+                        end
+                    else
+                        esp.Weapon.Visible = false
+                        esp.WeaponIcon.Visible = false
+                    end
+                else
+                    esp.Weapon.Visible = false
+                    esp.WeaponIcon.Visible = false
+                end
+            else
+                esp.Name.Visible = false
+                esp.HealthBg.Visible = false
+                esp.Distance.Visible = false
+                esp.Weapon.Visible = false
+                esp.WeaponIcon.Visible = false
+            end
+        else
+            esp.Name.Visible = false
+            esp.HealthBg.Visible = false
+            esp.Distance.Visible = false
+            esp.Weapon.Visible = false
+            esp.WeaponIcon.Visible = false
+        end
+    end
+end
+
+-- ============================================
+-- SILENT AIM
+-- ============================================
+local function SilentAimLoop()
+    while Features.SilentAim do
+        local mouse = LocalPlayer:GetMouse()
+        local cam = Workspace.CurrentCamera
+        if mouse and cam then
+            local closest = nil
+            local shortestDist = Features.FOV
+            
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local targetPart = player.Character:FindFirstChild(Features.AimPart) or player.Character:FindFirstChild("Head")
+                    local hum = player.Character:FindFirstChild("Humanoid")
+                    
+                    if targetPart and hum and hum.Health > 0 then
+                        local pos, onScreen = cam:WorldToViewportPoint(targetPart.Position)
+                        if onScreen then
+                            local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                            if dist < shortestDist then
+                                shortestDist = dist
+                                closest = player
                             end
                         end
-                        if #args > 0 and typeof(args[1]) == "Instance" and args[1]:IsA("Player") then
-                            args[1] = SilentAimTarget
-                        end
                     end
                 end
             end
+            
+            SilentAimTarget = closest
         end
-        
-        return OldNamecall(self, unpack(args))
-    end)
-end
-
--- Hitbox Expander
-local function SetHitboxExpanded(enabled)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                if enabled then
-                    hrp.Size = Vector3.new(10, 10, 10)
-                    hrp.Transparency = 0.7
-                    hrp.CanCollide = false
-                else
-                    hrp.Size = Vector3.new(2, 2, 1)
-                    hrp.Transparency = 1
-                end
-            end
-        end
+        task.wait(0.05)
     end
 end
 
--- Auto Heal
+-- ============================================
+-- AUTO HEAL
+-- ============================================
 local function AutoHealLoop()
     while Features.AutoHeal do
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                local healthPercent = (hum.Health / hum.MaxHealth) * 100
-                if healthPercent < Features.HealPercent then
-                    local backpack = LocalPlayer:FindFirstChild("Backpack")
-                    if backpack then
-                        local medkit = backpack:FindFirstChild("Medkit") or backpack:FindFirstChild("Bandage")
-                        if medkit then
-                            hum.Health = hum.MaxHealth
-                        end
-                    end
-                end
+            if hum and (hum.Health / hum.MaxHealth) * 100 < Features.HealPercent then
+                FireSend("UseItem", "Medkit")
+                FireSend("Heal")
             end
         end
-        task.wait(0.5)
+        task.wait(1)
     end
 end
 
--- Auto Hit
+-- ============================================
+-- AUTO HIT
+-- ============================================
 local function AutoHitLoop()
     while Features.AutoHit do
         if SilentAimTarget then
-            local char = LocalPlayer.Character
-            if char then
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
-                    pcall(function() tool:Activate() end)
-                end
-            end
+            FireSend("Hit", SilentAimTarget, Features.AimPart)
         end
         task.wait(0.2)
     end
 end
 
 -- ============================================
--- MOVEMENT
+-- MOVEMENT LOOPS
 -- ============================================
 local function SpeedLoop()
     while Features.SpeedEnabled do
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.WalkSpeed = Features.SpeedValue
-            end
+            if hum then hum.WalkSpeed = Features.SpeedValue end
         end
         task.wait(0.1)
     end
@@ -302,27 +418,8 @@ local function InfiniteJumpLoop()
     end
 end
 
-local function InfiniteStaminaLoop()
-    while Features.InfiniteStamina do
-        local char = LocalPlayer.Character
-        if char then
-            local staminaVal = char:FindFirstChild("Stamina")
-            if staminaVal and staminaVal:IsA("NumberValue") then
-                staminaVal.Value = 100
-            end
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                local humStamina = hum:FindFirstChild("Stamina")
-                if humStamina then humStamina.Value = 100 end
-                hum:SetAttribute("Stamina", 100)
-            end
-        end
-        task.wait(0.2)
-    end
-end
-
-local function SetNoClip(enabled)
-    if enabled then
+local function NoClipLoop()
+    if Features.NoClip then
         if NoClipConnection then return end
         NoClipConnection = RunService.Stepped:Connect(function()
             if not Features.NoClip then return end
@@ -350,7 +447,6 @@ local function SetNoClip(enabled)
     end
 end
 
--- Fly
 local function FlyLoop()
     local char = LocalPlayer.Character
     if not char then return end
@@ -360,9 +456,7 @@ local function FlyLoop()
     local speed = 50
     local keys = {W = false, A = false, S = false, D = false, Space = false, LeftShift = false}
     
-    local connections = {}
-    
-    connections.KeyDown = UserInputService.InputBegan:Connect(function(input)
+    local keyDown = UserInputService.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.W then keys.W = true end
         if input.KeyCode == Enum.KeyCode.A then keys.A = true end
         if input.KeyCode == Enum.KeyCode.S then keys.S = true end
@@ -371,7 +465,7 @@ local function FlyLoop()
         if input.KeyCode == Enum.KeyCode.LeftShift then keys.LeftShift = true end
     end)
     
-    connections.KeyUp = UserInputService.InputEnded:Connect(function(input)
+    local keyUp = UserInputService.InputEnded:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.W then keys.W = false end
         if input.KeyCode == Enum.KeyCode.A then keys.A = false end
         if input.KeyCode == Enum.KeyCode.S then keys.S = false end
@@ -401,217 +495,64 @@ local function FlyLoop()
         task.wait()
     end
     
-    for _, conn in pairs(connections) do
-        conn:Disconnect()
-    end
+    keyDown:Disconnect()
+    keyUp:Disconnect()
 end
 
 -- ============================================
--- WEAPON MODS
+-- MAGNETO
 -- ============================================
-local function ApplyWeaponMods()
-    local char = LocalPlayer.Character
-    if not char then return end
-    
-    for _, obj in ipairs(char:GetDescendants()) do
-        if obj:IsA("Tool") then
-            -- No Recoil
-            if Features.NoRecoil then
-                local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
-                if recoil then recoil.Value = 0 end
-            end
-            
-            -- No Spread
-            if Features.NoSpread then
-                local spread = obj:FindFirstChild("Spread") or obj:FindFirstChild("SpreadValue")
-                if spread then spread.Value = 0 end
-            end
-            
-            -- Rapid Fire
-            if Features.RapidFire then
-                local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
-                if fireRate then fireRate.Value = 0.01 end
-            end
-            
-            -- Instant Reload
-            if Features.InstantReload then
-                local reload = obj:FindFirstChild("ReloadTime")
-                if reload then reload.Value = 0.01 end
-            end
-        end
-    end
-end
-
--- ============================================
--- VISUAL - ESP
--- ============================================
-local ESPGui = nil
-
-local function GetESPGui()
-    if ESPGui and ESPGui.Parent then return ESPGui end
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "ESP"
-    sg.ResetOnSpawn = false
-    sg.Parent = gethui()
-    ESPGui = sg
-    return sg
-end
-
-local function CreateESP(player)
-    if ESPObjects[player] then return end
-    
-    local gui = GetESPGui()
-    local esp = {}
-    
-    -- Name
-    esp.Name = Instance.new("TextLabel")
-    esp.Name.Size = UDim2.new(0, 200, 0, 20)
-    esp.Name.BackgroundTransparency = 1
-    esp.Name.TextColor3 = Color3.fromRGB(255, 255, 255)
-    esp.Name.TextSize = 12
-    esp.Name.Font = Enum.Font.GothamBold
-    esp.Name.Parent = gui
-    
-    -- Health
-    esp.HealthBg = Instance.new("Frame")
-    esp.HealthBg.Size = UDim2.new(0, 100, 0, 6)
-    esp.HealthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    esp.HealthBg.BorderSizePixel = 0
-    esp.HealthBg.Parent = gui
-    
-    esp.HealthBar = Instance.new("Frame")
-    esp.HealthBar.Size = UDim2.new(1, 0, 1, 0)
-    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    esp.HealthBar.BorderSizePixel = 0
-    esp.HealthBar.Parent = esp.HealthBg
-    
-    -- Distance
-    esp.Distance = Instance.new("TextLabel")
-    esp.Distance.Size = UDim2.new(0, 100, 0, 15)
-    esp.Distance.BackgroundTransparency = 1
-    esp.Distance.TextColor3 = Color3.fromRGB(200, 200, 200)
-    esp.Distance.TextSize = 10
-    esp.Distance.Font = Enum.Font.Gotham
-    esp.Distance.Parent = gui
-    
-    -- Weapon
-    esp.Weapon = Instance.new("TextLabel")
-    esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
-    esp.Weapon.BackgroundTransparency = 1
-    esp.Weapon.TextColor3 = Color3.fromRGB(255, 200, 100)
-    esp.Weapon.TextSize = 10
-    esp.Weapon.Font = Enum.Font.GothamBold
-    esp.Weapon.Parent = gui
-    
-    esp.LastWeapon = nil
-    ESPObjects[player] = esp
-end
-
-local function UpdateESP()
-    local cam = Workspace.CurrentCamera
-    if not cam then return end
-    
-    local myChar = LocalPlayer.Character
-    local myPos = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if myPos then myPos = myPos.Position end
-    
-    for player, esp in pairs(ESPObjects) do
-        local success = pcall(function()
-            local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChild("Humanoid")
-            
-            if hrp and hum and hum.Health > 0 then
-                local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
+local function MagnetoLoop()
+    while Features.Magneto do
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and not MagnetoItems[part] then
+                local isItem = part:GetAttribute("Item") or 
+                              part.Name:find("Cash") or 
+                              part.Name:find("Money") or
+                              part.Name:find("Ammo") or
+                              part:FindFirstChild("DroppedItem")
                 
-                if onScreen then
-                    if Features.ESPName then
-                        esp.Name.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 50)
-                        esp.Name.Text = player.Name
-                        esp.Name.Visible = true
-                    else
-                        esp.Name.Visible = false
-                    end
-                    
-                    if Features.ESPHealth then
-                        local percent = hum.Health / hum.MaxHealth
-                        esp.HealthBar.Size = UDim2.new(percent, 0, 1, 0)
-                        esp.HealthBar.BackgroundColor3 = Color3.fromRGB(255 * (1-percent), 255 * percent, 0)
-                        esp.HealthBg.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 30)
-                        esp.HealthBg.Visible = true
-                    else
-                        esp.HealthBg.Visible = false
-                    end
-                    
-                    if Features.ESPDistance and myPos then
-                        local dist = (myPos - hrp.Position).Magnitude
-                        esp.Distance.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 20)
-                        esp.Distance.Text = math.floor(dist) .. "m"
-                        esp.Distance.Visible = true
-                    else
-                        esp.Distance.Visible = false
-                    end
-                    
-                    if Features.ESPWeapon then
-                        local weapon = GetEquippedTool(player)
-                        if weapon and weapon ~= esp.LastWeapon then
-                            esp.LastWeapon = weapon
-                            esp.Weapon.Text = weapon
+                if isItem and part.Parent and not part.Parent:FindFirstChild("Humanoid") then
+                    MagnetoItems[part] = true
+                    task.spawn(function()
+                        while MagnetoItems[part] and Features.Magneto and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") do
+                            local dist = (part.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            if dist < Features.MagnetoRadius then
+                                local dir = (LocalPlayer.Character.HumanoidRootPart.Position - part.Position).Unit
+                                part.Velocity = dir * 60
+                                part.AssemblyLinearVelocity = dir * 60
+                            end
+                            task.wait(0.1)
                         end
-                        if weapon then
-                            esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
-                            esp.Weapon.Visible = true
-                        else
-                            esp.Weapon.Visible = false
-                        end
-                    else
-                        esp.Weapon.Visible = false
-                    end
-                else
-                    esp.Name.Visible = false
-                    esp.HealthBg.Visible = false
-                    esp.Distance.Visible = false
-                    esp.Weapon.Visible = false
-                end
-            else
-                esp.Name.Visible = false
-                esp.HealthBg.Visible = false
-                esp.Distance.Visible = false
-                esp.Weapon.Visible = false
-            end
-        end)
-    end
-end
-
--- Chams
-local function SetChams(enabled)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            if enabled then
-                if not ChamsObjects[player] then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "Chams"
-                    highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0
-                    highlight.Adornee = player.Character
-                    highlight.Parent = player.Character
-                    ChamsObjects[player] = highlight
-                end
-            else
-                if ChamsObjects[player] then
-                    ChamsObjects[player]:Destroy()
-                    ChamsObjects[player] = nil
+                    end)
                 end
             end
         end
+        task.wait(0.5)
+    end
+    MagnetoItems = {}
+end
+
+-- ============================================
+-- ANTI AFK
+-- ============================================
+local function AntiAFKLoop()
+    while Features.AntiAFK do
+        local vu = game:GetService("VirtualUser")
+        pcall(function()
+            vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            task.wait(0.1)
+            vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        end)
+        task.wait(60)
     end
 end
 
--- Full Bright / No Fog
-local function SetFullBright(enabled)
-    if enabled then
+-- ============================================
+-- FULL BRIGHT
+-- ============================================
+local function SetFullBright()
+    if Features.FullBright then
         Lighting.Brightness = 10
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 100000
@@ -622,610 +563,368 @@ local function SetFullBright(enabled)
     end
 end
 
-local function SetNoFog(enabled)
-    if enabled then
-        Lighting.FogEnd = 100000
-    else
-        Lighting.FogEnd = 1000
-    end
-end
-
 -- ============================================
--- AUTOFARM
--- ============================================
-local function AutoFarmLoop()
-    while Features.AutoFarm do
-        -- Detectar trabajo actual y farmear
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                -- Auto farm segun el trabajo seleccionado
-                if Features.SelectedJob == "Cleaner" then
-                    -- Buschar charcos y limpiarlos
-                    for _, part in ipairs(Workspace:GetDescendants()) do
-                        if part.Name:find("Puddle") or part.Name:find("Mess") then
-                            if (part.Position - char.HumanoidRootPart.Position).Magnitude < 50 then
-                                firetouchinterest(char.HumanoidRootPart, part, 0)
-                                firetouchinterest(char.HumanoidRootPart, part, 1)
-                            end
-                        end
-                    end
-                elseif Features.SelectedJob == "Pizza" then
-                    -- Farmear pizza job
-                end
-            end
-        end
-        task.wait(0.5)
-    end
-end
-
-local function AutoATMLoop()
-    while Features.AutoATM do
-        -- Buscar ATMs cercanos y robarlos
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            for _, atm in ipairs(Workspace:GetDescendants()) do
-                if atm.Name:find("ATM") and atm:FindFirstChild("ClickDetector") then
-                    local dist = (atm.Position - char.HumanoidRootPart.Position).Magnitude
-                    if dist < 10 then
-                        fireclickdetector(atm.ClickDetector)
-                    end
-                end
-            end
-        end
-        task.wait(1)
-    end
-end
-
-local function AutoDepositLoop()
-    while Features.AutoDeposit do
-        local cash, _ = GetMoney()
-        if cash > 1000 then
-            -- Buscar ATM para depositar
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                for _, atm in ipairs(Workspace:GetDescendants()) do
-                    if atm.Name:find("ATM") and atm:FindFirstChild("ClickDetector") then
-                        local dist = (atm.Position - char.HumanoidRootPart.Position).Magnitude
-                        if dist < 10 then
-                            -- Depositar dinero
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(5)
-    end
-end
-
--- ============================================
--- GUNS AMMO
--- ============================================
-local function InfiniteAmmoLoop()
-    while Features.InfiniteAmmo do
-        local char = LocalPlayer.Character
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Clip")
-                if ammo and ammo:IsA("IntValue") then
-                    ammo.Value = 999
-                end
-            end
-        end
-        task.wait(0.1)
-    end
-end
-
--- ============================================
--- SPECTATE
--- ============================================
-local function StartSpectate(targetPlayer)
-    if SpectateConnection then
-        SpectateConnection:Disconnect()
-        SpectateConnection = nil
-    end
-    
-    if not targetPlayer then
-        Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character
-        return
-    end
-    
-    SpectateConnection = RunService.RenderStepped:Connect(function()
-        if targetPlayer and targetPlayer.Character then
-            Workspace.CurrentCamera.CameraSubject = targetPlayer.Character:FindFirstChild("Humanoid") or targetPlayer.Character
-        else
-            Workspace.CurrentCamera.CameraSubject = LocalPlayer.Character
-        end
-    end)
-end
-
--- ============================================
--- MISC
--- ============================================
-local function AntiAFKLoop()
-    while Features.AntiAFK do
-        local vu = game:GetService("VirtualUser")
-        vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        wait(1)
-        vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        task.wait(60)
-    end
-end
-
--- ============================================
--- VENTANA PRINCIPAL
+-- WINDUI VENTANA PRINCIPAL
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
-    Icon = "droplet",
-    Theme = "Dark",
+    Folder = "WaterHub_AdamABJ",
+    Icon = "solar:water-drops-bold-duotone",
     NewElements = true,
-    Transparent = true,
-    ToggleKey = Enum.KeyCode.F,
-    Acrylic = false, -- Desactivado para evitar bugs
+    HideSearchBar = false,
+    OpenButton = {
+        Title = "Open Water Hub",
+        CornerRadius = UDim.new(1, 0),
+        StrokeThickness = 2,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.5,
+        Color = ColorSequence.new(Color3.fromHex("#00F2FE"), Color3.fromHex("#4FACFE")),
+    },
+    Topbar = { Height = 44, ButtonsType = "Mac" },
 })
 
-Notify("Water Hub", "Script cargado correctamente")
+Window:Tag({ Title = "v1.0 | By AdamABJ", Icon = "github", Color = Color3.fromHex("#1c1c1c"), Border = true })
 
 -- ============================================
--- PESTAÑAS EXACTAS COMO EN LA IMAGEN
+-- PESTAÑAS
 -- ============================================
+local CombatTab = Window:Tab({ Title = "Combat", Icon = "solar:swords-bold-duotone", Border = true })
+local MovementTab = Window:Tab({ Title = "Movement", Icon = "solar:user-bold-duotone", Border = true })
+local WeaponsTab = Window:Tab({ Title = "Weapons", Icon = "solar:tuning-bold-duotone", Border = true })
+local VisualTab = Window:Tab({ Title = "Visual", Icon = "solar:eye-bold-duotone", Border = true })
+local MagnetoTab = Window:Tab({ Title = "Magneto", Icon = "solar:magnet-bold-duotone", Border = true })
+local MiscTab = Window:Tab({ Title = "Misc", Icon = "solar:slider-minimalistic-horizontal-bold-duotone", Border = true })
 
--- 1. COMBAT
-local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "sword" })
+-- ============================================
+-- COMBAT TAB
+-- ============================================
+local CombatGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚔️ Combat" })
 
-CombatTab:Section({ Title = "Aimbot", Desc = "Apuntado automatico" })
-
-CombatTab:Toggle({
-    Title = "Silent Aim",
-    Value = false,
+CombatGroup:Toggle({
+    Flag = "SilentAim", Title = "Silent Aim", Value = false,
     Callback = function(v)
         Features.SilentAim = v
-        if v then SetupSilentAim() end
-        Notify("Silent Aim", v and "ON" or "OFF")
+        if v then Threads.SilentAim = task.spawn(SilentAimLoop) else Threads.SilentAim = nil end
     end,
 })
 
-CombatTab:Slider({
-    Title = "FOV",
-    Step = 10,
+CombatGroup:Space()
+CombatGroup:Space()
+
+CombatGroup:Slider({
+    Flag = "FOV", Title = "FOV Radius", IsTooltip = true, Step = 1,
     Value = { Min = 50, Max = 500, Default = 200 },
     Callback = function(v) Features.FOV = v end,
 })
 
-CombatTab:Dropdown({
-    Title = "Aim Part",
-    Value = "Head",
-    Values = { "Head", "HumanoidRootPart", "Torso" },
+CombatGroup:Space()
+CombatGroup:Space()
+
+CombatGroup:Dropdown({
+    Flag = "AimPart", Title = "Aim Part", Values = { "Head", "Torso", "HumanoidRootPart" }, Value = "Head",
     Callback = function(v) Features.AimPart = v end,
 })
 
-CombatTab:Space({ Columns = 1 })
+CombatTab:Space({ Columns = 2 })
 
-CombatTab:Section({ Title = "Auto", Desc = "Funciones automaticas" })
+local AutoGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🤖 Auto" })
 
-CombatTab:Toggle({
-    Title = "Auto Heal",
-    Value = false,
+AutoGroup:Toggle({
+    Flag = "AutoHeal", Title = "Auto Heal", Value = false,
     Callback = function(v)
         Features.AutoHeal = v
         if v then Threads.AutoHeal = task.spawn(AutoHealLoop) else Threads.AutoHeal = nil end
     end,
 })
 
-CombatTab:Slider({
-    Title = "Heal %",
-    Step = 5,
-    Value = { Min = 10, Max = 90, Default = 70 },
+AutoGroup:Space()
+AutoGroup:Space()
+
+AutoGroup:Slider({
+    Flag = "HealHP", Title = "Heal at HP%", IsTooltip = true, Step = 1,
+    Value = { Min = 20, Max = 90, Default = 70 },
     Callback = function(v) Features.HealPercent = v end,
 })
 
-CombatTab:Toggle({
-    Title = "Auto Hit",
-    Value = false,
+AutoGroup:Space()
+AutoGroup:Space()
+
+AutoGroup:Toggle({
+    Flag = "AutoHit", Title = "Auto Hit", Value = false,
     Callback = function(v)
         Features.AutoHit = v
         if v then Threads.AutoHit = task.spawn(AutoHitLoop) else Threads.AutoHit = nil end
     end,
 })
 
-CombatTab:Toggle({
-    Title = "Hitbox Expander",
-    Value = false,
-    Callback = function(v)
-        Features.HitboxExpander = v
-        SetHitboxExpanded(v)
-    end,
-})
+-- ============================================
+-- MOVEMENT TAB
+-- ============================================
+local MoveGroup = MovementTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚡ Movement" })
 
--- 2. MOVEMENT
-local MovementTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
-
-MovementTab:Section({ Title = "Speed", Desc = "Velocidad de movimiento" })
-
-MovementTab:Toggle({
-    Title = "Speed Hack",
-    Value = false,
+MoveGroup:Toggle({
+    Flag = "SpeedHack", Title = "Speed Hack", Value = false,
     Callback = function(v)
         Features.SpeedEnabled = v
         if v then Threads.Speed = task.spawn(SpeedLoop) else Threads.Speed = nil end
     end,
 })
 
-MovementTab:Slider({
-    Title = "Speed",
-    Step = 5,
-    Value = { Min = 16, Max = 200, Default = 50 },
-    Callback = function(v) Features.SpeedValue = v end,
+MoveGroup:Space()
+MoveGroup:Space()
+
+MoveGroup:Slider({
+    Flag = "SpeedValue", Title = "Speed Amount", IsTooltip = true, Step = 1,
+    Value = { Min = 16, Max = 250, Default = 50 },
+    Callback = function(v)
+        Features.SpeedValue = v
+        if Features.SpeedEnabled then
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if hum then hum.WalkSpeed = v end
+        end
+    end,
 })
 
-MovementTab:Space({ Columns = 1 })
+MoveGroup:Space()
+MoveGroup:Space()
 
-MovementTab:Section({ Title = "Extras", Desc = "Otras funciones" })
-
-MovementTab:Toggle({
-    Title = "Infinite Jump",
-    Value = false,
+MoveGroup:Toggle({
+    Flag = "InfiniteJump", Title = "Infinite Jump", Value = false,
     Callback = function(v)
         Features.InfiniteJump = v
         if v then Threads.Jump = task.spawn(InfiniteJumpLoop) else Threads.Jump = nil end
     end,
 })
 
-MovementTab:Toggle({
-    Title = "Infinite Stamina",
-    Value = false,
-    Callback = function(v)
-        Features.InfiniteStamina = v
-        if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) else Threads.Stamina = nil end
-    end,
-})
+MoveGroup:Space()
+MoveGroup:Space()
 
-MovementTab:Toggle({
-    Title = "No Clip",
-    Value = false,
+MoveGroup:Toggle({
+    Flag = "NoClip", Title = "No Clip", Value = false,
     Callback = function(v)
         Features.NoClip = v
-        SetNoClip(v)
+        NoClipLoop()
     end,
 })
 
-MovementTab:Toggle({
-    Title = "Fly",
-    Value = false,
+MoveGroup:Space()
+MoveGroup:Space()
+
+MoveGroup:Toggle({
+    Flag = "Fly", Title = "Fly Mode", Value = false,
     Callback = function(v)
         Features.Fly = v
         if v then Threads.Fly = task.spawn(FlyLoop) else Threads.Fly = nil end
     end,
 })
 
--- 3. WEAPON
-local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "crosshair" })
+-- ============================================
+-- WEAPONS TAB
+-- ============================================
+local WeaponGroup = WeaponsTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🔫 Mods" })
 
-WeaponTab:Section({ Title = "Mods", Desc = "Modificaciones de armas" })
-
-WeaponTab:Toggle({
-    Title = "No Recoil",
-    Value = false,
+WeaponGroup:Toggle({
+    Flag = "NoRecoil", Title = "No Recoil", Value = false,
     Callback = function(v)
         Features.NoRecoil = v
         ApplyWeaponMods()
     end,
 })
 
-WeaponTab:Toggle({
-    Title = "No Spread",
-    Value = false,
+WeaponGroup:Space()
+WeaponGroup:Space()
+
+WeaponGroup:Toggle({
+    Flag = "NoSpread", Title = "No Spread", Value = false,
     Callback = function(v)
         Features.NoSpread = v
         ApplyWeaponMods()
     end,
 })
 
-WeaponTab:Toggle({
-    Title = "Rapid Fire",
-    Value = false,
+WeaponGroup:Space()
+WeaponGroup:Space()
+
+WeaponGroup:Toggle({
+    Flag = "RapidFire", Title = "Rapid Fire", Value = false,
     Callback = function(v)
         Features.RapidFire = v
         ApplyWeaponMods()
     end,
 })
 
-WeaponTab:Toggle({
-    Title = "Instant Reload",
-    Value = false,
-    Callback = function(v)
-        Features.InstantReload = v
-        ApplyWeaponMods()
-    end,
-})
+-- ============================================
+-- VISUAL TAB
+-- ============================================
+local EspGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "👁️ ESP" })
 
--- 4. VISUAL
-local VisualTab = Window:Tab({ Title = "VISUAL", Icon = "eye" })
-
-VisualTab:Section({ Title = "ESP", Desc = "Ver jugadores" })
-
-VisualTab:Toggle({
-    Title = "Name ESP",
-    Value = false,
+EspGroup:Toggle({
+    Flag = "NameESP", Title = "Name ESP", Value = false,
     Callback = function(v) Features.ESPName = v end,
 })
 
-VisualTab:Toggle({
-    Title = "Health ESP",
-    Value = false,
+EspGroup:Space()
+EspGroup:Space()
+
+EspGroup:Toggle({
+    Flag = "HealthESP", Title = "Health ESP", Value = false,
     Callback = function(v) Features.ESPHealth = v end,
 })
 
-VisualTab:Toggle({
-    Title = "Distance ESP",
-    Value = false,
+EspGroup:Space()
+EspGroup:Space()
+
+EspGroup:Toggle({
+    Flag = "DistanceESP", Title = "Distance ESP", Value = false,
     Callback = function(v) Features.ESPDistance = v end,
 })
 
-VisualTab:Toggle({
-    Title = "Weapon ESP",
-    Value = false,
+EspGroup:Space()
+EspGroup:Space()
+
+EspGroup:Toggle({
+    Flag = "WeaponESP", Title = "Weapon Name ESP", Value = false,
     Callback = function(v) Features.ESPWeapon = v end,
 })
 
-VisualTab:Space({ Columns = 1 })
+EspGroup:Space()
+EspGroup:Space()
 
-VisualTab:Section({ Title = "Chams", Desc = "Resaltar jugadores" })
-
-VisualTab:Toggle({
-    Title = "Chams",
-    Value = false,
-    Callback = function(v)
-        Features.Chams = v
-        SetChams(v)
-    end,
+EspGroup:Toggle({
+    Flag = "WeaponIconESP", Title = "Weapon Icon ESP", Value = false,
+    Callback = function(v) Features.ESPWeaponIcon = v end,
 })
 
-VisualTab:Space({ Columns = 1 })
+VisualTab:Space({ Columns = 2 })
 
-VisualTab:Section({ Title = "World", Desc = "Modificar mundo" })
+local WorldGroup = VisualTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🌍 World" })
 
-VisualTab:Toggle({
-    Title = "Full Bright",
-    Value = false,
+WorldGroup:Toggle({
+    Flag = "FullBright", Title = "Full Bright", Value = false,
     Callback = function(v)
         Features.FullBright = v
-        SetFullBright(v)
+        SetFullBright()
     end,
 })
 
-VisualTab:Toggle({
-    Title = "No Fog",
-    Value = false,
+-- ============================================
+-- MAGNETO TAB
+-- ============================================
+local MagnetoGroup = MagnetoTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "🧲 Magneto" })
+
+MagnetoGroup:Toggle({
+    Flag = "Magneto", Title = "Magneto (Attract Items)", Value = false,
     Callback = function(v)
-        Features.NoFog = v
-        SetNoFog(v)
+        Features.Magneto = v
+        if v then Threads.Magneto = task.spawn(MagnetoLoop) else Threads.Magneto = nil end
     end,
 })
 
--- 5. AUTOFARM
-local AutoFarmTab = Window:Tab({ Title = "AUTOFARM", Icon = "robot" })
+MagnetoGroup:Space()
+MagnetoGroup:Space()
 
-AutoFarmTab:Section({ Title = "Farm", Desc = "Farmear automaticamente" })
-
-AutoFarmTab:Toggle({
-    Title = "Auto Farm Job",
-    Value = false,
-    Callback = function(v)
-        Features.AutoFarm = v
-        if v then Threads.AutoFarm = task.spawn(AutoFarmLoop) else Threads.AutoFarm = nil end
-    end,
+MagnetoGroup:Slider({
+    Flag = "MagnetoRadius", Title = "Magneto Radius", IsTooltip = true, Step = 1,
+    Value = { Min = 10, Max = 100, Default = 50 },
+    Callback = function(v) Features.MagnetoRadius = v end,
 })
 
-AutoFarmTab:Dropdown({
-    Title = "Job",
-    Value = "None",
-    Values = { "None", "Cleaner", "Pizza", "Delivery" },
-    Callback = function(v) Features.SelectedJob = v end,
-})
+-- ============================================
+-- MISC TAB
+-- ============================================
+local MiscGroup = MiscTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "⚙️ Misc" })
 
-AutoFarmTab:Space({ Columns = 1 })
-
-AutoFarmTab:Section({ Title = "ATM", Desc = "Robar y depositar" })
-
-AutoFarmTab:Toggle({
-    Title = "Auto ATM",
-    Value = false,
-    Callback = function(v)
-        Features.AutoATM = v
-        if v then Threads.AutoATM = task.spawn(AutoATMLoop) else Threads.AutoATM = nil end
-    end,
-})
-
-AutoFarmTab:Toggle({
-    Title = "Auto Deposit",
-    Value = false,
-    Callback = function(v)
-        Features.AutoDeposit = v
-        if v then Threads.AutoDeposit = task.spawn(AutoDepositLoop) else Threads.AutoDeposit = nil end
-    end,
-})
-
--- 6. GUNS AMMO
-local GunsAmmoTab = Window:Tab({ Title = "GUNS AMMO", Icon = "target" })
-
-GunsAmmoTab:Section({ Title = "Ammo", Desc = "Municion infinita" })
-
-GunsAmmoTab:Toggle({
-    Title = "Infinite Ammo",
-    Value = false,
-    Callback = function(v)
-        Features.InfiniteAmmo = v
-        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) else Threads.InfiniteAmmo = nil end
-    end,
-})
-
-GunsAmmoTab:Toggle({
-    Title = "No Reload",
-    Value = false,
-    Callback = function(v) Features.NoReload = v end,
-})
-
--- 7. SPECTATE
-local SpectateTab = Window:Tab({ Title = "SPECTATE", Icon = "video" })
-
-SpectateTab:Section({ Title = "Spectate", Desc = "Ver otros jugadores" })
-
-local PlayerList = SpectateTab:Dropdown({
-    Title = "Select Player",
-    Value = "None",
-    Values = GetPlayers(),
-    Callback = function(v)
-        local target = Players:FindFirstChild(v)
-        Features.SpectateTarget = target
-        if target then
-            StartSpectate(target)
-        else
-            StartSpectate(nil)
-        end
-    end,
-})
-
--- Actualizar lista de jugadores
-task.spawn(function()
-    while true do
-        task.wait(5)
-        pcall(function()
-            PlayerList:SetValues(GetPlayers())
-        end)
-    end
-end)
-
-SpectateTab:Button({
-    Title = "Stop Spectate",
-    Callback = function()
-        StartSpectate(nil)
-        Features.SpectateTarget = nil
-    end,
-})
-
-SpectateTab:Space({ Columns = 1 })
-
-SpectateTab:Section({ Title = "Freecam", Desc = "Camara libre" })
-
-SpectateTab:Toggle({
-    Title = "Freecam",
-    Value = false,
-    Callback = function(v)
-        Features.Freecam = v
-        -- Implementar freecam
-    end,
-})
-
--- 8. MISC
-local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
-
-MiscTab:Section({ Title = "General", Desc = "Funciones varias" })
-
-MiscTab:Toggle({
-    Title = "Anti AFK",
-    Value = false,
+MiscGroup:Toggle({
+    Flag = "AntiAFK", Title = "Anti AFK", Value = false,
     Callback = function(v)
         Features.AntiAFK = v
         if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) else Threads.AntiAFK = nil end
     end,
 })
 
-MiscTab:Toggle({
-    Title = "Auto Accept",
-    Value = false,
-    Callback = function(v) Features.AutoAccept = v end,
-})
+MiscGroup:Space()
+MiscGroup:Space()
 
--- 9. CONFIG
-local ConfigTab = Window:Tab({ Title = "CONFIG", Icon = "cog" })
-
-ConfigTab:Section({ Title = "Account", Desc = "Tu informacion" })
-
-local CashLabel = ConfigTab:Label({ Title = "Cash: Loading..." })
-local BankLabel = ConfigTab:Label({ Title = "Bank: Loading..." })
-
-task.spawn(function()
-    while true do
-        local cash, bank = GetMoney()
-        pcall(function()
-            CashLabel:Set("Cash: $" .. cash)
-            BankLabel:Set("Bank: $" .. bank)
-        end)
-        task.wait(1)
-    end
-end)
-
-ConfigTab:Space({ Columns = 1 })
-
-ConfigTab:Section({ Title = "Script", Desc = "Control del script" })
-
-ConfigTab:Button({
-    Title = "Destroy UI",
+MiscGroup:Button({
+    Title = "🔄 Rejoin Server",
+    Icon = "solar:refresh-bold-duotone",
+    Justify = "Left",
     Callback = function()
-        -- Limpiar todo
-        for k, _ in pairs(Threads) do Threads[k] = nil end
-        SetChams(false)
-        SetNoClip(false)
-        StartSpectate(nil)
-        Window:Destroy()
-    end,
-})
-
-ConfigTab:Button({
-    Title = "Rejoin Server",
-    Callback = function()
-        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end,
 })
 
 -- ============================================
--- INICIALIZACION
+-- CRÉDITOS
+-- ============================================
+local CreditsGroup = MiscTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "📝 Credits" })
+
+CreditsGroup:Button({
+    Title = "Water Hub Created By AdamABJ",
+    Icon = "solar:star-bold-duotone",
+    Color = Color3.fromHex("#EF4F1D"),
+    Justify = "Center",
+    Callback = function() end,
+})
+
+-- ============================================
+-- INICIALIZAR ESP
 -- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then CreateESP(player) end
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
 end
 
-Players.PlayerAdded:Connect(function(p) if p ~= LocalPlayer then CreateESP(p) end end)
-Players.PlayerRemoving:Connect(function(p)
-    if ESPObjects[p] then
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then CreateESP(player) end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    local esp = ESPs[player]
+    if esp then
         pcall(function()
-            ESPObjects[p].Name:Destroy()
-            ESPObjects[p].HealthBg:Destroy()
-            ESPObjects[p].Distance:Destroy()
-            ESPObjects[p].Weapon:Destroy()
+            esp.Name:Destroy()
+            esp.HealthBg:Destroy()
+            esp.Distance:Destroy()
+            esp.Weapon:Destroy()
+            esp.WeaponIcon:Destroy()
         end)
-        ESPObjects[p] = nil
-    end
-    if ChamsObjects[p] then
-        ChamsObjects[p]:Destroy()
-        ChamsObjects[p] = nil
+        ESPs[player] = nil
     end
 end)
 
 RunService.RenderStepped:Connect(UpdateESP)
 
--- Respawn handler
+-- ============================================
+-- RESPAWN HANDLER
+-- ============================================
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     if Features.SpeedEnabled then
         local hum = char:FindFirstChild("Humanoid")
         if hum then hum.WalkSpeed = Features.SpeedValue end
     end
-    if Features.NoClip then
-        SetNoClip(false)
-        task.wait(0.1)
-        SetNoClip(true)
-    end
-    -- Reaplicar mods de armas
     if Features.NoRecoil or Features.NoSpread or Features.RapidFire then
         ApplyWeaponMods()
     end
+    if Features.NoClip then
+        NoClipLoop()
+    end
 end)
 
-CombatTab:Select()
-print("Water Hub | BlockSpin - 9 Pestañas cargadas 100% funcional")
+-- ============================================
+-- NOTIFICACIÓN
+-- ============================================
+WindUI:Notify({
+    Title = "Water Hub | BlockSpin",
+    Content = "¡Cargado con éxito! By: AdamABJ",
+    Icon = "solar:water-drops-bold-duotone",
+    Duration = 3,
+})
+
+print("✅ Water Hub | BlockSpin - Cargado correctamente")
+print("🔫 24 armas con IDs cargadas para ESP de inventario")
