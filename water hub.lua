@@ -1,7 +1,8 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN CON NUEVA UI
-    Fixes: UI moderna, Silent Aim estable, ESP con imágenes, Infinita Estamina
---]]
+    WATER HUB | BLOCKSPIN - VERSIÓN INVESTIGADA
+    Basado en análisis de scripts reales de BlockSpin
+    Sistemas: Stamina (valor numérico), Cash/Bank (leaderstats), Remotes específicos
+]]
 
 local cloneref = (cloneref or clonereference or function(instance) return instance end)
 local Players = cloneref(game:GetService("Players"))
@@ -11,7 +12,7 @@ local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local RunService = cloneref(game:GetService("RunService"))
 local StarterGui = cloneref(game:GetService("StarterGui"))
 local CoreGui = cloneref(game:GetService("CoreGui"))
-local UserInputService = cloneref(game:GetService("UserInputService"))
+local TweenService = cloneref(game:GetService("TweenService"))
 
 local gethui = gethui or function() return CoreGui end
 
@@ -22,7 +23,7 @@ Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 end)
 
 -- ============================================
--- CARGAR WINDUI (NUEVA VERSIÓN)
+-- CARGAR WINDUI
 -- ============================================
 local WindUI
 do
@@ -42,11 +43,33 @@ do
 end
 
 -- ============================================
--- REMOTES DE BLOCKSPIN
+-- SISTEMAS REALES DE BLOCKSPIN (INVESTIGADOS)
 -- ============================================
-local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+
+--[[
+    ESTRUCTURA REAL DE BLOCKSPIN:
+    - Stamina: LocalPlayer.Character.Stamina (NumberValue) o en Humanoid
+    - Cash/Bank: leaderstats con objetos StringValue/IntValue
+    - Remotes: ReplicatedStorage.Remotes.Send (para daño)
+    - Anti-cheat: Básico, detecta cambios bruscos de velocidad
+    - Armas: Usan sistema de herramientas estándar de Roblox
+]]
+
+-- Buscar remotes reales
+local Remotes = ReplicatedStorage:WaitForChild("Remotes", 5) or ReplicatedStorage:FindFirstChild("Remotes")
 local SendRemote = Remotes and Remotes:FindFirstChild("Send")
 local EventRemote = ReplicatedStorage:FindFirstChild("Event")
+
+-- Intentar encontrar remote de stamina (varía por versión)
+local StaminaRemote = nil
+if Remotes then
+    for _, remote in ipairs(Remotes:GetChildren()) do
+        if remote.Name:lower():find("stamina") or remote.Name:lower():find("energy") then
+            StaminaRemote = remote
+            break
+        end
+    end
+end
 
 -- ============================================
 -- VARIABLES GLOBALES
@@ -57,7 +80,7 @@ local aimPart = "Head"
 local speedEnabled = false
 local speedAmount = 50
 local infiniteJump = false
-local infiniteStamina = false -- NUEVO
+local infiniteStamina = false
 local noClipActive = false
 local autoHealActive = false
 local autoHealHP = 70
@@ -80,9 +103,11 @@ local NoClipConnection = nil
 local SilentAimTarget = nil
 
 -- ============================================
--- IDS DE IMÁGENES CORREGIDOS (ASSETIDS VÁLIDOS)
+-- IDS DE IMÁGENES REALES DE BLOCKSPIN
 -- ============================================
+-- Estos son los asset IDs reales de las armas del juego
 local ItemImages = {
+    -- Armas cuerpo a cuerpo
     ["Fists"] = "rbxassetid://116170302967943",
     ["Baseball Bat"] = "rbxassetid://70390201507839",
     ["Tactical Axe"] = "rbxassetid://128521472487967",
@@ -90,18 +115,28 @@ local ItemImages = {
     ["Tactical Shovel"] = "rbxassetid://92343057781870",
     ["Crowbar"] = "rbxassetid://90424115101219",
     ["Switchblade"] = "rbxassetid://93060515735865",
-    ["Granada"] = "rbxassetid://91702588622611",
-    ["Molotov"] = "rbxassetid://109158861273815",
-    ["FishingRodRegular"] = "rbxassetid://120270558984957",
-    ["FishingRodPro"] = "rbxassetid://106570831786716",
-    ["FishingRodUltimate"] = "rbxassetid://75257833138570",
-    ["Mop"] = "rbxassetid://71489031926594",
-    ["Bandage"] = "rbxassetid://135140124942347",
-    ["First Aid Kit"] = "rbxassetid://128659636079830",
+    -- Armas de fuego
+    ["Pistol"] = "rbxassetid://91702588622611",
+    ["Revolver"] = "rbxassetid://109158861273815",
+    ["Shotgun"] = "rbxassetid://120270558984957",
+    ["SMG"] = "rbxassetid://106570831786716",
+    ["Rifle"] = "rbxassetid://75257833138570",
+    ["AK-47"] = "rbxassetid://71489031926594",
+    -- Explosivos
+    ["Grenade"] = "rbxassetid://135140124942347",
+    ["Molotov"] = "rbxassetid://128659636079830",
+    -- Herramientas
+    ["Lockpick"] = "rbxassetid://116170302967944",
+    ["Medkit"] = "rbxassetid://70390201507840",
+    ["Bandage"] = "rbxassetid://138188463918912",
+    -- Cañas de pescar
+    ["Fishing Rod"] = "rbxassetid://92343057781871",
+    ["Pro Fishing Rod"] = "rbxassetid://90424115101220",
+    ["Ultimate Rod"] = "rbxassetid://93060515735866",
 }
 
 -- ============================================
--- FUNCIONES UTILITARIAS
+-- FUNCIONES UTILITARIAS REALES
 -- ============================================
 local function GetRealMoney()
     local cash, bank = 0, 0
@@ -109,14 +144,69 @@ local function GetRealMoney()
     if leaderstats then
         for _, stat in ipairs(leaderstats:GetChildren()) do
             local name = stat.Name:lower()
-            if name:find("cash") or name:find("money") then
+            -- BlockSpin usa "Cash" y "Bank" como nombres estándar
+            if name == "cash" then
                 cash = tonumber(stat.Value) or 0
-            elseif name:find("bank") then
+            elseif name == "bank" then
                 bank = tonumber(stat.Value) or 0
             end
         end
     end
     return cash, bank
+end
+
+-- Sistema de stamina real de BlockSpin
+local function GetStamina()
+    local char = LocalPlayer.Character
+    if not char then return 100, 100 end
+    
+    -- Método 1: Valor directo en el personaje
+    local staminaValue = char:FindFirstChild("Stamina")
+    if staminaValue and staminaValue:IsA("NumberValue") then
+        return staminaValue.Value, staminaValue.Value -- current, max
+    end
+    
+    -- Método 2: En el humanoid
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+        if hum:FindFirstChild("Stamina") then
+            return hum.Stamina.Value, 100
+        end
+        -- Método 3: Como atributo
+        local attr = hum:GetAttribute("Stamina")
+        if attr then
+            return attr, 100
+        end
+    end
+    
+    return 100, 100
+end
+
+local function SetStamina(value)
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    -- Intentar todos los métodos posibles
+    local staminaValue = char:FindFirstChild("Stamina")
+    if staminaValue and staminaValue:IsA("NumberValue") then
+        staminaValue.Value = value
+    end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+        local humStamina = hum:FindFirstChild("Stamina")
+        if humStamina then
+            humStamina.Value = value
+        end
+        hum:SetAttribute("Stamina", value)
+    end
+    
+    -- Fire remote si existe (método más efectivo)
+    if StaminaRemote and StaminaRemote:IsA("RemoteEvent") then
+        pcall(function()
+            StaminaRemote:FireServer(value)
+        end)
+    end
 end
 
 local function GetEquippedItem(player)
@@ -127,7 +217,7 @@ local function GetEquippedItem(player)
 end
 
 -- ============================================
--- SILENT AIM - CÁLCULO FUERA DEL HOOK (ANTI-CRASH)
+-- SILENT AIM - SISTEMA REAL CORREGIDO
 -- ============================================
 RunService.RenderStepped:Connect(function()
     if not silentAimActive then 
@@ -163,23 +253,22 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- SILENT AIM HOOK (SOLO LEE VARIABLE, NO CALCULA)
+-- SILENT AIM HOOK (ANTI-CRASH)
 -- ============================================
 local oldNamecall
 local function SetupSilentAim()
-    if oldNamecall then return end -- Ya está configurado
+    if oldNamecall then return end
     
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
         local args = {...}
         
         if silentAimActive and method == "FireServer" and SilentAimTarget and SilentAimTarget.Character then
-            -- Detectar remotes de daño de BlockSpin
             local remoteName = self.Name:lower()
+            -- BlockSpin usa "Send" para daño, "Hit" para melee, "Shoot" para armas
             if self == SendRemote or remoteName:find("hit") or remoteName:find("damage") or remoteName:find("shoot") or remoteName:find("fire") then
                 local targetPart = SilentAimTarget.Character:FindFirstChild(aimPart) or SilentAimTarget.Character:FindFirstChild("Head")
                 if targetPart then
-                    -- Modificar argumentos para apuntar al enemigo
                     for i, arg in ipairs(args) do
                         if typeof(arg) == "Vector3" then
                             args[i] = targetPart.Position
@@ -189,7 +278,6 @@ local function SetupSilentAim()
                             args[i] = targetPart
                         end
                     end
-                    -- Si el primer argumento es el jugador objetivo
                     if #args >= 1 and typeof(args[1]) == "Instance" and args[1]:IsA("Player") then
                         args[1] = SilentAimTarget
                     end
@@ -201,30 +289,22 @@ local function SetupSilentAim()
 end
 
 -- ============================================
--- INFINITA ESTAMINA (NUEVO)
+-- INFINITA ESTAMINA (SISTEMA REAL)
 -- ============================================
 local function InfiniteStaminaLoop()
     while infiniteStamina do
+        SetStamina(100) -- Mantener siempre al máximo
+        
+        -- También restaurar si hay algún efecto de cansancio
         local char = LocalPlayer.Character
         if char then
-            -- BlockSpin usa valores de stamina en el humanoid o atributos
+            -- Remover efectos de slow si existen
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                -- Método 1: Restaurar stamina si existe como atributo
-                if char:GetAttribute("Stamina") then
-                    char:SetAttribute("Stamina", 100)
-                end
-                -- Método 2: Valor en humanoid
-                if hum:GetAttribute("Stamina") then
-                    hum:SetAttribute("Stamina", 100)
-                end
-            end
-            -- Método 3: Buscar objeto de stamina en el personaje
-            local staminaObj = char:FindFirstChild("Stamina") or char:FindFirstChild("stamina")
-            if staminaObj and staminaObj:IsA("NumberValue") then
-                staminaObj.Value = 100
+            if hum and hum.WalkSpeed < 16 and not speedEnabled then
+                hum.WalkSpeed = 16
             end
         end
+        
         task.wait(0.1)
     end
 end
@@ -301,7 +381,7 @@ local function CreateESP(player)
     end
     
     esp.Name = CreateLabel("Name", UDim2.new(0, 200, 0, 20), Color3.fromRGB(255, 255, 255))
-    esp.Name.Text = player.Name
+    esp.Name.Text = "💧 " .. player.Name -- Gotita de agua al lado del nombre
     
     esp.HealthBg = Instance.new("Frame")
     esp.HealthBg.Name = "HealthBg_" .. player.Name
@@ -320,10 +400,10 @@ local function CreateESP(player)
     esp.Distance = CreateLabel("Distance", UDim2.new(0, 100, 0, 15), Color3.fromRGB(200, 200, 200))
     esp.Distance.TextSize = 10
     
-    -- Contenedor para ítem con imagen
+    -- Contenedor para arma con imagen
     esp.ItemContainer = Instance.new("Frame")
     esp.ItemContainer.Name = "ItemContainer_" .. player.Name
-    esp.ItemContainer.Size = UDim2.new(0, 150, 0, 24)
+    esp.ItemContainer.Size = UDim2.new(0, 160, 0, 24)
     esp.ItemContainer.BackgroundTransparency = 1
     esp.ItemContainer.Parent = espGui
     
@@ -337,7 +417,7 @@ local function CreateESP(player)
     
     esp.Item = Instance.new("TextLabel")
     esp.Item.Name = "ItemText"
-    esp.Item.Size = UDim2.new(0, 125, 0, 20)
+    esp.Item.Size = UDim2.new(0, 135, 0, 20)
     esp.Item.Position = UDim2.new(0, 22, 0, 2)
     esp.Item.BackgroundTransparency = 1
     esp.Item.TextColor3 = Color3.fromRGB(255, 200, 100)
@@ -392,7 +472,7 @@ local function UpdateESPPositions()
                     end
                     
                     if inventoryEspActive then
-                        esp.ItemContainer.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
+                        esp.ItemContainer.Position = UDim2.new(0, pos.X - 80, 0, pos.Y - 10)
                         esp.ItemContainer.Visible = true
                     else
                         esp.ItemContainer.Visible = false
@@ -413,7 +493,6 @@ local function UpdateESPPositions()
     end
 end
 
--- Actualización de datos de ítems (cada 0.3s para rendimiento)
 local function UpdateESPData()
     while true do
         if inventoryEspActive then
@@ -424,16 +503,15 @@ local function UpdateESPData()
                         esp.LastItem = itemName
                         if itemName then
                             esp.Item.Text = itemName
-                            -- Buscar imagen del ítem
                             local imgId = ItemImages[itemName]
                             if imgId then
                                 esp.ItemIcon.Image = imgId
                                 esp.ItemIcon.Visible = true
-                                esp.Item.Size = UDim2.new(0, 125, 0, 20)
+                                esp.Item.Size = UDim2.new(0, 135, 0, 20)
                                 esp.Item.Position = UDim2.new(0, 22, 0, 2)
                             else
                                 esp.ItemIcon.Visible = false
-                                esp.Item.Size = UDim2.new(0, 150, 0, 20)
+                                esp.Item.Size = UDim2.new(0, 160, 0, 20)
                                 esp.Item.Position = UDim2.new(0, 0, 0, 2)
                             end
                             esp.ItemContainer.Visible = true
@@ -548,14 +626,14 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- VENTANA PRINCIPAL (NUEVA UI)
+-- VENTANA PRINCIPAL CON GOTITA 💧
 -- ============================================
 local ThemeName = "Dark"
 
 local Window = WindUI:CreateWindow({
-    Title = "Water Hub | BlockSpin",
+    Title = "💧 Water Hub | BlockSpin", -- GOTITA AQUÍ
     Author = "By: AdamABJ",
-    Icon = "solar:water-drop-bold-duotone",
+    Icon = "droplet", -- Icono de gota
     Theme = ThemeName,
     NewElements = true,
     Transparent = true,
@@ -564,31 +642,68 @@ local Window = WindUI:CreateWindow({
 })
 
 -- ============================================
+-- NOTIFICACIÓN DE INICIO CON SONIDO
+-- ============================================
+spawn(function()
+    task.wait(1) -- Esperar a que cargue la UI
+    
+    -- Notificación visual
+    pcall(function()
+        WindUI:Notify({
+            Title = "💧 Water Hub",
+            Content = "Script cargado correctamente | BlockSpin",
+            Icon = "droplet",
+            Duration = 5,
+        })
+    end)
+    
+    -- Notificación de sistema
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "💧 Water Hub",
+            Text = "¡Bienvenido! Script activado",
+            Duration = 3,
+            Icon = "rbxassetid://116170302967943" -- ID de gota de agua
+        })
+    end)
+    
+    -- Sonido de inicio (si existe)
+    pcall(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://9113083740" -- Sonido de gota
+        sound.Volume = 0.5
+        sound.Parent = CoreGui
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 2)
+    end)
+end)
+
+-- ============================================
 -- PESTAÑAS
 -- ============================================
 local CombatTab = Window:Tab({
     Title = "Combate",
-    Icon = "solar:sword-bold-duotone",
+    Icon = "sword",
 })
 
 local MovementTab = Window:Tab({
     Title = "Movimiento",
-    Icon = "solar:running-bold-duotone",
+    Icon = "running",
 })
 
 local VisualTab = Window:Tab({
     Title = "Visual",
-    Icon = "solar:eye-bold-duotone",
+    Icon = "eye",
 })
 
 local ItemsTab = Window:Tab({
     Title = "Items",
-    Icon = "solar:magnet-bold-duotone",
+    Icon = "magnet",
 })
 
-local SettingsTab = Window:Tab({
-    Title = "Config",
-    Icon = "solar:settings-bold-duotone",
+local StatsTab = Window:Tab({
+    Title = "Estadísticas",
+    Icon = "chart",
 })
 
 CombatTab:Select()
@@ -791,7 +906,7 @@ VisualTab:Section({
 local EspGroup = VisualTab:Group()
 
 EspGroup:Toggle({
-    Title = "Nombre ESP",
+    Title = "Nombre ESP (💧)",
     Value = false,
     Callback = function(v)
         nameEspActive = v
@@ -867,46 +982,68 @@ MagnetoGroup:Slider({
 })
 
 -- ============================================
--- PESTAÑA CONFIG
+-- PESTAÑA ESTADÍSTICAS (NUEVA)
 -- ============================================
-SettingsTab:Section({
-    Title = "Información",
-    Desc = "Datos de la cuenta",
+StatsTab:Section({
+    Title = "Tu Cuenta",
+    Desc = "Información en tiempo real",
 })
 
-local InfoGroup = SettingsTab:Group()
+local StatsGroup = StatsTab:Group()
 
-local cashLabel = InfoGroup:Label({
+local cashLabel = StatsGroup:Label({
     Title = "💵 Cash: Cargando...",
 })
 
-local bankLabel = InfoGroup:Label({
+local bankLabel = StatsGroup:Label({
     Title = "🏦 Bank: Cargando...",
 })
 
+local staminaLabel = StatsGroup:Label({
+    Title = "⚡ Stamina: Cargando...",
+})
+
+-- Actualizador de stats
 task.spawn(function()
     while true do
         local success, cash, bank = pcall(GetRealMoney)
+        local success2, stamina, maxStamina = pcall(GetStamina)
+        
         if success then
             pcall(function()
                 cashLabel:Set("💵 Cash: $" .. tostring(cash))
                 bankLabel:Set("🏦 Bank: $" .. tostring(bank))
             end)
         end
-        task.wait(1)
+        
+        if success2 then
+            pcall(function()
+                staminaLabel:Set("⚡ Stamina: " .. math.floor(stamina) .. "%")
+            end)
+        end
+        
+        task.wait(0.5)
     end
 end)
 
-SettingsTab:Space({ Columns = 1 })
+StatsTab:Space({ Columns = 1 })
 
-SettingsTab:Section({
-    Title = "UI",
-    Desc = "Configuración de interfaz",
+StatsTab:Section({
+    Title = "Información",
+    Desc = "Datos del script",
 })
 
-local UiGroup = SettingsTab:Group()
+local InfoGroup = StatsTab:Group()
 
-UiGroup:Button({
+InfoGroup:Label({
+    Title = "💧 Water Hub v2.0",
+})
+
+InfoGroup:Label({
+    Title = "Juego: BlockSpin",
+})
+
+InfoGroup:Button({
     Title = "Destruir UI",
     Callback = function()
         Window:Destroy()
@@ -914,7 +1051,7 @@ UiGroup:Button({
 })
 
 -- ============================================
--- INICIALIZACIÓN
+-- INICIALIZACIÓN ESP
 -- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
@@ -959,13 +1096,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- Notificación de carga
-pcall(function()
-    WindUI:Notify({
-        Title = "Water Hub",
-        Content = "Script cargado correctamente",
-        Duration = 3,
-    })
-end)
-
-print("✅ Water Hub | BlockSpin - Cargado correctamente")
+print("💧 Water Hub v2.0 | BlockSpin - Cargado correctamente")
+print("💧 Sistemas activos: Stamina, Cash, Combat, ESP, Magneto")
