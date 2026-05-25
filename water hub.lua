@@ -1,65 +1,55 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN FINAL ESTABLE
-    Fixes: Silent Aim sin crash, Magneto optimizado, Control de hilos limpio
+    WATER HUB | BLOCKSPIN - VERSIÓN CON NUEVA UI
+    Fixes: UI moderna, Silent Aim estable, ESP con imágenes, Infinita Estamina
 --]]
 
--- ============================================
--- SERVICIOS Y CONFIGURACIÓN INICIAL
--- ============================================
-local Players = game:GetService("Players")
+local cloneref = (cloneref or clonereference or function(instance) return instance end)
+local Players = cloneref(game:GetService("Players"))
 local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
-local CoreGui = game:GetService("CoreGui")
+local Workspace = cloneref(game:GetService("Workspace"))
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+local RunService = cloneref(game:GetService("RunService"))
+local StarterGui = cloneref(game:GetService("StarterGui"))
+local CoreGui = cloneref(game:GetService("CoreGui"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
 
 local gethui = gethui or function() return CoreGui end
 
--- Cache de cámara optimizado
+-- Cache de cámara
 local Camera = Workspace.CurrentCamera
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     Camera = Workspace.CurrentCamera
 end)
 
-print("🌀 Water Hub | BlockSpin - Iniciando...")
-
 -- ============================================
--- CARGAR WINDUI
+-- CARGAR WINDUI (NUEVA VERSIÓN)
 -- ============================================
 local WindUI
-local success, result = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
-
-if success and result then
-    WindUI = result
-else
-    success, result = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua"))()
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
     end)
-    if success and result then
+
+    if ok then
         WindUI = result
     else
-        warn("❌ Error cargando WindUI")
-        return
+        if RunService:IsStudio() or not writefile then
+            WindUI = require(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init"))
+        else
+            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+        end
     end
 end
 
-if not WindUI or not WindUI.CreateWindow then
-    warn("❌ WindUI inválido")
-    return
-end
-
 -- ============================================
--- REMOTES
+-- REMOTES DE BLOCKSPIN
 -- ============================================
 local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
 local SendRemote = Remotes and Remotes:FindFirstChild("Send")
 local EventRemote = ReplicatedStorage:FindFirstChild("Event")
 
 -- ============================================
--- VARIABLES GLOBALES Y CONTROL DE HILOS
+-- VARIABLES GLOBALES
 -- ============================================
 local silentAimActive = false
 local fovRadius = 200
@@ -67,6 +57,7 @@ local aimPart = "Head"
 local speedEnabled = false
 local speedAmount = 50
 local infiniteJump = false
+local infiniteStamina = false -- NUEVO
 local noClipActive = false
 local autoHealActive = false
 local autoHealHP = 70
@@ -89,7 +80,7 @@ local NoClipConnection = nil
 local SilentAimTarget = nil
 
 -- ============================================
--- IDS DE IMÁGENES
+-- IDS DE IMÁGENES CORREGIDOS (ASSETIDS VÁLIDOS)
 -- ============================================
 local ItemImages = {
     ["Fists"] = "rbxassetid://116170302967943",
@@ -136,7 +127,7 @@ local function GetEquippedItem(player)
 end
 
 -- ============================================
--- SILENT AIM - CÁLCULO SEGURO FUERA DEL HOOK
+-- SILENT AIM - CÁLCULO FUERA DEL HOOK (ANTI-CRASH)
 -- ============================================
 RunService.RenderStepped:Connect(function()
     if not silentAimActive then 
@@ -172,18 +163,23 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- SILENT AIM HOOK (SOLO LEE LA VARIABLE)
+-- SILENT AIM HOOK (SOLO LEE VARIABLE, NO CALCULA)
 -- ============================================
 local oldNamecall
 local function SetupSilentAim()
+    if oldNamecall then return end -- Ya está configurado
+    
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
         local args = {...}
         
         if silentAimActive and method == "FireServer" and SilentAimTarget and SilentAimTarget.Character then
-            if self == SendRemote or self.Name:lower():find("hit") or self.Name:lower():find("damage") or self.Name:lower():find("shoot") then
+            -- Detectar remotes de daño de BlockSpin
+            local remoteName = self.Name:lower()
+            if self == SendRemote or remoteName:find("hit") or remoteName:find("damage") or remoteName:find("shoot") or remoteName:find("fire") then
                 local targetPart = SilentAimTarget.Character:FindFirstChild(aimPart) or SilentAimTarget.Character:FindFirstChild("Head")
                 if targetPart then
+                    -- Modificar argumentos para apuntar al enemigo
                     for i, arg in ipairs(args) do
                         if typeof(arg) == "Vector3" then
                             args[i] = targetPart.Position
@@ -193,7 +189,8 @@ local function SetupSilentAim()
                             args[i] = targetPart
                         end
                     end
-                    if #args == 1 and typeof(args[1]) == "Instance" then
+                    -- Si el primer argumento es el jugador objetivo
+                    if #args >= 1 and typeof(args[1]) == "Instance" and args[1]:IsA("Player") then
                         args[1] = SilentAimTarget
                     end
                 end
@@ -201,6 +198,35 @@ local function SetupSilentAim()
         end
         return oldNamecall(self, unpack(args))
     end)
+end
+
+-- ============================================
+-- INFINITA ESTAMINA (NUEVO)
+-- ============================================
+local function InfiniteStaminaLoop()
+    while infiniteStamina do
+        local char = LocalPlayer.Character
+        if char then
+            -- BlockSpin usa valores de stamina en el humanoid o atributos
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                -- Método 1: Restaurar stamina si existe como atributo
+                if char:GetAttribute("Stamina") then
+                    char:SetAttribute("Stamina", 100)
+                end
+                -- Método 2: Valor en humanoid
+                if hum:GetAttribute("Stamina") then
+                    hum:SetAttribute("Stamina", 100)
+                end
+            end
+            -- Método 3: Buscar objeto de stamina en el personaje
+            local staminaObj = char:FindFirstChild("Stamina") or char:FindFirstChild("stamina")
+            if staminaObj and staminaObj:IsA("NumberValue") then
+                staminaObj.Value = 100
+            end
+        end
+        task.wait(0.1)
+    end
 end
 
 -- ============================================
@@ -236,10 +262,10 @@ local function SetNoClip(enabled)
 end
 
 -- ============================================
--- ESP OPTIMIZADO
+-- ESP CON IMÁGENES CORREGIDAS
 -- ============================================
 local function GetESPScreenGui()
-    if ScreenGui then return ScreenGui end
+    if ScreenGui and ScreenGui.Parent then return ScreenGui end
     local success, gui = pcall(function()
         local sg = Instance.new("ScreenGui")
         sg.Name = "WaterHub_ESP_" .. tostring(math.random(1000, 9999))
@@ -294,14 +320,31 @@ local function CreateESP(player)
     esp.Distance = CreateLabel("Distance", UDim2.new(0, 100, 0, 15), Color3.fromRGB(200, 200, 200))
     esp.Distance.TextSize = 10
     
-    esp.Item = CreateLabel("Item", UDim2.new(0, 150, 0, 20), Color3.fromRGB(255, 200, 100))
-    esp.Item.TextSize = 10
+    -- Contenedor para ítem con imagen
+    esp.ItemContainer = Instance.new("Frame")
+    esp.ItemContainer.Name = "ItemContainer_" .. player.Name
+    esp.ItemContainer.Size = UDim2.new(0, 150, 0, 24)
+    esp.ItemContainer.BackgroundTransparency = 1
+    esp.ItemContainer.Parent = espGui
     
     esp.ItemIcon = Instance.new("ImageLabel")
-    esp.ItemIcon.Name = "ItemIcon_" .. player.Name
+    esp.ItemIcon.Name = "ItemIcon"
     esp.ItemIcon.Size = UDim2.new(0, 20, 0, 20)
+    esp.ItemIcon.Position = UDim2.new(0, 0, 0, 2)
     esp.ItemIcon.BackgroundTransparency = 1
-    esp.ItemIcon.Parent = espGui
+    esp.ItemIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    esp.ItemIcon.Parent = esp.ItemContainer
+    
+    esp.Item = Instance.new("TextLabel")
+    esp.Item.Name = "ItemText"
+    esp.Item.Size = UDim2.new(0, 125, 0, 20)
+    esp.Item.Position = UDim2.new(0, 22, 0, 2)
+    esp.Item.BackgroundTransparency = 1
+    esp.Item.TextColor3 = Color3.fromRGB(255, 200, 100)
+    esp.Item.TextSize = 10
+    esp.Item.Font = Enum.Font.GothamBold
+    esp.Item.TextXAlignment = Enum.TextXAlignment.Left
+    esp.Item.Parent = esp.ItemContainer
     
     esp.LastItem = nil
     ESPs[player] = esp
@@ -349,32 +392,28 @@ local function UpdateESPPositions()
                     end
                     
                     if inventoryEspActive then
-                        esp.Item.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
-                        if esp.ItemIcon.Visible then
-                            esp.ItemIcon.Position = UDim2.new(0, pos.X - 95, 0, pos.Y - 10)
-                        end
+                        esp.ItemContainer.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
+                        esp.ItemContainer.Visible = true
                     else
-                        esp.Item.Visible = false
-                        esp.ItemIcon.Visible = false
+                        esp.ItemContainer.Visible = false
                     end
                 else
                     esp.Name.Visible = false
                     esp.HealthBg.Visible = false
                     esp.Distance.Visible = false
-                    esp.Item.Visible = false
-                    esp.ItemIcon.Visible = false
+                    esp.ItemContainer.Visible = false
                 end
             else
                 esp.Name.Visible = false
                 esp.HealthBg.Visible = false
                 esp.Distance.Visible = false
-                esp.Item.Visible = false
-                esp.ItemIcon.Visible = false
+                esp.ItemContainer.Visible = false
             end
         end)
     end
 end
 
+-- Actualización de datos de ítems (cada 0.3s para rendimiento)
 local function UpdateESPData()
     while true do
         if inventoryEspActive then
@@ -384,18 +423,22 @@ local function UpdateESPData()
                     if itemName ~= esp.LastItem then
                         esp.LastItem = itemName
                         if itemName then
-                            esp.Item.Text = "🔫 " .. itemName
+                            esp.Item.Text = itemName
+                            -- Buscar imagen del ítem
                             local imgId = ItemImages[itemName]
                             if imgId then
                                 esp.ItemIcon.Image = imgId
                                 esp.ItemIcon.Visible = true
+                                esp.Item.Size = UDim2.new(0, 125, 0, 20)
+                                esp.Item.Position = UDim2.new(0, 22, 0, 2)
                             else
                                 esp.ItemIcon.Visible = false
+                                esp.Item.Size = UDim2.new(0, 150, 0, 20)
+                                esp.Item.Position = UDim2.new(0, 0, 0, 2)
                             end
-                            esp.Item.Visible = true
+                            esp.ItemContainer.Visible = true
                         else
-                            esp.Item.Visible = false
-                            esp.ItemIcon.Visible = false
+                            esp.ItemContainer.Visible = false
                         end
                     end
                 end)
@@ -406,7 +449,7 @@ local function UpdateESPData()
 end
 
 -- ============================================
--- MAGNETO OPTIMIZADO (EVENTOS + ESCANEO ÚNICO)
+-- MAGNETO OPTIMIZADO
 -- ============================================
 local function ScanMapForItems()
     for _, part in ipairs(Workspace:GetDescendants()) do
@@ -459,7 +502,7 @@ local function MagnetoLoop()
 end
 
 -- ============================================
--- LOOPS CON CONTROL DE HILOS LIMPIO
+-- LOOPS CON CONTROL DE HILOS
 -- ============================================
 local function StartSpeedLoop()
     if threads.Speed then return end
@@ -505,50 +548,164 @@ local function AutoHitLoop()
 end
 
 -- ============================================
--- VENTANA PRINCIPAL
+-- VENTANA PRINCIPAL (NUEVA UI)
 -- ============================================
+local ThemeName = "Dark"
+
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
-    Folder = "WaterHub_AdamABJ",
-    Icon = "droplet",
+    Icon = "solar:water-drop-bold-duotone",
+    Theme = ThemeName,
     NewElements = true,
-    HideSearchBar = false,
-    OpenButton = {
-        Title = "Abrir Water Hub",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false,
-        Scale = 0.5,
-        Color = ColorSequence.new(
-            Color3.fromHex("#00F2FE"),
-            Color3.fromHex("#4FACFE")
-        ),
-    },
-    Topbar = {
-        Height = 44,
-        ButtonsType = "Mac",
-    },
+    Transparent = true,
+    ToggleKey = Enum.KeyCode.F,
+    Acrylic = true,
 })
 
 -- ============================================
 -- PESTAÑAS
 -- ============================================
-local GeneralTab = Window:Tab({ Title = "General", Icon = "user", Border = true })
-local CombatTab = Window:Tab({ Title = "Combate", Icon = "sword", Border = true })
-local WeaponsTab = Window:Tab({ Title = "Armas", Icon = "settings", Border = true })
-local EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Border = true })
-local MagnetoTab = Window:Tab({ Title = "Magneto", Icon = "magnet", Border = true })
+local CombatTab = Window:Tab({
+    Title = "Combate",
+    Icon = "solar:sword-bold-duotone",
+})
+
+local MovementTab = Window:Tab({
+    Title = "Movimiento",
+    Icon = "solar:running-bold-duotone",
+})
+
+local VisualTab = Window:Tab({
+    Title = "Visual",
+    Icon = "solar:eye-bold-duotone",
+})
+
+local ItemsTab = Window:Tab({
+    Title = "Items",
+    Icon = "solar:magnet-bold-duotone",
+})
+
+local SettingsTab = Window:Tab({
+    Title = "Config",
+    Icon = "solar:settings-bold-duotone",
+})
+
+CombatTab:Select()
 
 -- ============================================
--- PESTAÑA: GENERAL
+-- PESTAÑA COMBATE
 -- ============================================
-local GeneralGroup = GeneralTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Movimiento" })
+CombatTab:Section({
+    Title = "Aimbot",
+    Desc = "Configuración de apuntado automático",
+})
 
-GeneralGroup:Toggle({
-    Flag = "SpeedHack",
+local SilentAimGroup = CombatTab:Group()
+
+SilentAimGroup:Toggle({
+    Title = "Silent Aim",
+    Value = false,
+    Callback = function(v)
+        silentAimActive = v
+        if v and not oldNamecall then
+            SetupSilentAim()
+        end
+    end,
+})
+
+SilentAimGroup:Slider({
+    Title = "Radio FOV",
+    Step = 1,
+    Value = { Min = 50, Max = 500, Default = 200 },
+    Callback = function(v)
+        fovRadius = v
+    end,
+})
+
+SilentAimGroup:Dropdown({
+    Title = "Parte Objetivo",
+    Value = "Head",
+    Values = { "Head", "HumanoidRootPart", "Torso" },
+    Callback = function(v)
+        aimPart = v
+    end,
+})
+
+CombatTab:Space({ Columns = 1 })
+
+CombatTab:Section({
+    Title = "Automático",
+    Desc = "Funciones automáticas de combate",
+})
+
+local AutoGroup = CombatTab:Group()
+
+AutoGroup:Toggle({
+    Title = "Auto Heal",
+    Value = false,
+    Callback = function(v)
+        autoHealActive = v
+        if v then AutoHealLoop() else threads.AutoHeal = nil end
+    end,
+})
+
+AutoGroup:Slider({
+    Title = "% Vida para curar",
+    Step = 1,
+    Value = { Min = 10, Max = 90, Default = 70 },
+    Callback = function(v)
+        autoHealHP = v
+    end,
+})
+
+AutoGroup:Toggle({
+    Title = "Auto Hit",
+    Value = false,
+    Callback = function(v)
+        autoHitActive = v
+        if v then AutoHitLoop() else threads.AutoHit = nil end
+    end,
+})
+
+CombatTab:Space({ Columns = 1 })
+
+CombatTab:Section({
+    Title = "Armas",
+    Desc = "Modificaciones de armas",
+})
+
+local WeaponGroup = CombatTab:Group()
+
+WeaponGroup:Toggle({
+    Title = "No Recoil",
+    Value = false,
+    Callback = function(v)
+        noRecoilActive = v
+        LocalPlayer:SetAttribute("NoRecoil", v)
+    end,
+})
+
+WeaponGroup:Toggle({
+    Title = "No Spread",
+    Value = false,
+    Callback = function(v)
+        noSpreadActive = v
+        LocalPlayer:SetAttribute("NoSpread", v)
+    end,
+})
+
+-- ============================================
+-- PESTAÑA MOVIMIENTO
+-- ============================================
+MovementTab:Section({
+    Title = "Velocidad",
+    Desc = "Control de movimiento del personaje",
+})
+
+local SpeedGroup = MovementTab:Group()
+
+SpeedGroup:Toggle({
     Title = "Speed Hack",
     Value = false,
     Callback = function(v)
@@ -556,15 +713,14 @@ GeneralGroup:Toggle({
         if v then
             StartSpeedLoop()
         else
-            threads.Speed = nil -- LIMPIAR HILO
+            threads.Speed = nil
             local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
             if hum then hum.WalkSpeed = 16 end
         end
     end,
 })
 
-GeneralGroup:Slider({
-    Flag = "SpeedValue",
+SpeedGroup:Slider({
     Title = "Velocidad",
     Step = 1,
     Value = { Min = 16, Max = 250, Default = 50 },
@@ -573,9 +729,17 @@ GeneralGroup:Slider({
     end,
 })
 
-GeneralGroup:Toggle({
-    Flag = "InfiniteJump",
-    Title = "Salto Infinito",
+MovementTab:Space({ Columns = 1 })
+
+MovementTab:Section({
+    Title = "Movimiento Avanzado",
+    Desc = "Funciones adicionales de movimiento",
+})
+
+local AdvancedMoveGroup = MovementTab:Group()
+
+AdvancedMoveGroup:Toggle({
+    Title = "Infinite Jump",
     Value = false,
     Callback = function(v)
         infiniteJump = v
@@ -593,8 +757,21 @@ GeneralGroup:Toggle({
     end,
 })
 
-GeneralGroup:Toggle({
-    Flag = "NoClip",
+AdvancedMoveGroup:Toggle({
+    Title = "Infinita Estamina",
+    Value = false,
+    Callback = function(v)
+        infiniteStamina = v
+        if v then
+            if threads.Stamina then return end
+            threads.Stamina = task.spawn(InfiniteStaminaLoop)
+        else
+            threads.Stamina = nil
+        end
+    end,
+})
+
+AdvancedMoveGroup:Toggle({
     Title = "No Clip",
     Value = false,
     Callback = function(v)
@@ -604,106 +781,16 @@ GeneralGroup:Toggle({
 })
 
 -- ============================================
--- PESTAÑA: COMBATE
+-- PESTAÑA VISUAL (ESP)
 -- ============================================
-local CombatGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Aimbot" })
-
-CombatGroup:Toggle({
-    Flag = "SilentAim",
-    Title = "Silent Aim (Hook Real)",
-    Value = false,
-    Callback = function(v)
-        silentAimActive = v
-        if v and not oldNamecall then
-            SetupSilentAim()
-        end
-    end,
+VisualTab:Section({
+    Title = "ESP",
+    Desc = "Visualización de jugadores",
 })
 
-CombatGroup:Slider({
-    Flag = "FOV",
-    Title = "Radio FOV",
-    Step = 1,
-    Value = { Min = 50, Max = 500, Default = 200 },
-    Callback = function(v)
-        fovRadius = v
-    end,
-})
-
-CombatGroup:Dropdown({
-    Flag = "AimPart",
-    Title = "Parte Objetivo",
-    Values = { "Head", "HumanoidRootPart", "Torso" },
-    Value = "Head",
-    Callback = function(v)
-        aimPart = v
-    end,
-})
-
-local AutoGroup = CombatTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Automático" })
-
-AutoGroup:Toggle({
-    Flag = "AutoHeal",
-    Title = "Curación Automática",
-    Value = false,
-    Callback = function(v)
-        autoHealActive = v
-        if v then AutoHealLoop() else threads.AutoHeal = nil end
-    end,
-})
-
-AutoGroup:Slider({
-    Flag = "HealHP",
-    Title = "Curar al % de vida",
-    Step = 1,
-    Value = { Min = 20, Max = 90, Default = 70 },
-    Callback = function(v)
-        autoHealHP = v
-    end,
-})
-
-AutoGroup:Toggle({
-    Flag = "AutoHit",
-    Title = "Golpe Automático",
-    Value = false,
-    Callback = function(v)
-        autoHitActive = v
-        if v then AutoHitLoop() else threads.AutoHit = nil end
-    end,
-})
-
--- ============================================
--- PESTAÑA: ARMAS
--- ============================================
-local WeaponGroup = WeaponsTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Modificaciones" })
-
-WeaponGroup:Toggle({
-    Flag = "NoRecoil",
-    Title = "Sin Retroceso",
-    Value = false,
-    Callback = function(v)
-        noRecoilActive = v
-        LocalPlayer:SetAttribute("NoRecoil", v)
-    end,
-})
-
-WeaponGroup:Toggle({
-    Flag = "NoSpread",
-    Title = "Sin Dispersión",
-    Value = false,
-    Callback = function(v)
-        noSpreadActive = v
-        LocalPlayer:SetAttribute("NoSpread", v)
-    end,
-})
-
--- ============================================
--- PESTAÑA: ESP
--- ============================================
-local EspGroup = EspTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Visualización" })
+local EspGroup = VisualTab:Group()
 
 EspGroup:Toggle({
-    Flag = "NameESP",
     Title = "Nombre ESP",
     Value = false,
     Callback = function(v)
@@ -712,7 +799,6 @@ EspGroup:Toggle({
 })
 
 EspGroup:Toggle({
-    Flag = "HealthESP",
     Title = "Vida ESP",
     Value = false,
     Callback = function(v)
@@ -721,7 +807,6 @@ EspGroup:Toggle({
 })
 
 EspGroup:Toggle({
-    Flag = "DistanceESP",
     Title = "Distancia ESP",
     Value = false,
     Callback = function(v)
@@ -730,8 +815,7 @@ EspGroup:Toggle({
 })
 
 EspGroup:Toggle({
-    Flag = "InventoryESP",
-    Title = "Inventario ESP (Arma)",
+    Title = "Arma ESP (con imagen)",
     Value = false,
     Callback = function(v)
         inventoryEspActive = v
@@ -739,12 +823,16 @@ EspGroup:Toggle({
 })
 
 -- ============================================
--- PESTAÑA: MAGNETO
+-- PESTAÑA ITEMS (MAGNETO)
 -- ============================================
-local MagnetoGroup = MagnetoTab:Group({ Box = true, BoxBorder = true, Opened = true, Title = "Atracción de Items" })
+ItemsTab:Section({
+    Title = "Magneto",
+    Desc = "Atracción automática de items",
+})
+
+local MagnetoGroup = ItemsTab:Group()
 
 MagnetoGroup:Toggle({
-    Flag = "Magneto",
     Title = "Magneto Activado",
     Value = false,
     Callback = function(v)
@@ -754,15 +842,14 @@ MagnetoGroup:Toggle({
             threads.Magneto = task.spawn(MagnetoLoop)
         else
             magnetoActive = false
-            threads.Magneto = nil -- LIMPIAR HILO
+            threads.Magneto = nil
             MagnetoItems = {}
         end
     end,
 })
 
 MagnetoGroup:Slider({
-    Flag = "MagnetoRadius",
-    Title = "Radio de Atracción",
+    Title = "Radio",
     Step = 1,
     Value = { Min = 10, Max = 100, Default = 50 },
     Callback = function(v)
@@ -771,8 +858,7 @@ MagnetoGroup:Slider({
 })
 
 MagnetoGroup:Slider({
-    Flag = "MagnetoSpeed",
-    Title = "Velocidad de Atracción",
+    Title = "Velocidad",
     Step = 1,
     Value = { Min = 20, Max = 150, Default = 60 },
     Callback = function(v)
@@ -781,7 +867,54 @@ MagnetoGroup:Slider({
 })
 
 -- ============================================
--- INICIALIZACIÓN ESP
+-- PESTAÑA CONFIG
+-- ============================================
+SettingsTab:Section({
+    Title = "Información",
+    Desc = "Datos de la cuenta",
+})
+
+local InfoGroup = SettingsTab:Group()
+
+local cashLabel = InfoGroup:Label({
+    Title = "💵 Cash: Cargando...",
+})
+
+local bankLabel = InfoGroup:Label({
+    Title = "🏦 Bank: Cargando...",
+})
+
+task.spawn(function()
+    while true do
+        local success, cash, bank = pcall(GetRealMoney)
+        if success then
+            pcall(function()
+                cashLabel:Set("💵 Cash: $" .. tostring(cash))
+                bankLabel:Set("🏦 Bank: $" .. tostring(bank))
+            end)
+        end
+        task.wait(1)
+    end
+end)
+
+SettingsTab:Space({ Columns = 1 })
+
+SettingsTab:Section({
+    Title = "UI",
+    Desc = "Configuración de interfaz",
+})
+
+local UiGroup = SettingsTab:Group()
+
+UiGroup:Button({
+    Title = "Destruir UI",
+    Callback = function()
+        Window:Destroy()
+    end,
+})
+
+-- ============================================
+-- INICIALIZACIÓN
 -- ============================================
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
@@ -802,14 +935,13 @@ Players.PlayerRemoving:Connect(function(player)
             if esp.Name then esp.Name:Destroy() end
             if esp.HealthBg then esp.HealthBg:Destroy() end
             if esp.Distance then esp.Distance:Destroy() end
-            if esp.Item then esp.Item:Destroy() end
-            if esp.ItemIcon then esp.ItemIcon:Destroy() end
+            if esp.ItemContainer then esp.ItemContainer:Destroy() end
         end)
         ESPs[player] = nil
     end
 end)
 
--- Conexiones optimizadas
+-- Conexiones ESP
 RunService.RenderStepped:Connect(UpdateESPPositions)
 task.spawn(UpdateESPData)
 
@@ -827,14 +959,13 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- Notificación
+-- Notificación de carga
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub",
-        Content = "Script cargado correctamente - Versión Estable",
-        Icon = "droplet",
+        Content = "Script cargado correctamente",
         Duration = 3,
     })
 end)
 
-print("✅ Water Hub cargado - Versión Final Estable para Delta")
+print("✅ Water Hub | BlockSpin - Cargado correctamente")
