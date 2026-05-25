@@ -1,7 +1,14 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSION FINAL FUNCIONAL
-    Pestañas: COMBAT, MOVEMENT, WEAPON, VISUAL, AUTOFARM, GUNS AMMO, SPECTATE, MISC, CONFIG
-]]
+    WATER HUB | BLOCKSPIN - VERSION FINAL (VERDE/AZUL)
+    Colores: Verde #00FF88 → Azul #00F2FE
+    By: AdamABJ
+--]]
+
+if getgenv and getgenv().WaterHubLoaded then
+    print("⚠️ Water Hub ya está cargado")
+    return
+end
+if getgenv then getgenv().WaterHubLoaded = true end
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -12,6 +19,7 @@ local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
 
 local gethui = gethui or function() return CoreGui end
 
@@ -26,72 +34,6 @@ if not WindUI then
 end
 
 -- ============================================
--- VARIABLES Y ESTADO
--- ============================================
-local Features = {
-    -- Combat
-    SilentAim = false,
-    FOV = 200,
-    AimPart = "Head",
-    AutoHeal = false,
-    HealPercent = 70,
-    AutoHit = false,
-    HitboxExpander = false,
-    
-    -- Movement
-    SpeedEnabled = false,
-    SpeedValue = 50,
-    InfiniteJump = false,
-    InfiniteStamina = false,
-    NoClip = false,
-    Fly = false,
-    
-    -- Weapon
-    NoRecoil = false,
-    NoSpread = false,
-    RapidFire = false,
-    InstantReload = false,
-    
-    -- Visual
-    ESPName = false,
-    ESPHealth = false,
-    ESPDistance = false,
-    ESPWeapon = false,
-    Chams = false,
-    Tracers = false,
-    FullBright = false,
-    NoFog = false,
-    
-    -- AutoFarm
-    AutoFarm = false,
-    AutoATM = false,
-    AutoDeposit = false,
-    SelectedJob = "None",
-    
-    -- Guns Ammo
-    InfiniteAmmo = false,
-    NoReload = false,
-    
-    -- Spectate
-    SpectateTarget = nil,
-    Freecam = false,
-    
-    -- Misc
-    AntiAFK = false,
-    AutoAccept = false
-}
-
-local Threads = {}
-local ESPObjects = {}
-local ChamsObjects = {}
-local MagnetoItems = {}
-local NoClipConnection = nil
-local SilentAimTarget = nil
-local OldNamecall = nil
-local SpectateConnection = nil
-local FlyConnection = nil
-
--- ============================================
 -- NOTIFICACIONES
 -- ============================================
 local function Notify(title, message)
@@ -103,6 +45,56 @@ local function Notify(title, message)
         })
     end)
 end
+
+-- ============================================
+-- VARIABLES Y ESTADO
+-- ============================================
+local Features = {
+    SilentAim = false,
+    FOV = 200,
+    AimPart = "Head",
+    AutoHeal = false,
+    HealPercent = 70,
+    AutoHit = false,
+    HitboxExpander = false,
+    SpeedEnabled = false,
+    SpeedValue = 50,
+    InfiniteJump = false,
+    InfiniteStamina = false,
+    NoClip = false,
+    Fly = false,
+    NoRecoil = false,
+    NoSpread = false,
+    RapidFire = false,
+    InstantReload = false,
+    ESPName = false,
+    ESPHealth = false,
+    ESPDistance = false,
+    ESPWeapon = false,
+    Chams = false,
+    Tracers = false,
+    FullBright = false,
+    NoFog = false,
+    AutoFarm = false,
+    AutoATM = false,
+    AutoDeposit = false,
+    SelectedJob = "None",
+    InfiniteAmmo = false,
+    NoReload = false,
+    SpectateTarget = nil,
+    Freecam = false,
+    AntiAFK = false,
+    AutoAccept = false
+}
+
+local Threads = {}
+local ESPObjects = {}
+local ChamsObjects = {}
+local NoClipConnection = nil
+local SilentAimTarget = nil
+local OldNamecall = nil
+local SpectateConnection = nil
+local InfiniteJumpConnection = nil
 
 -- ============================================
 -- FUNCIONES UTILIDAD
@@ -289,16 +281,22 @@ local function SpeedLoop()
     end
 end
 
-local function InfiniteJumpLoop()
-    while Features.InfiniteJump do
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum and hum:GetState() == Enum.HumanoidStateType.Landed then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+local function SetupInfiniteJump()
+    if InfiniteJumpConnection then
+        pcall(function() InfiniteJumpConnection:Disconnect() end)
+        InfiniteJumpConnection = nil
+    end
+    
+    if Features.InfiniteJump then
+        InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
             end
-        end
-        task.wait(0.1)
+        end)
     end
 end
 
@@ -306,16 +304,14 @@ local function InfiniteStaminaLoop()
     while Features.InfiniteStamina do
         local char = LocalPlayer.Character
         if char then
-            local staminaVal = char:FindFirstChild("Stamina")
-            if staminaVal and staminaVal:IsA("NumberValue") then
-                staminaVal.Value = 100
-            end
             local hum = char:FindFirstChild("Humanoid")
             if hum then
-                local humStamina = hum:FindFirstChild("Stamina")
-                if humStamina then humStamina.Value = 100 end
-                hum:SetAttribute("Stamina", 100)
+                pcall(function() hum:SetAttribute("Stamina", 100) end)
+                local staminaVal = char:FindFirstChild("Stamina")
+                if staminaVal then staminaVal.Value = 100 end
             end
+            local staminaPlayer = LocalPlayer:FindFirstChild("Stamina")
+            if staminaPlayer then staminaPlayer.Value = 100 end
         end
         task.wait(0.2)
     end
@@ -415,25 +411,18 @@ local function ApplyWeaponMods()
     
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("Tool") then
-            -- No Recoil
             if Features.NoRecoil then
                 local recoil = obj:FindFirstChild("Recoil") or obj:FindFirstChild("RecoilValue")
                 if recoil then recoil.Value = 0 end
             end
-            
-            -- No Spread
             if Features.NoSpread then
                 local spread = obj:FindFirstChild("Spread") or obj:FindFirstChild("SpreadValue")
                 if spread then spread.Value = 0 end
             end
-            
-            -- Rapid Fire
             if Features.RapidFire then
                 local fireRate = obj:FindFirstChild("FireRate") or obj:FindFirstChild("Cooldown")
                 if fireRate then fireRate.Value = 0.01 end
             end
-            
-            -- Instant Reload
             if Features.InstantReload then
                 local reload = obj:FindFirstChild("ReloadTime")
                 if reload then reload.Value = 0.01 end
@@ -463,7 +452,6 @@ local function CreateESP(player)
     local gui = GetESPGui()
     local esp = {}
     
-    -- Name
     esp.Name = Instance.new("TextLabel")
     esp.Name.Size = UDim2.new(0, 200, 0, 20)
     esp.Name.BackgroundTransparency = 1
@@ -472,7 +460,6 @@ local function CreateESP(player)
     esp.Name.Font = Enum.Font.GothamBold
     esp.Name.Parent = gui
     
-    -- Health
     esp.HealthBg = Instance.new("Frame")
     esp.HealthBg.Size = UDim2.new(0, 100, 0, 6)
     esp.HealthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -481,24 +468,22 @@ local function CreateESP(player)
     
     esp.HealthBar = Instance.new("Frame")
     esp.HealthBar.Size = UDim2.new(1, 0, 1, 0)
-    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    esp.HealthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 100) -- Verde neón
     esp.HealthBar.BorderSizePixel = 0
     esp.HealthBar.Parent = esp.HealthBg
     
-    -- Distance
     esp.Distance = Instance.new("TextLabel")
     esp.Distance.Size = UDim2.new(0, 100, 0, 15)
     esp.Distance.BackgroundTransparency = 1
-    esp.Distance.TextColor3 = Color3.fromRGB(200, 200, 200)
+    esp.Distance.TextColor3 = Color3.fromRGB(0, 242, 254) -- Azul claro
     esp.Distance.TextSize = 10
     esp.Distance.Font = Enum.Font.Gotham
     esp.Distance.Parent = gui
     
-    -- Weapon
     esp.Weapon = Instance.new("TextLabel")
     esp.Weapon.Size = UDim2.new(0, 150, 0, 20)
     esp.Weapon.BackgroundTransparency = 1
-    esp.Weapon.TextColor3 = Color3.fromRGB(255, 200, 100)
+    esp.Weapon.TextColor3 = Color3.fromRGB(0, 255, 150) -- Verde-azul
     esp.Weapon.TextSize = 10
     esp.Weapon.Font = Enum.Font.GothamBold
     esp.Weapon.Parent = gui
@@ -536,7 +521,7 @@ local function UpdateESP()
                     if Features.ESPHealth then
                         local percent = hum.Health / hum.MaxHealth
                         esp.HealthBar.Size = UDim2.new(percent, 0, 1, 0)
-                        esp.HealthBar.BackgroundColor3 = Color3.fromRGB(255 * (1-percent), 255 * percent, 0)
+                        esp.HealthBar.BackgroundColor3 = Color3.fromRGB(255 * (1-percent), 255 * percent, 100)
                         esp.HealthBg.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 30)
                         esp.HealthBg.Visible = true
                     else
@@ -556,7 +541,7 @@ local function UpdateESP()
                         local weapon = GetEquippedTool(player)
                         if weapon and weapon ~= esp.LastWeapon then
                             esp.LastWeapon = weapon
-                            esp.Weapon.Text = weapon
+                            esp.Weapon.Text = "🔫 " .. weapon
                         end
                         if weapon then
                             esp.Weapon.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 10)
@@ -591,8 +576,8 @@ local function SetChams(enabled)
                 if not ChamsObjects[player] then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "Chams"
-                    highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillColor = Color3.fromRGB(0, 255, 100) -- Verde
+                    highlight.OutlineColor = Color3.fromRGB(0, 242, 254) -- Azul borde
                     highlight.FillTransparency = 0.5
                     highlight.OutlineTransparency = 0
                     highlight.Adornee = player.Character
@@ -635,24 +620,17 @@ end
 -- ============================================
 local function AutoFarmLoop()
     while Features.AutoFarm do
-        -- Detectar trabajo actual y farmear
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                -- Auto farm segun el trabajo seleccionado
-                if Features.SelectedJob == "Cleaner" then
-                    -- Buschar charcos y limpiarlos
-                    for _, part in ipairs(Workspace:GetDescendants()) do
-                        if part.Name:find("Puddle") or part.Name:find("Mess") then
-                            if (part.Position - char.HumanoidRootPart.Position).Magnitude < 50 then
-                                firetouchinterest(char.HumanoidRootPart, part, 0)
-                                firetouchinterest(char.HumanoidRootPart, part, 1)
-                            end
+            if hum and Features.SelectedJob == "Cleaner" then
+                for _, part in ipairs(Workspace:GetDescendants()) do
+                    if part.Name:find("Puddle") or part.Name:find("Mess") then
+                        if (part.Position - char.HumanoidRootPart.Position).Magnitude < 50 then
+                            firetouchinterest(char.HumanoidRootPart, part, 0)
+                            firetouchinterest(char.HumanoidRootPart, part, 1)
                         end
                     end
-                elseif Features.SelectedJob == "Pizza" then
-                    -- Farmear pizza job
                 end
             end
         end
@@ -662,7 +640,6 @@ end
 
 local function AutoATMLoop()
     while Features.AutoATM do
-        -- Buscar ATMs cercanos y robarlos
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             for _, atm in ipairs(Workspace:GetDescendants()) do
@@ -675,27 +652,6 @@ local function AutoATMLoop()
             end
         end
         task.wait(1)
-    end
-end
-
-local function AutoDepositLoop()
-    while Features.AutoDeposit do
-        local cash, _ = GetMoney()
-        if cash > 1000 then
-            -- Buscar ATM para depositar
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                for _, atm in ipairs(Workspace:GetDescendants()) do
-                    if atm.Name:find("ATM") and atm:FindFirstChild("ClickDetector") then
-                        local dist = (atm.Position - char.HumanoidRootPart.Position).Magnitude
-                        if dist < 10 then
-                            -- Depositar dinero
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(5)
     end
 end
 
@@ -748,14 +704,14 @@ local function AntiAFKLoop()
     while Features.AntiAFK do
         local vu = game:GetService("VirtualUser")
         vu:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        wait(1)
+        task.wait(1)
         vu:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
         task.wait(60)
     end
 end
 
 -- ============================================
--- VENTANA PRINCIPAL
+-- VENTANA PRINCIPAL - COLORES VERDE Y AZUL
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
@@ -765,13 +721,37 @@ local Window = WindUI:CreateWindow({
     NewElements = true,
     Transparent = true,
     ToggleKey = Enum.KeyCode.F,
-    Acrylic = false, -- Desactivado para evitar bugs
+    Acrylic = false,
+    -- BOTÓN FLOTANTE CON COLORES VERDE → AZUL
+    OpenButton = {
+        Title = "Open Water Hub",
+        CornerRadius = UDim.new(1, 0),
+        StrokeThickness = 2,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.5,
+        -- DEGRADADO VERDE A AZUL (Principal)
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromHex("#00FF88")),   -- Verde neón
+            ColorSequenceKeypoint.new(0.5, Color3.fromHex("#00E5FF")),   -- Cyan
+            ColorSequenceKeypoint.new(1, Color3.fromHex("#00B0FF"))    -- Azul
+        }),
+    },
 })
 
-Notify("Water Hub", "Script cargado correctamente")
+-- Tag con colores verde/azul
+Window:Tag({ 
+    Title = "v2.0 | Green Edition", 
+    Icon = "leaf", 
+    Color = Color3.fromHex("#00FF88"), 
+    Border = true 
+})
+
+Notify("Water Hub", "Script cargado - Tema Verde/Azul activado")
 
 -- ============================================
--- PESTAÑAS EXACTAS COMO EN LA IMAGEN
+-- PESTAÑAS
 -- ============================================
 
 -- 1. COMBAT
@@ -785,7 +765,7 @@ CombatTab:Toggle({
     Callback = function(v)
         Features.SilentAim = v
         if v then SetupSilentAim() end
-        Notify("Silent Aim", v and "ON" or "OFF")
+        Notify("Silent Aim", v and "Activado" or "Desactivado")
     end,
 })
 
@@ -812,7 +792,7 @@ CombatTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AutoHeal = v
-        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) else Threads.AutoHeal = nil end
+        if v then Threads.AutoHeal = task.spawn(AutoHealLoop) end
     end,
 })
 
@@ -828,7 +808,7 @@ CombatTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AutoHit = v
-        if v then Threads.AutoHit = task.spawn(AutoHitLoop) else Threads.AutoHit = nil end
+        if v then Threads.AutoHit = task.spawn(AutoHitLoop) end
     end,
 })
 
@@ -851,7 +831,7 @@ MovementTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.SpeedEnabled = v
-        if v then Threads.Speed = task.spawn(SpeedLoop) else Threads.Speed = nil end
+        if v then Threads.Speed = task.spawn(SpeedLoop) end
     end,
 })
 
@@ -871,7 +851,7 @@ MovementTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.InfiniteJump = v
-        if v then Threads.Jump = task.spawn(InfiniteJumpLoop) else Threads.Jump = nil end
+        SetupInfiniteJump()
     end,
 })
 
@@ -880,7 +860,7 @@ MovementTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.InfiniteStamina = v
-        if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) else Threads.Stamina = nil end
+        if v then Threads.Stamina = task.spawn(InfiniteStaminaLoop) end
     end,
 })
 
@@ -898,7 +878,7 @@ MovementTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.Fly = v
-        if v then Threads.Fly = task.spawn(FlyLoop) else Threads.Fly = nil end
+        if v then Threads.Fly = task.spawn(FlyLoop) end
     end,
 })
 
@@ -977,7 +957,7 @@ VisualTab:Space({ Columns = 1 })
 VisualTab:Section({ Title = "Chams", Desc = "Resaltar jugadores" })
 
 VisualTab:Toggle({
-    Title = "Chams",
+    Title = "Chams (Verde/Azul)",
     Value = false,
     Callback = function(v)
         Features.Chams = v
@@ -1017,7 +997,7 @@ AutoFarmTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AutoFarm = v
-        if v then Threads.AutoFarm = task.spawn(AutoFarmLoop) else Threads.AutoFarm = nil end
+        if v then Threads.AutoFarm = task.spawn(AutoFarmLoop) end
     end,
 })
 
@@ -1037,7 +1017,7 @@ AutoFarmTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AutoATM = v
-        if v then Threads.AutoATM = task.spawn(AutoATMLoop) else Threads.AutoATM = nil end
+        if v then Threads.AutoATM = task.spawn(AutoATMLoop) end
     end,
 })
 
@@ -1046,7 +1026,6 @@ AutoFarmTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AutoDeposit = v
-        if v then Threads.AutoDeposit = task.spawn(AutoDepositLoop) else Threads.AutoDeposit = nil end
     end,
 })
 
@@ -1060,7 +1039,7 @@ GunsAmmoTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.InfiniteAmmo = v
-        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) else Threads.InfiniteAmmo = nil end
+        if v then Threads.InfiniteAmmo = task.spawn(InfiniteAmmoLoop) end
     end,
 })
 
@@ -1082,15 +1061,10 @@ local PlayerList = SpectateTab:Dropdown({
     Callback = function(v)
         local target = Players:FindFirstChild(v)
         Features.SpectateTarget = target
-        if target then
-            StartSpectate(target)
-        else
-            StartSpectate(nil)
-        end
+        StartSpectate(target)
     end,
 })
 
--- Actualizar lista de jugadores
 task.spawn(function()
     while true do
         task.wait(5)
@@ -1117,7 +1091,6 @@ SpectateTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.Freecam = v
-        -- Implementar freecam
     end,
 })
 
@@ -1131,7 +1104,7 @@ MiscTab:Toggle({
     Value = false,
     Callback = function(v)
         Features.AntiAFK = v
-        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) else Threads.AntiAFK = nil end
+        if v then Threads.AntiAFK = task.spawn(AntiAFKLoop) end
     end,
 })
 
@@ -1153,8 +1126,8 @@ task.spawn(function()
     while true do
         local cash, bank = GetMoney()
         pcall(function()
-            CashLabel:Set("Cash: $" .. cash)
-            BankLabel:Set("Bank: $" .. bank)
+            CashLabel:Set("💵 Cash: $" .. cash)
+            BankLabel:Set("🏦 Bank: $" .. bank)
         end)
         task.wait(1)
     end
@@ -1167,19 +1140,20 @@ ConfigTab:Section({ Title = "Script", Desc = "Control del script" })
 ConfigTab:Button({
     Title = "Destroy UI",
     Callback = function()
-        -- Limpiar todo
         for k, _ in pairs(Threads) do Threads[k] = nil end
         SetChams(false)
         SetNoClip(false)
         StartSpectate(nil)
+        if InfiniteJumpConnection then InfiniteJumpConnection:Disconnect() end
         Window:Destroy()
+        if getgenv then getgenv().WaterHubLoaded = false end
     end,
 })
 
 ConfigTab:Button({
     Title = "Rejoin Server",
     Callback = function()
-        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end,
 })
 
@@ -1209,7 +1183,6 @@ end)
 
 RunService.RenderStepped:Connect(UpdateESP)
 
--- Respawn handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     if Features.SpeedEnabled then
@@ -1221,11 +1194,10 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.1)
         SetNoClip(true)
     end
-    -- Reaplicar mods de armas
     if Features.NoRecoil or Features.NoSpread or Features.RapidFire then
         ApplyWeaponMods()
     end
 end)
 
 CombatTab:Select()
-print("Water Hub | BlockSpin - 9 Pestañas cargadas 100% funcional")
+print("✅ Water Hub | BlockSpin - Tema Verde/Azul cargado")
