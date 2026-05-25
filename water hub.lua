@@ -1,6 +1,6 @@
 --[[
     WATER HUB | BLOCKSPIN - VERSIÓN DELTA FINAL
-    Librería WindUI Oficial
+    Librería WindUI Oficial - Corregida
     By: AdamABJ
 --]]
 
@@ -23,40 +23,34 @@ local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 
 -- ============================================
--- CARGAR WINDUI OFICIAL
+-- CARGAR WINDUI - VERSIÓN FUNCIONAL
 -- ============================================
-local cloneref = (cloneref or clonereference or function(instance)
-    return instance
-end)
-
-local ReplicatedStorageClone = cloneref(game:GetService("ReplicatedStorage"))
-local RunServiceClone = cloneref(game:GetService("RunService"))
-
 local WindUI
 
-do
-    local ok, result = pcall(function()
-        return require("./src/Init")
-    end)
+print("⏳ Cargando WindUI...")
 
-    if ok then
-        WindUI = result
-    else
-        if RunServiceClone:IsStudio() or not writefile then
-            WindUI = require(ReplicatedStorageClone:WaitForChild("WindUI"):WaitForChild("Init"))
-        else
-            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-        end
-    end
+local ok, result = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+end)
+
+if not ok then
+    warn("❌ Error cargando WindUI: " .. tostring(result))
+    getgenv().WaterHubLoaded = false
+    return
 end
 
+WindUI = result
+
 if not WindUI then
-    warn("❌ Error cargando WindUI")
+    warn("❌ WindUI es nil después de cargar")
     getgenv().WaterHubLoaded = false
     return
 end
 
 print("✅ WindUI Cargado Correctamente")
+
+-- Esperar a que esté completamente listo
+task.wait(0.5)
 
 -- ============================================
 -- REMOTES
@@ -682,6 +676,8 @@ end)
 -- ============================================
 -- UI - WINDUI OFICIAL
 -- ============================================
+print("⏳ Creando ventana WindUI...")
+
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
     Author = "By: AdamABJ",
@@ -689,10 +685,15 @@ local Window = WindUI:CreateWindow({
     Icon = "solar:water-drops-bold-duotone",
     Theme = "Dark",
     NewElements = true,
-    Transparent = true,
-    ToggleKey = Enum.KeyCode.F,
-    Acrylic = true,
 })
+
+if not Window then
+    warn("❌ Error creando la ventana WindUI")
+    getgenv().WaterHubLoaded = false
+    return
+end
+
+print("✅ Ventana WindUI creada correctamente")
 
 local Tag = Window:Tag({
     Title = "v2.1 | Delta Ready",
@@ -739,7 +740,6 @@ CombatTab:Select()
 -- ============================================
 CombatTab:Section({
     Title = "⚔️ Combat",
-    Desc = "Sistemas de combate",
 })
 
 local CombatGroup = CombatTab:Group()
@@ -750,7 +750,7 @@ CombatGroup:Toggle({
     Callback = function(v) Settings.SilentAim = v end,
 })
 
-CombatGroup:Space({ Columns = 0.5 })
+CombatGroup:Space()
 
 CombatGroup:Slider({
     Title = "FOV Radius",
@@ -760,7 +760,7 @@ CombatGroup:Slider({
     Callback = function(v) Settings.FOV = v end,
 })
 
-CombatGroup:Space({ Columns = 0.5 })
+CombatGroup:Space()
 
 CombatGroup:Dropdown({
     Title = "Aim Part",
@@ -773,7 +773,6 @@ CombatTab:Space({ Columns = 2 })
 
 CombatTab:Section({
     Title = "🤖 Auto",
-    Desc = "Automatizaciones",
 })
 
 local AutoGroup = CombatTab:Group()
@@ -787,7 +786,7 @@ AutoGroup:Toggle({
     end,
 })
 
-AutoGroup:Space({ Columns = 0.5 })
+AutoGroup:Space()
 
 AutoGroup:Slider({
     Title = "Heal at HP%",
@@ -797,7 +796,7 @@ AutoGroup:Slider({
     Callback = function(v) Settings.HealPercent = v end,
 })
 
-AutoGroup:Space({ Columns = 0.5 })
+AutoGroup:Space()
 
 AutoGroup:Toggle({
     Title = "Auto Hit",
@@ -813,7 +812,6 @@ AutoGroup:Toggle({
 -- ============================================
 MovementTab:Section({
     Title = "⚡ Movement",
-    Desc = "Sistemas de movimiento",
 })
 
 local MoveGroup = MovementTab:Group()
@@ -835,7 +833,7 @@ MoveGroup:Toggle({
     end,
 })
 
-MoveGroup:Space({ Columns = 0.5 })
+MoveGroup:Space()
 
 MoveGroup:Slider({
     Title = "Speed Amount",
@@ -850,7 +848,7 @@ MoveGroup:Slider({
     end,
 })
 
-MoveGroup:Space({ Columns = 0.5 })
+MoveGroup:Space()
 
 MoveGroup:Toggle({
     Title = "Infinite Jump",
@@ -861,7 +859,7 @@ MoveGroup:Toggle({
     end,
 })
 
-MoveGroup:Space({ Columns = 0.5 })
+MoveGroup:Space()
 
 MoveGroup:Toggle({
     Title = "Infinite Stamina",
@@ -877,7 +875,6 @@ MoveGroup:Toggle({
 -- ============================================
 WeaponsTab:Section({
     Title = "🔫 Weapon Mods",
-    Desc = "Modificaciones",
 })
 
 local WeaponGroup = WeaponsTab:Group()
@@ -891,7 +888,7 @@ WeaponGroup:Toggle({
     end,
 })
 
-WeaponGroup:Space({ Columns = 0.5 })
+WeaponGroup:Space()
 
 WeaponGroup:Toggle({
     Title = "No Spread",
@@ -907,7 +904,6 @@ WeaponGroup:Toggle({
 -- ============================================
 VisualTab:Section({
     Title = "👤 Chams",
-    Desc = "Resaltar jugadores",
 })
 
 local ChamsGroup = VisualTab:Group()
@@ -925,7 +921,6 @@ VisualTab:Space({ Columns = 2 })
 
 VisualTab:Section({
     Title = "👁️ ESP",
-    Desc = "Información en pantalla",
 })
 
 local EspGroup = VisualTab:Group()
@@ -936,7 +931,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.NameESP = v end,
 })
 
-EspGroup:Space({ Columns = 0.5 })
+EspGroup:Space()
 
 EspGroup:Toggle({
     Title = "Health ESP",
@@ -944,7 +939,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.HealthESP = v end,
 })
 
-EspGroup:Space({ Columns = 0.5 })
+EspGroup:Space()
 
 EspGroup:Toggle({
     Title = "Distance ESP",
@@ -952,7 +947,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.DistanceESP = v end,
 })
 
-EspGroup:Space({ Columns = 0.5 })
+EspGroup:Space()
 
 EspGroup:Toggle({
     Title = "Weapon ESP",
@@ -960,7 +955,7 @@ EspGroup:Toggle({
     Callback = function(v) Settings.WeaponESP = v end,
 })
 
-EspGroup:Space({ Columns = 0.5 })
+EspGroup:Space()
 
 EspGroup:Toggle({
     Title = "Weapon Icon ESP",
@@ -972,7 +967,6 @@ VisualTab:Space({ Columns = 2 })
 
 VisualTab:Section({
     Title = "🌍 World",
-    Desc = "Efectos globales",
 })
 
 local WorldGroup = VisualTab:Group()
@@ -991,7 +985,6 @@ WorldGroup:Toggle({
 -- ============================================
 MiscTab:Section({
     Title = "⚙️ Miscellaneous",
-    Desc = "Otras opciones",
 })
 
 local MiscGroup = MiscTab:Group()
@@ -1010,7 +1003,6 @@ MiscGroup:Toggle({
 -- ============================================
 ConfigTab:Section({
     Title = "⚙️ Server",
-    Desc = "Servidor",
 })
 
 local ServerGroup = ConfigTab:Group()
@@ -1023,27 +1015,10 @@ ServerGroup:Button({
     end,
 })
 
-ServerGroup:Space({ Columns = 0.5 })
-
-ServerGroup:Button({
-    Title = "Copy Game ID",
-    Icon = "solar:copy-bold",
-    Callback = function()
-        setclipboard(tostring(game.PlaceId))
-        WindUI:Notify({
-            Title = "Copiado",
-            Content = "Game ID copiado al portapapeles",
-            Icon = "solar:copy-bold",
-            Duration = 2,
-        })
-    end,
-})
-
 ConfigTab:Space({ Columns = 2 })
 
 ConfigTab:Section({
     Title = "💀 Danger Zone",
-    Desc = "Opciones peligrosas",
 })
 
 local DangerGroup = ConfigTab:Group()
@@ -1102,7 +1077,6 @@ ConfigTab:Space({ Columns = 2 })
 
 ConfigTab:Section({
     Title = "📝 About",
-    Desc = "Acerca de",
 })
 
 local AboutGroup = ConfigTab:Group()
@@ -1115,7 +1089,7 @@ AboutGroup:Button({
     Callback = function() end,
 })
 
-AboutGroup:Space({ Columns = 0.5 })
+AboutGroup:Space()
 
 AboutGroup:Button({
     Title = "By: AdamABJ",
@@ -1128,6 +1102,8 @@ AboutGroup:Button({
 -- ============================================
 -- NOTIFICACIONES
 -- ============================================
+task.wait(0.5)
+
 pcall(function()
     WindUI:Notify({
         Title = "Water Hub",
