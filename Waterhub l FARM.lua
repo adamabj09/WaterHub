@@ -1,6 +1,6 @@
 --// FARM v3.0 - Blockspin Superior Edition
 --// By: adamABJ
---// Executor: Delta
+--// Executor: Delta (Fixed)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -162,7 +162,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HRP = char:WaitForChild("HumanoidRootPart")
 end)
 
---// SECURE NETWORKING (Metamethod Hooking)
+--// SECURE NETWORKING (Metamethod Hooking - Fixed for Delta)
 function FARM:InitSecureNetworking()
     local mt = getrawmetatable(Net)
     if not mt then return end
@@ -170,13 +170,13 @@ function FARM:InitSecureNetworking()
     setreadonly(mt, false)
     local oldNamecall = mt.__namecall
     
-    mt.__namecall = newcclosure(function(self, ...)
+    mt.__namecall = function(self, ...)
         local method = getnamecallmethod()
         if method == "send" and self == Net and FARM.Config.Humanize then
             FARM:HumanDelay()
         end
         return oldNamecall(self, ...)
-    end)
+    end
     
     setreadonly(mt, true)
 end
@@ -205,12 +205,12 @@ function FARM:InitSafety()
         if mt then
             setreadonly(mt, false)
             local oldNewIndex = mt.__newindex
-            mt.__newindex = newcclosure(function(t, k, v)
+            mt.__newindex = function(t, k, v)
                 if k == "Health" and v <= 0 then
                     return
                 end
                 return oldNewIndex(t, k, v)
-            end)
+            end
             setreadonly(mt, true)
         end
     end
@@ -924,4 +924,4 @@ end
 
 getgenv().FARM = FARM
 
-print("FARM v" .. FARM.Version .. " by adamABJ - Loaded Successfully")
+print("FARM v" .. FARM.Version .. " by adamABJ - Loaded Successfully (Delta Fixed)")
