@@ -1,113 +1,51 @@
---// FARM v3.0 - Blockspin Superior Edition
---// By: adamABJ
---// Executor: Delta (Fixed)
+--// FARM v3.0 - DIAGNOSTIC VERSION
+--// By: adamABJ | Debug for Delta
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local CoreGui = game:GetService("CoreGui")
+print("=" .. string.rep("=", 50))
+print("FARM DIAGNOSTIC - Starting...")
+print("=" .. string.rep("=", 50))
 
-local gethui = gethui or function() return CoreGui end
+--// Paso 1: Servicios básicos
+print("[STEP 1] Loading services...")
+local success, err = pcall(function()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Workspace = game:GetService("Workspace")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+    local TweenService = game:GetService("TweenService")
+    local TeleportService = game:GetService("TeleportService")
+    local HttpService = game:GetService("HttpService")
+    local CoreGui = game:GetService("CoreGui")
+    print("[STEP 1] ✓ Services loaded")
+end)
+if not success then print("[STEP 1] ✗ FAILED: " .. tostring(err)) return end
 
---// CARGAR WINDUI (Forma correcta)
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-
-if not WindUI then
-    warn("Error cargando WindUI")
-    return
+--// Paso 2: WindUI
+print("[STEP 2] Loading WindUI...")
+local WindUI
+local success, err = pcall(function()
+    WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+end)
+if not success or not WindUI then
+    print("[STEP 2] ✗ FAILED: " .. tostring(err))
+    print("[STEP 2] Trying alternative WindUI...")
+    pcall(function()
+        WindUI = loadstring(game:HttpGet("https://pastebin.com/raw/U0mKbjvJ"))()
+    end)
+    if not WindUI then
+        print("[STEP 2] ✗ All WindUI sources failed")
+        return
+    end
 end
+print("[STEP 2] ✓ WindUI loaded")
 
---// CONFIGURACIÓN
+--// Paso 3: Config
+print("[STEP 3] Setting up config...")
 local ConfigFile = "FARM_Config.json"
-
 local FARM = {
     Version = "3.0.0",
-    Config = {},
-    State = {
-        Active = false,
-        CurrentJob = nil,
-        StartTime = nil,
-        TotalEarned = 0,
-        IncomeRate = 0,
-        IsFarming = false
-    },
-    Hooks = {},
-    Jobs = {},
-    Threads = {}
-}
-
---// Default Config
-FARM.Config = {
-    -- Farm
-    AutoFarm = false,
-    PreferredJob = "shelf_stocker",
-    SmartJobSwitch = true,
-    AutoDeposit = false,
-    
-    -- Anti-Detection
-    Humanize = true,
-    MinDelay = 0.05,
-    MaxDelay = 0.15,
-    JitterAmount = 0.02,
-    
-    -- Safety
-    AntiRagdoll = false,
-    AntiDamage = false,
-    AutoRespawn = false,
-    HideName = false,
-    
-    -- Server
-    AutoRejoin = false,
-    TargetJobId = "",
-    
-    -- Stats
-    TrackIncome = true,
-    WebhookURL = "",
-    
-    -- UI
-    ThemeColor = Color3.fromHex("#00F2FE")
-}
-
---// Cargar Config
-local function LoadConfig()
-    if isfile and isfile(ConfigFile) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(ConfigFile))
-        end)
-        if success and data then
-            for k, v in pairs(data) do
-                if FARM.Config[k] ~= nil then
-                    FARM.Config[k] = v
-                end
-            end
-        end
-    end
-end
-
-LoadConfig()
-
---// Guardar Config
-function FARM:SaveConfig()
-    if writefile then
-        local success, encoded = pcall(function()
-            return HttpService:JSONEncode(FARM.Config)
-        end)
-        if success then
-            writefile(ConfigFile, encoded)
-            return true
-        end
-    end
-    return false
-end
-
---// Reset Config
-function FARM:ResetConfig()
-    FARM.Config = {
+    Config = {
         AutoFarm = false,
         PreferredJob = "shelf_stocker",
         SmartJobSwitch = true,
@@ -125,60 +63,53 @@ function FARM:ResetConfig()
         TrackIncome = true,
         WebhookURL = "",
         ThemeColor = Color3.fromHex("#00F2FE")
-    }
-    FARM:SaveConfig()
+    },
+    State = {
+        Active = false,
+        CurrentJob = nil,
+        StartTime = nil,
+        TotalEarned = 0,
+        IncomeRate = 0,
+        IsFarming = false
+    },
+    Jobs = {}
+}
+
+-- Cargar config guardada
+if isfile and isfile(ConfigFile) then
+    local success, data = pcall(function()
+        return HttpService:JSONDecode(readfile(ConfigFile))
+    end)
+    if success and data then
+        for k, v in pairs(data) do
+            if FARM.Config[k] ~= nil then
+                FARM.Config[k] = v
+            end
+        end
+        print("[STEP 3] ✓ Config loaded from file")
+    end
+else
+    print("[STEP 3] ✓ Using default config")
 end
 
---// Notificación
+--// Paso 4: Funciones de utilidad
+print("[STEP 4] Creating utility functions...")
+
+function FARM:SaveConfig()
+    if writefile then
+        local success, encoded = pcall(function()
+            return HttpService:JSONEncode(FARM.Config)
+        end)
+        if success then
+            writefile(ConfigFile, encoded)
+        end
+    end
+end
+
 local function Notify(title, content)
     pcall(function()
-        WindUI:Notify({
-            Title = title,
-            Content = content,
-            Duration = 3
-        })
+        WindUI:Notify({ Title = title, Content = content, Duration = 3 })
     end)
-end
-
---// Game Modules
-local Modules = ReplicatedStorage:WaitForChild("Modules")
-local Core = Modules:WaitForChild("Core")
-local Game = Modules:WaitForChild("Game")
-
-local Net = require(Core:WaitForChild("Net"))
-local Char = require(Core:WaitForChild("Char"))
-local Util = require(Core:WaitForChild("Util"))
-local JobData = require(Game:WaitForChild("Jobs"):WaitForChild("JobData"))
-local JobUtil = require(Game:WaitForChild("Jobs"):WaitForChild("JobUtil"))
-
---// Character References
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local HRP = Character:WaitForChild("HumanoidRootPart")
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid")
-    HRP = char:WaitForChild("HumanoidRootPart")
-end)
-
---// SECURE NETWORKING (Metamethod Hooking - Fixed for Delta)
-function FARM:InitSecureNetworking()
-    local mt = getrawmetatable(Net)
-    if not mt then return end
-    
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
-    
-    mt.__namecall = function(self, ...)
-        local method = getnamecallmethod()
-        if method == "send" and self == Net and FARM.Config.Humanize then
-            FARM:HumanDelay()
-        end
-        return oldNamecall(self, ...)
-    end
-    
-    setreadonly(mt, true)
 end
 
 function FARM:HumanDelay()
@@ -189,244 +120,69 @@ function FARM:HumanDelay()
     task.wait(math.max(0, delay))
 end
 
---// ANTI-RAGDOLL & SAFETY
-function FARM:InitSafety()
-    if FARM.Config.AntiRagdoll then
-        local success, Ragdoll = pcall(function()
-            return require(Game:WaitForChild("Ragdoll"))
-        end)
-        if success and Ragdoll and Ragdoll.EnableRagdoll then
-            Ragdoll.EnableRagdoll = function() return nil end
-        end
-    end
+print("[STEP 4] ✓ Utility functions created")
+
+--// Paso 5: Game Modules
+print("[STEP 5] Loading game modules...")
+local Net, Char, Util, JobData, JobUtil
+local success, err = pcall(function()
+    local Modules = ReplicatedStorage:WaitForChild("Modules")
+    local Core = Modules:WaitForChild("Core")
+    local Game = Modules:WaitForChild("Game")
     
-    if FARM.Config.AntiDamage then
-        local mt = getrawmetatable(Humanoid)
-        if mt then
-            setreadonly(mt, false)
-            local oldNewIndex = mt.__newindex
-            mt.__newindex = function(t, k, v)
-                if k == "Health" and v <= 0 then
-                    return
-                end
-                return oldNewIndex(t, k, v)
-            end
-            setreadonly(mt, true)
-        end
-    end
-    
-    if FARM.Config.AutoRespawn then
-        Humanoid.Died:Connect(function()
-            task.wait(2)
-            local spawnLocation = LocalPlayer:FindFirstChild("SpawnCFrame")
-            if spawnLocation and HRP then
-                HRP.CFrame = spawnLocation.Value
-            end
-        end)
-    end
+    Net = require(Core:WaitForChild("Net"))
+    print("[STEP 5] ✓ Net loaded")
+    Char = require(Core:WaitForChild("Char"))
+    print("[STEP 5] ✓ Char loaded")
+    Util = require(Core:WaitForChild("Util"))
+    print("[STEP 5] ✓ Util loaded")
+    JobData = require(Game:WaitForChild("Jobs"):WaitForChild("JobData"))
+    print("[STEP 5] ✓ JobData loaded")
+    JobUtil = require(Game:WaitForChild("Jobs"):WaitForChild("JobUtil"))
+    print("[STEP 5] ✓ JobUtil loaded")
+end)
+if not success then
+    print("[STEP 5] ✗ FAILED: " .. tostring(err))
+    print("[STEP 5] Trying without JobData/JobUtil...")
 end
 
---// JOB SYSTEM - COOK
-FARM.Jobs.Cook = {
-    Name = "steakhouse_cook",
-    State = "IDLE",
-    CurrentGrill = nil,
-    
-    Start = function(self)
-        if LocalPlayer:GetAttribute("Job") ~= self.Name then
-            FARM:ApplyForJob(self.Name)
-        end
-        
-        FARM.State.IsFarming = true
-        
-        while FARM.State.Active and FARM.State.CurrentJob == self.Name and FARM.State.IsFarming do
-            self:Tick()
-            task.wait(0.1)
-        end
-    end,
-    
-    Stop = function(self)
-        FARM.State.IsFarming = false
-        self.State = "IDLE"
-    end,
-    
-    Tick = function(self)
-        if self.State == "IDLE" then
-            local grill = FARM:FindFreeGrill()
-            if grill then
-                self.CurrentGrill = grill
-                self.State = "WALKING"
-                FARM:TweenToPosition(grill.Position)
-            else
-                task.wait(1)
-            end
-            
-        elseif self.State == "WALKING" then
-            if FARM:IsAtPosition(self.CurrentGrill.Position, 5) then
-                self.State = "COOKING"
-            else
-                task.wait(0.1)
-            end
-            
-        elseif self.State == "COOKING" then
-            Net.send("start_grilling_2", self.CurrentGrill)
-            
-            local cookTime = math.random(8, 12)
-            task.wait(cookTime)
-            
-            if FARM.State.IsFarming then
-                Net.send("finish_grilling_2", self.CurrentGrill, "Cooked")
-                self.State = "IDLE"
-            end
+--// Paso 6: Character setup
+print("[STEP 6] Setting up character...")
+local Character, Humanoid, HRP
+
+local function SetupCharacter()
+    Character = LocalPlayer.Character
+    if Character then
+        Humanoid = Character:FindFirstChild("Humanoid")
+        HRP = Character:FindFirstChild("HumanoidRootPart")
+        if Humanoid and HRP then
+            print("[STEP 6] ✓ Character ready")
+            return true
         end
     end
-}
-
---// JOB SYSTEM - STOCKER (La joya - Hermanos no tiene esto)
-FARM.Jobs.Stocker = {
-    Name = "shelf_stocker",
-    State = "IDLE",
-    HasBox = false,
-    CurrentShelf = nil,
-    
-    Start = function(self)
-        if LocalPlayer:GetAttribute("Job") ~= self.Name then
-            FARM:ApplyForJob(self.Name)
-        end
-        
-        FARM.State.IsFarming = true
-        
-        while FARM.State.Active and FARM.State.CurrentJob == self.Name and FARM.State.IsFarming do
-            self:Tick()
-            task.wait(0.1)
-        end
-    end,
-    
-    Stop = function(self)
-        FARM.State.IsFarming = false
-        self.State = "IDLE"
-    end,
-    
-    Tick = function(self)
-        if self.State == "IDLE" then
-            if not self.HasBox then
-                local box = FARM:FindAvailableBox()
-                if box then
-                    FARM:TweenToPosition(box.Position)
-                    task.wait(FARM:CalculateTweenTime(box.Position))
-                    FARM:FirePrompt(box:FindFirstChild("ProximityPrompt"))
-                    self.HasBox = true
-                else
-                    task.wait(1)
-                end
-            else
-                local shelf = FARM:FindEmptyShelf()
-                if shelf then
-                    self.CurrentShelf = shelf
-                    self.State = "WALKING_TO_SHELF"
-                    FARM:TweenToPosition(shelf.Position)
-                else
-                    task.wait(1)
-                end
-            end
-            
-        elseif self.State == "WALKING_TO_SHELF" then
-            if FARM:IsAtPosition(self.CurrentShelf.Position, 3) then
-                self.State = "STOCKING"
-            else
-                task.wait(0.1)
-            end
-            
-        elseif self.State == "STOCKING" then
-            local success = Net.get("player_started_stocking_shelf", self.CurrentShelf)
-            if success then
-                local stockTime = 10 / FARM:GetSkillMultiplier("speed")
-                task.wait(stockTime)
-                
-                if FARM.State.IsFarming then
-                    Net.get("player_stocked_shelf", self.CurrentShelf)
-                    self.HasBox = false
-                    self.State = "IDLE"
-                end
-            else
-                self.State = "IDLE"
-            end
-        end
-    end
-}
-
---// JOB SYSTEM - JANITOR
-FARM.Jobs.Janitor = {
-    Name = "janitor",
-    State = "IDLE",
-    CurrentPuddle = nil,
-    
-    Start = function(self)
-        if LocalPlayer:GetAttribute("Job") ~= self.Name then
-            FARM:ApplyForJob(self.Name)
-        end
-        
-        FARM:EquipTool("Mop")
-        FARM.State.IsFarming = true
-        
-        while FARM.State.Active and FARM.State.CurrentJob == self.Name and FARM.State.IsFarming do
-            self:Tick()
-            task.wait(0.1)
-        end
-    end,
-    
-    Stop = function(self)
-        FARM.State.IsFarming = false
-        self.State = "IDLE"
-    end,
-    
-    Tick = function(self)
-        if self.State == "IDLE" then
-            local puddle = FARM:FindNearestPuddle()
-            if puddle then
-                self.CurrentPuddle = puddle
-                self.State = "WALKING"
-                FARM:TweenToPosition(puddle.Position)
-            else
-                task.wait(1)
-            end
-            
-        elseif self.State == "WALKING" then
-            if FARM:IsAtPosition(self.CurrentPuddle.Position, 5) then
-                self.State = "CLEANING"
-            else
-                task.wait(0.1)
-            end
-            
-        elseif self.State == "CLEANING" then
-            Net.send("start_cleaning_puddle", self.CurrentPuddle)
-            
-            local mopLength = FARM:GetMopLength(self.CurrentPuddle)
-            task.wait(mopLength)
-            
-            if FARM.State.IsFarming then
-                if not FARM:IsAtPosition(self.CurrentPuddle.Position, 5) then
-                    Net.send("player_moved_from_puddle", self.CurrentPuddle)
-                end
-                self.State = "IDLE"
-            end
-        end
-    end
-}
-
---// UTILITY FUNCTIONS
-function FARM:CalculateTweenTime(targetPos)
-    if not HRP then return 2 end
-    local distance = (HRP.Position - targetPos).Magnitude
-    return distance / 16
+    return false
 end
+
+if not SetupCharacter() then
+    print("[STEP 6] Waiting for character...")
+    LocalPlayer.CharacterAdded:Wait()
+    task.wait(1)
+    SetupCharacter()
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    HRP = char:WaitForChild("HumanoidRootPart")
+    print("[STEP 6] Character respawned")
+end)
+
+--// Paso 7: Job functions básicas (versión simplificada)
+print("[STEP 7] Creating job functions...")
 
 function FARM:TweenToPosition(position)
     if not HRP then return end
-    local distance = (HRP.Position - position).Magnitude
-    local duration = distance / 16
-    
-    local tween = TweenService:Create(HRP, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+    local tween = TweenService:Create(HRP, TweenInfo.new(1, Enum.EasingStyle.Linear), {
         CFrame = CFrame.new(position)
     })
     tween:Play()
@@ -443,22 +199,7 @@ function FARM:FirePrompt(prompt)
     end
 end
 
-function FARM:ApplyForJob(jobName)
-    local locations = {
-        ["steakhouse_cook"] = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("Tiles") and Workspace.Map.Tiles:FindFirstChild("ShoppingTile") and Workspace.Map.Tiles.ShoppingTile:FindFirstChild("SteakHouse") and Workspace.Map.Tiles.ShoppingTile.SteakHouse:FindFirstChild("Interior") and Workspace.Map.Tiles.ShoppingTile.SteakHouse.Interior:FindFirstChild("SteakHouseBeacon") and Workspace.Map.Tiles.ShoppingTile.SteakHouse.Interior.SteakHouseBeacon:FindFirstChild("TouchPart"),
-        ["shelf_stocker"] = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("Tiles") and Workspace.Map.Tiles:FindFirstChild("GasStationTile") and Workspace.Map.Tiles.GasStationTile:FindFirstChild("Quick11") and Workspace.Map.Tiles.GasStationTile.Quick11:FindFirstChild("Interior") and Workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("Quick11Beacon") and Workspace.Map.Tiles.GasStationTile.Quick11.Interior.Quick11Beacon:FindFirstChild("TouchPart"),
-        ["janitor"] = Workspace:FindFirstChild("BurgePlaceBeacon") and Workspace.BurgePlaceBeacon:FindFirstChild("TouchPart")
-    }
-    
-    local beacon = locations[jobName]
-    if beacon then
-        self:TweenToPosition(beacon.Position)
-        task.wait(self:CalculateTweenTime(beacon.Position) + 0.5)
-        Net.send("apply_for_job", beacon)
-        task.wait(1)
-    end
-end
-
+--// Funciones de búsqueda simplificadas
 function FARM:FindFreeGrill()
     for _, grill in pairs(Workspace:GetDescendants()) do
         if grill.Name == "SteakGrill" then
@@ -486,8 +227,7 @@ end
 function FARM:FindEmptyShelf()
     for _, shelf in pairs(Workspace:GetDescendants()) do
         if shelf.Name == "Shelf" then
-            local playerAssigned = shelf:GetAttribute("player_assigned")
-            if not playerAssigned then
+            if not shelf:GetAttribute("player_assigned") then
                 return shelf
             end
         end
@@ -497,179 +237,125 @@ end
 
 function FARM:FindNearestPuddle()
     local nearest, minDist = nil, math.huge
+    if not HRP then return nil end
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj.Name:match("Puddle") and not obj:GetAttribute("mopped") then
-            if HRP then
-                local dist = (obj.Position - HRP.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    nearest = obj
-                end
+            local dist = (obj.Position - HRP.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = obj
             end
         end
     end
     return nearest
 end
 
-function FARM:GetSkillMultiplier(skillType)
-    return 1
-end
+print("[STEP 7] ✓ Job functions created")
 
-function FARM:GetMopLength(puddle)
-    local spillTypes = JobData.job_info.janitor.spill_types
-    for typeName, data in pairs(spillTypes) do
-        if puddle.Name:match(typeName) then
-            return data.mop_length
+--// Paso 8: Inicializar seguridad (versión simplificada sin hooks)
+print("[STEP 8] Setting up safety...")
+if FARM.Config.AutoRespawn and Humanoid then
+    Humanoid.Died:Connect(function()
+        task.wait(2)
+        local spawnLocation = LocalPlayer:FindFirstChild("SpawnCFrame")
+        if spawnLocation and HRP then
+            HRP.CFrame = spawnLocation.Value
         end
-    end
-    return 5
-end
-
-function FARM:EquipTool(toolName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if backpack then
-        local tool = backpack:FindFirstChild(toolName)
-        if tool and Humanoid then
-            Humanoid:EquipTool(tool)
-        end
-    end
-end
-
-function FARM:GetBestJob()
-    return FARM.Config.PreferredJob
-end
-
---// INCOME TRACKER
-function FARM:InitIncomeTracker()
-    if not FARM.Config.TrackIncome then return end
-    
-    FARM.State.StartTime = tick()
-    FARM.State.StartMoney = LocalPlayer:GetAttribute("HandCash") or 0
-    
-    LocalPlayer:GetAttributeChangedSignal("HandCash"):Connect(function()
-        local current = LocalPlayer:GetAttribute("HandCash") or 0
-        FARM.State.TotalEarned = current - FARM.State.StartMoney
-        local elapsed = (tick() - FARM.State.StartTime) / 3600
-        FARM.State.IncomeRate = FARM.State.TotalEarned / math.max(elapsed, 0.001)
     end)
+    print("[STEP 8] ✓ AutoRespawn enabled")
 end
 
---// SERVER FUNCTIONS
-function FARM:GetServerInfo()
-    return {
-        PlaceId = game.PlaceId,
-        Players = #Players:GetPlayers(),
-        MaxPlayers = Players.MaxPlayers,
-        Ping = math.floor(LocalPlayer:GetNetworkPing() * 1000),
-        JobId = game.JobId
-    }
-end
-
-function FARM:CopyJobId()
-    if setclipboard then
-        setclipboard(game.JobId)
-        return true
-    end
-    return false
-end
-
-function FARM:TeleportToJobId(jobId)
-    if jobId and jobId ~= "" then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
-    end
-end
-
-function FARM:RejoinSameServer()
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-end
-
-function FARM:ServerHop()
-    local PlaceID = game.PlaceId
-    local url = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
-    
-    local success, result = pcall(function()
-        return game:HttpGet(url)
-    end)
-    
-    if success and result then
-        local data = HttpService:JSONDecode(result)
-        if data and data.data then
-            for _, server in ipairs(data.data) do
-                if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                    TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer)
-                    return true
-                end
+--// COMENTADO: Hooks que pueden fallar en Delta
+--[[
+if FARM.Config.AntiDamage and Humanoid then
+    pcall(function()
+        local mt = getrawmetatable(Humanoid)
+        if mt then
+            setreadonly(mt, false)
+            local oldNewIndex = mt.__newindex
+            mt.__newindex = function(t, k, v)
+                if k == "Health" and v <= 0 then return end
+                return oldNewIndex(t, k, v)
             end
+            setreadonly(mt, true)
         end
-    end
-    return false
+    end)
 end
+]]
 
---// INITIALIZE
-FARM:InitSecureNetworking()
-FARM:InitSafety()
-FARM:InitIncomeTracker()
+print("[STEP 8] ✓ Safety setup complete")
 
---// WINDUI WINDOW
-local Window = WindUI:CreateWindow({
-    Title = "FARM",
-    Author = "By: adamABJ",
-    Icon = "solar:bolt-bold",
-    Theme = "Dark",
-    NewElements = true,
-    Transparent = true,
-    ToggleKey = Enum.KeyCode.RightShift,
-    Acrylic = false,
-    OpenButton = {
-        Title = "Open",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false,
-        Scale = 0.5,
-        Color = ColorSequence.new(FARM.Config.ThemeColor, FARM.Config.ThemeColor),
-    },
-})
+--// Paso 9: Crear UI
+print("[STEP 9] Creating UI...")
+local Window
 
---// TABS
+local success, err = pcall(function()
+    Window = WindUI:CreateWindow({
+        Title = "FARM v" .. FARM.Version,
+        Author = "By: adamABJ",
+        Icon = "solar:bolt-bold",
+        Theme = "Dark",
+        NewElements = true,
+        Transparent = true,
+        ToggleKey = Enum.KeyCode.RightShift,
+        Acrylic = false,
+        OpenButton = {
+            Title = "Open",
+            CornerRadius = UDim.new(1, 0),
+            StrokeThickness = 2,
+            Enabled = true,
+            Draggable = true,
+            OnlyMobile = false,
+            Scale = 0.5,
+            Color = ColorSequence.new(FARM.Config.ThemeColor, FARM.Config.ThemeColor),
+        },
+    })
+end)
+
+if not success or not Window then
+    print("[STEP 9] ✗ FAILED to create Window: " .. tostring(err))
+    print("[STEP 9] Trying simpler Window...")
+    pcall(function()
+        Window = WindUI:CreateWindow({
+            Title = "FARM",
+            Theme = "Dark",
+            ToggleKey = Enum.KeyCode.RightShift,
+        })
+    end)
+    if not Window then
+        print("[STEP 9] ✗ Cannot create Window")
+        return
+    end
+end
+print("[STEP 9] ✓ Window created")
+
+--// Crear Tabs
 local TabFarm = Window:Tab({ Title = "Farming", Icon = "solar:case-round-bold" })
 local TabGeneral = Window:Tab({ Title = "General", Icon = "solar:user-bold" })
 local TabServer = Window:Tab({ Title = "Server", Icon = "solar:server-bold" })
 local TabConfig = Window:Tab({ Title = "Config", Icon = "solar:settings-bold" })
 
 TabFarm:Select()
+print("[STEP 9] ✓ Tabs created")
 
---// FARMING TAB
+--// Paso 10: Agregar botones
+print("[STEP 10] Adding UI elements...")
+
 TabFarm:Section({ Title = "Auto Farm", Desc = "Automatic job farming" })
 
 TabFarm:Toggle({
     Title = "Enable Auto Farm",
-    Value = FARM.Config.AutoFarm,
+    Value = false,
     Callback = function(v)
         FARM.Config.AutoFarm = v
         FARM.State.Active = v
+        print("[FARM] AutoFarm: " .. tostring(v))
         
         if v then
-            local job = FARM.Config.SmartJobSwitch and FARM:GetBestJob() or FARM.Config.PreferredJob
-            FARM.State.CurrentJob = job
-            
-            if job == "steakhouse_cook" then
-                FARM.Jobs.Cook:Start()
-            elseif job == "shelf_stocker" then
-                FARM.Jobs.Stocker:Start()
-            elseif job == "janitor" then
-                FARM.Jobs.Janitor:Start()
-            end
-            
-            Notify("FARM", "Started farming: " .. job)
+            -- Intentar iniciar farm simple
+            Notify("FARM", "Farm started!")
         else
-            FARM.State.Active = false
-            FARM.State.IsFarming = false
-            if FARM.Jobs.Cook then FARM.Jobs.Cook:Stop() end
-            if FARM.Jobs.Stocker then FARM.Jobs.Stocker:Stop() end
-            if FARM.Jobs.Janitor then FARM.Jobs.Janitor:Stop() end
-            Notify("FARM", "Stopped farming")
+            Notify("FARM", "Farm stopped!")
         end
         FARM:SaveConfig()
     end,
@@ -681,247 +367,134 @@ TabFarm:Dropdown({
     Values = { "shelf_stocker", "steakhouse_cook", "janitor" },
     Callback = function(v)
         FARM.Config.PreferredJob = v
+        print("[FARM] Job selected: " .. v)
         FARM:SaveConfig()
     end
 })
 
-TabFarm:Toggle({
-    Title = "Smart Job Switch",
-    Value = FARM.Config.SmartJobSwitch,
-    Callback = function(v)
-        FARM.Config.SmartJobSwitch = v
-        FARM:SaveConfig()
-    end
-})
-
-TabFarm:Toggle({
-    Title = "Auto Deposit",
-    Value = FARM.Config.AutoDeposit,
-    Callback = function(v)
-        FARM.Config.AutoDeposit = v
-        FARM:SaveConfig()
-    end
-})
-
-TabFarm:Section({ Title = "Anti-Detection", Desc = "Human behavior simulation" })
-
-TabFarm:Toggle({
-    Title = "Humanize Actions",
-    Value = FARM.Config.Humanize,
-    Callback = function(v)
-        FARM.Config.Humanize = v
-        FARM:SaveConfig()
-    end
-})
-
-TabFarm:Slider({
-    Title = "Min Delay",
-    Step = 0.01,
-    Value = { Min = 0, Max = 1, Default = FARM.Config.MinDelay },
-    Callback = function(v)
-        FARM.Config.MinDelay = v
-        FARM:SaveConfig()
-    end
-})
-
-TabFarm:Slider({
-    Title = "Max Delay",
-    Step = 0.01,
-    Value = { Min = 0, Max = 1, Default = FARM.Config.MaxDelay },
-    Callback = function(v)
-        FARM.Config.MaxDelay = v
-        FARM:SaveConfig()
-    end
-})
-
---// GENERAL TAB
-TabGeneral:Section({ Title = "Safety Features", Desc = "Protection settings" })
-
-TabGeneral:Toggle({
-    Title = "Anti Ragdoll",
-    Value = FARM.Config.AntiRagdoll,
-    Callback = function(v)
-        FARM.Config.AntiRagdoll = v
-        Notify("FARM", "Restart script to apply Anti-Ragdoll")
-        FARM:SaveConfig()
-    end
-})
-
-TabGeneral:Toggle({
-    Title = "Anti Damage",
-    Value = FARM.Config.AntiDamage,
-    Callback = function(v)
-        FARM.Config.AntiDamage = v
-        Notify("FARM", "Restart script to apply Anti-Damage")
-        FARM:SaveConfig()
-    end
-})
-
-TabGeneral:Toggle({
-    Title = "Auto Respawn",
-    Value = FARM.Config.AutoRespawn,
-    Callback = function(v)
-        FARM.Config.AutoRespawn = v
-        FARM:SaveConfig()
-    end
-})
-
-TabGeneral:Toggle({
-    Title = "Hide Name",
-    Value = FARM.Config.HideName,
-    Callback = function(v)
-        FARM.Config.HideName = v
-        if v then
-            local head = Character:FindFirstChild("Head")
-            if head then
-                local nametag = head:FindFirstChild("Nametag")
-                if nametag then nametag:Destroy() end
-            end
-        end
-        FARM:SaveConfig()
-    end
-})
-
-TabGeneral:Section({ Title = "Statistics", Desc = "Farming stats" })
-
-local StatsLabel = TabGeneral:Label({ Title = "Income: $0/hr | Total: $0" })
-
-task.spawn(function()
-    while task.wait(1) do
-        local rate = math.floor(FARM.State.IncomeRate or 0)
-        local total = math.floor(FARM.State.TotalEarned or 0)
-        StatsLabel:SetTitle(string.format("Income: $%d/hr | Total: $%d", rate, total))
-    end
-end)
-
---// SERVER TAB
-TabServer:Section({ Title = "Server Information", Desc = "Current server details" })
-
-local ServerInfo = FARM:GetServerInfo()
-local InfoLabel = TabServer:Label({ 
-    Title = string.format("PlaceId: %d\nPlayers: %d/%d\nPing: %dms\nJobId: %s...", 
-        ServerInfo.PlaceId, ServerInfo.Players, ServerInfo.MaxPlayers, 
-        ServerInfo.Ping, string.sub(ServerInfo.JobId, 1, 20)) 
-})
-
--- Actualizar info cada 5 segundos
-task.spawn(function()
-    while task.wait(5) do
-        local info = FARM:GetServerInfo()
-        InfoLabel:SetTitle(string.format("PlaceId: %d\nPlayers: %d/%d\nPing: %dms\nJobId: %s...", 
-            info.PlaceId, info.Players, info.MaxPlayers, info.Ping, string.sub(info.JobId, 1, 20)))
-    end
-end)
-
-TabServer:Input({
-    Title = "Target JobId",
-    Placeholder = "Enter JobId to teleport...",
-    Default = FARM.Config.TargetJobId,
-    Callback = function(v)
-        FARM.Config.TargetJobId = v
-        FARM:SaveConfig()
-    end
-})
-
-TabServer:Button({
-    Title = "Copy JobId",
-    Desc = "Copy current server's JobId to clipboard",
+TabFarm:Button({
+    Title = "Test: Find Grill",
     Callback = function()
-        if FARM:CopyJobId() then
-            Notify("Success", "JobId copied to clipboard!")
+        local grill = FARM:FindFreeGrill()
+        if grill then
+            print("[TEST] ✓ Grill found: " .. grill:GetFullName())
+            Notify("Test", "Grill found!")
         else
-            Notify("Error", "Clipboard not available")
+            print("[TEST] ✗ No grill found")
+            Notify("Test", "No grill available")
         end
     end
 })
 
-TabServer:Button({
-    Title = "Teleport to JobId",
-    Desc = "Teleport to target server",
+TabFarm:Button({
+    Title = "Test: Find Box",
     Callback = function()
-        if FARM.Config.TargetJobId ~= "" then
-            FARM:TeleportToJobId(FARM.Config.TargetJobId)
+        local box = FARM:FindAvailableBox()
+        if box then
+            print("[TEST] ✓ Box found: " .. box:GetFullName())
+            Notify("Test", "Box found!")
         else
-            Notify("Error", "Enter a JobId first")
+            print("[TEST] ✗ No box found")
+            Notify("Test", "No box available")
         end
     end
 })
 
-TabServer:Button({
-    Title = "Rejoin Same Server",
+TabFarm:Button({
+    Title = "Test: Find Shelf",
     Callback = function()
-        FARM:RejoinSameServer()
-    end
-})
-
-TabServer:Button({
-    Title = "Server Hop",
-    Callback = function()
-        Notify("Server Hop", "Finding new server...")
-        if FARM:ServerHop() then
-            Notify("Success", "Joining new server...")
+        local shelf = FARM:FindEmptyShelf()
+        if shelf then
+            print("[TEST] ✓ Shelf found: " .. shelf:GetFullName())
+            Notify("Test", "Shelf found!")
         else
-            Notify("Error", "No servers found")
+            print("[TEST] ✗ No shelf found")
+            Notify("Test", "No empty shelf")
         end
     end
 })
 
---// CONFIG TAB
-TabConfig:Section({ Title = "Configuration", Desc = "Save and manage settings" })
+TabFarm:Button({
+    Title = "Test: Find Puddle",
+    Callback = function()
+        local puddle = FARM:FindNearestPuddle()
+        if puddle then
+            print("[TEST] ✓ Puddle found: " .. puddle:GetFullName())
+            Notify("Test", "Puddle found!")
+        else
+            print("[TEST] ✗ No puddle found")
+            Notify("Test", "No puddle found")
+        end
+    end
+})
+
+TabGeneral:Section({ Title = "Diagnostics" })
+
+TabGeneral:Button({
+    Title = "Check HRP",
+    Callback = function()
+        if HRP then
+            print("[DIAG] ✓ HRP exists at: " .. tostring(HRP.Position))
+            Notify("Diag", "HRP OK: " .. math.floor(HRP.Position.X) .. ", " .. math.floor(HRP.Position.Y))
+        else
+            print("[DIAG] ✗ No HRP")
+            Notify("Diag", "No HRP found!")
+        end
+    end
+})
+
+TabGeneral:Button({
+    Title = "Check Net",
+    Callback = function()
+        if Net then
+            print("[DIAG] ✓ Net module loaded")
+            Notify("Diag", "Net module OK")
+        else
+            print("[DIAG] ✗ Net module not loaded")
+            Notify("Diag", "Net module missing")
+        end
+    end
+})
+
+TabGeneral:Button({
+    Title = "Print All Info",
+    Callback = function()
+        print("\n=== FARM DIAGNOSTIC ===")
+        print("Version: " .. FARM.Version)
+        print("PlaceId: " .. game.PlaceId)
+        print("JobId: " .. game.JobId)
+        print("Players: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers)
+        print("Character: " .. tostring(Character))
+        print("Humanoid: " .. tostring(Humanoid))
+        print("HRP: " .. tostring(HRP))
+        print("Net: " .. tostring(Net))
+        print("JobData: " .. tostring(JobData))
+        print("JobUtil: " .. tostring(JobUtil))
+        print("Config.AutoFarm: " .. tostring(FARM.Config.AutoFarm))
+        print("=======================\n")
+        Notify("Diag", "Check console output")
+    end
+})
+
+TabConfig:Section({ Title = "Configuration" })
 
 TabConfig:Button({
     Title = "Save Config",
-    Desc = "Save current configuration to file",
     Callback = function()
-        if FARM:SaveConfig() then
-            Notify("Success", "Configuration saved!")
-        else
-            Notify("Error", "Could not save config")
-        end
+        FARM:SaveConfig()
+        Notify("Config", "Saved!")
     end
 })
 
-TabConfig:Button({
-    Title = "Reset Config",
-    Desc = "Reset all settings to default",
-    Callback = function()
-        FARM:ResetConfig()
-        Notify("Success", "Configuration reset to default!")
-    end
-})
+print("[STEP 10] ✓ UI elements added")
 
-TabConfig:Button({
-    Title = "Wipe Workspace",
-    Desc = "Delete all FARM files",
-    Callback = function()
-        if delfile and isfile then
-            if isfile(ConfigFile) then
-                delfile(ConfigFile)
-            end
-        end
-        Notify("Success", "Workspace wiped!")
-    end
-})
-
---// Welcome Notification
-Notify("FARM Loaded", "v" .. FARM.Version .. " by adamABJ | Ready to dominate Blockspin")
-
---// Auto-start si estaba activo
-if FARM.Config.AutoFarm then
-    task.wait(2)
-    FARM.State.Active = true
-    local job = FARM.Config.PreferredJob
-    FARM.State.CurrentJob = job
-    
-    if job == "steakhouse_cook" then
-        FARM.Jobs.Cook:Start()
-    elseif job == "shelf_stocker" then
-        FARM.Jobs.Stocker:Start()
-    elseif job == "janitor" then
-        FARM.Jobs.Janitor:Start()
-    end
-end
+--// Final
+print("\n" .. string.rep("=", 50))
+print("FARM DIAGNOSTIC LOADED SUCCESSFULLY")
+print("Version: " .. FARM.Version)
+print("Use the DIAGNOSTICS buttons to test functions")
+print(string.rep("=", 50) .. "\n")
 
 getgenv().FARM = FARM
 
-print("FARM v" .. FARM.Version .. " by adamABJ - Loaded Successfully (Delta Fixed)")
+Notify("FARM Diagnostic", "Loaded! Use test buttons to find issues")
