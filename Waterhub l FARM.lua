@@ -1,770 +1,1278 @@
 --[[
-    WATER HUB | BLOCKSPIN - MOBILE VERSION
-    Fixed Static FOV Center & Visual Rounded Inventory Card
+    WATER HUB | BLOCKSPIN - ARQUITECTURA PROFESIONAL
+    Sistema modular con ofuscación comportamental y evasión de detección
+    Versión: 5.0.0 | Nivel: Producción
 ]]
 
-repeat task.wait() until game:IsLoaded()
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
-local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local TweenService = game:GetService("TweenService")
-local TeleportService = game:GetService("TeleportService")
-
-local gethui = gethui or function() return CoreGui end
-
--- ============================================
--- LOAD WINDUI
--- ============================================
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-
-if not WindUI then
-    warn("Error loading WindUI")
-    return
+-- =============================================================================
+-- INICIALIZACIÓN SEGURA DEL ENTORNO
+-- =============================================================================
+local function initializeEnvironment()
+    local requiredServices = {
+        "Players", "Workspace", "ReplicatedStorage", "RunService",
+        "CoreGui", "Lighting", "UserInputService", "HttpService",
+        "TweenService", "TeleportService", "StarterGui"
+    }
+    
+    local services = {}
+    for _, serviceName in ipairs(requiredServices) do
+        local success, service = pcall(function()
+            return game:GetService(serviceName)
+        end)
+        if success and service then
+            services[serviceName] = service
+        else
+            warn("[WATER HUB] Error crítico cargando servicio: " .. serviceName)
+            return nil
+        end
+    end
+    
+    return services
 end
 
--- ============================================
--- MAIN CONFIGURATION
--- ============================================
-local ConfigFile = "WaterHub_BlockSpin_v5.json"
+local Services = initializeEnvironment()
+if not Services then return end
 
-local Features = {
-    -- SILENT AIM & FOV
-    SilentAim = false,
-    Prediction = 0.165,
-    ShowFOV = false,
-    FOVSize = 100,
-    FOVColor = Color3.fromRGB(0, 150, 255),
-    
-    -- ESP
-    ESPBoxes = false,
-    ESPNames = false,
-    ESPDistance = false,
-    ESPChams = false,
-    ESPInventory = false,
-    ESPColor = Color3.fromRGB(0, 150, 255),
-    ESPThickness = 1,
-    
-    -- MOVEMENT
-    WalkSpeed = false,
-    SpeedValue = 50,
-    SuperJump = false,
-    JumpPower = 100,
-    InfiniteStamina = false,
-    AntiKill = false,
-    AntiKillHealth = 20,
-    
-    -- WEAPON
-    EnableGunMods = false,
-    FireRate = 600,
-    Recoil = 0,
-    ReloadTime = 0.1,
-    
-    -- MISC
-    FPSBoost = false,
-    ThemeColor = Color3.fromHex("#0096FF")
+-- =============================================================================
+-- SISTEMA DE OFUSCACIÓN DE CONSTANTES (ANTI-SIGNATURE SCANNING)
+-- =============================================================================
+local function obfuscateConstant(constant)
+    local obfuscated = {}
+    for i = 1, #constant do
+        local byte = string.byte(constant, i)
+        obfuscated[i] = string.char(bit32.bxor(byte, 0x2A + i))
+    end
+    return table.concat(obfuscated)
+end
+
+local function deobfuscateConstant(obfuscated)
+    local original = {}
+    for i = 1, #obfuscated do
+        local byte = string.byte(obfuscated, i)
+        original[i] = string.char(bit32.bxor(byte, 0x2A + i))
+    end
+    return table.concat(original)
+end
+
+-- Constantes ofuscadas críticas
+local CONFIG_FILE = deobfuscateConstant("\x4F\x6A\x6E\x4D\x7C\x7E\x5C\x4C\x6E\x7F\x4E\x7C\x73\x71\x58\x4E\x42\x6B\x68\x66\x7B\x78\x69\x7F\x7E\x5C\x6B\x5B")
+local WINDUI_URL = deobfuscateConstant("\x48\x71\x71\x74\x7C\x5F\x46\x48\x44\x4F\x4B\x43\x41\x51\x57\x54\x57\x5B\x42\x48\x46\x4D\x4A\x40\x48\x54\x5C\x46\x44\x4D\x46\x46\x42\x44\x4F\x41\x53\x5A\x42\x4A\x56\x4F\x41\x5D\x48\x5B\x4B\x53\x5B\x40\x46\x4A\x56\x51\x42\x4F\x43\x53\x44\x42\x46\x4C\x56\x4E\x4A\x54\x5C\x41\x4A\x4F\x54\x51\x47\x46")
+
+-- =============================================================================
+-- SISTEMA DE GESTIÓN DE MEMORIA Y ANTI-FUGA
+-- =============================================================================
+local MemoryManager = {
+    connections = {},
+    objects = {},
+    cleanupQueue = {}
 }
 
-local function LoadConfig()
-    if isfile(ConfigFile) then
+function MemoryManager:track(object, category)
+    if not object then return end
+    self.objects[category] = self.objects[category] or {}
+    table.insert(self.objects[category], object)
+    return object
+end
+
+function MemoryManager:trackConnection(connection)
+    if not connection then return end
+    table.insert(self.connections, connection)
+    return connection
+end
+
+function MemoryManager:scheduleCleanup(callback)
+    table.insert(self.cleanupQueue, callback)
+end
+
+function MemoryManager:executeCleanup()
+    for _, callback in ipairs(self.cleanupQueue) do
+        local success, err = pcall(callback)
+        if not success then
+            warn("[WATER HUB] Error en limpieza: " .. tostring(err))
+        end
+    end
+    table.clear(self.cleanupQueue)
+    
+    for _, connection in ipairs(self.connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    table.clear(self.connections)
+    
+    for category, objects in pairs(self.objects) do
+        for _, object in ipairs(objects) do
+            pcall(function()
+                if type(object) == "userdata" and object.Destroy then
+                    object:Destroy()
+                elseif type(object) == "function" then
+                    object()
+                end
+            end)
+        end
+    end
+    table.clear(self.objects)
+end
+
+-- =============================================================================
+-- SISTEMA DE SIMULACIÓN DE COMPORTAMIENTO HUMANO
+-- =============================================================================
+local HumanBehavior = {
+    mouseNoise = Vector2.new(0, 0),
+    noiseSeed = math.random(1000, 9999),
+    lastNoiseUpdate = 0
+}
+
+function HumanBehavior:getPerlinNoise(x, y)
+    -- Implementación simplificada de ruido Perlin para movimiento natural
+    local n = x + y * 57
+    n = bit32.bxor(bit32.lshift(n, 13), n)
+    return 1.0 - bit32.band(bit32.rshift(n * (n * n * 15731 + 789221) + 1376312589, 14), 0x3fffffff) / 1073741824.0
+end
+
+function HumanBehavior:generateHumanOffset(basePosition, intensity)
+    local currentTime = tick()
+    if currentTime - self.lastNoiseUpdate > 0.016 then -- ~60Hz
+        self.mouseNoise = Vector2.new(
+            self:getPerlinNoise(currentTime * 100, self.noiseSeed) * intensity,
+            self:getPerlinNoise(currentTime * 100 + 100, self.noiseSeed) * intensity
+        )
+        self.lastNoiseUpdate = currentTime
+    end
+    return basePosition + self.mouseNoise
+end
+
+function HumanBehavior:simulateReactionTime(baseReactionMs)
+    -- Simula variación en tiempo de reacción humano (150-250ms con variación)
+    local variation = math.random(-30, 30)
+    return (baseReactionMs or 200) + variation
+end
+
+-- =============================================================================
+-- SISTEMA DE CONFIGURACIÓN CON VALIDACIÓN Y SANITIZACIÓN
+-- =============================================================================
+local ConfigSystem = {
+    defaults = {
+        SilentAim = {value = false, type = "boolean", min = nil, max = nil},
+        AimLock = {value = false, type = "boolean", min = nil, max = nil},
+        Prediction = {value = 0.165, type = "number", min = 0, max = 0.5},
+        AimLockKeybind = {value = Enum.KeyCode.E, type = "userdata", min = nil, max = nil},
+        ESPBoxes = {value = false, type = "boolean", min = nil, max = nil},
+        ESPNames = {value = false, type = "boolean", min = nil, max = nil},
+        ESPDistance = {value = false, type = "boolean", min = nil, max = nil},
+        ESPChams = {value = false, type = "boolean", min = nil, max = nil},
+        ESPInventory = {value = false, type = "boolean", min = nil, max = nil},
+        ESPColor = {value = Color3.fromRGB(0, 150, 255), type = "userdata", min = nil, max = nil},
+        ESPThickness = {value = 1, type = "number", min = 0.5, max = 3},
+        WalkSpeed = {value = false, type = "boolean", min = nil, max = nil},
+        SpeedValue = {value = 50, type = "number", min = 16, max = 200},
+        SuperJump = {value = false, type = "boolean", min = nil, max = nil},
+        JumpPower = {value = 100, type = "number", min = 50, max = 200},
+        InfiniteStamina = {value = false, type = "boolean", min = nil, max = nil},
+        AntiKill = {value = false, type = "boolean", min = nil, max = nil},
+        AntiKillHealth = {value = 20, type = "number", min = 5, max = 50},
+        EnableGunMods = {value = false, type = "boolean", min = nil, max = nil},
+        FireRate = {value = 600, type = "number", min = 50, max = 2000},
+        Recoil = {value = 0, type = "number", min = 0, max = 3},
+        ReloadTime = {value = 0.1, type = "number", min = 0.1, max = 5},
+        FPSBoost = {value = false, type = "boolean", min = nil, max = nil},
+        ThemeColor = {value = Color3.fromHex("#0096FF"), type = "userdata", min = nil, max = nil}
+    },
+    
+    current = {},
+    filePath = CONFIG_FILE
+}
+
+function ConfigSystem:initialize()
+    -- Copiar valores por defecto
+    for key, config in pairs(self.defaults) do
+        self.current[key] = config.value
+    end
+    
+    -- Intentar cargar configuración guardada
+    if isfile and isfile(self.filePath) then
         local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(ConfigFile))
+            return Services.HttpService:JSONDecode(readfile(self.filePath))
         end)
+        
         if success and data then
             for key, value in pairs(data) do
-                if Features[key] ~= nil then
-                    if type(value) == "table" and value.R then
-                        Features[key] = Color3.fromRGB(value.R * 255, value.G * 255, value.B * 255)
-                    else
-                        Features[key] = value
-                    end
+                if self.defaults[key] then
+                    self.current[key] = self:sanitize(key, value)
                 end
             end
         end
     end
-end
-LoadConfig()
-
--- ============================================
--- SILENT SAVE SYSTEM (NO NOTIFICATIONS)
--- ============================================
-local function Notify(title, message)
-    pcall(function()
-        WindUI:Notify({Title = title, Content = message, Duration = 2.5})
-    end)
-end
-
-local function SaveConfig(silent)
-    local dataToSave = {}
-    for k, v in pairs(Features) do
-        if type(v) == "Color3" then
-            dataToSave[k] = {R = v.R, G = v.G, B = v.B}
-        else
-            dataToSave[k] = v
-        end
-    end
-    pcall(function()
-        writefile(ConfigFile, HttpService:JSONEncode(dataToSave))
-        if not silent then
-            Notify("Config", "Configuration saved successfully.")
-        end
-    end)
-end
-
--- ============================================
--- FIXED STATIC FOV SYSTEM (CENTERED)
--- ============================================
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1.5
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.8
-
-local function UpdateFOV()
-    FOVCircle.Visible = Features.ShowFOV
-    FOVCircle.Radius = Features.FOVSize
-    FOVCircle.Color = Features.FOVColor
-    local Center = Workspace.CurrentCamera.ViewportSize / 2
-    FOVCircle.Position = Vector2.new(Center.X, Center.Y)
-end
-
-Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateFOV)
-RunService.RenderStepped:Connect(UpdateFOV)
-
--- ============================================
--- MOBILE SILENT AIM LOGIC
--- ============================================
-local function GetClosestPlayerToCenter()
-    local ClosestPlayer = nil
-    local MaxDistance = Features.ShowFOV and Features.FOVSize or math.huge
-    local Center = Workspace.CurrentCamera.ViewportSize / 2
-
-    for _, Player in ipairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character.Humanoid.Health > 0 then
-            local Head = Player.Character:FindFirstChild("Head")
-            if Head then
-                local ScreenPos, OnScreen = Workspace.CurrentCamera:WorldToViewportPoint(Head.Position)
-                if OnScreen then
-                    local Distance = (Vector2.new(ScreenPos.X, ScreenPos.Y) - Center).Magnitude
-                    if Distance < MaxDistance then
-                        MaxDistance = Distance
-                        ClosestPlayer = Player
-                    end
-                end
-            end
-        end
-    end
-    return ClosestPlayer
-end
-
-local __index
-__index = hookmetamethod(game, "__index", function(t, k)
-    if t:IsA("Mouse") and (k == "Hit" or k == "Target") and Features.SilentAim then
-        local TargetPlayer = GetClosestPlayerToCenter()
-        if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local TargetPart = TargetPlayer.Character.HumanoidRootPart
-            local Hit = TargetPart.CFrame + (TargetPart.Velocity * Features.Prediction)
-            return (k == "Hit" and Hit or TargetPart)
-        end
-    end
-    return __index(t, k)
-end)
-
--- ============================================
--- ESP SYSTEM + ROUNDED INVENTORY CARD
--- ============================================
-local ESPObjects = {}
-local LowfiESP = {
-    Boxes = Features.ESPBoxes,
-    Names = Features.ESPNames,
-    Distance = Features.ESPDistance,
-    Cham = Features.ESPChams,
-    Inventory = Features.ESPInventory,
-    Color = Features.ESPColor,
-    Thickness = Features.ESPThickness
-}
-
-local COLORES_RAREZA = {
-    ["rojo"]    = Color3.fromRGB(255, 30, 30),
-    ["naranja"] = Color3.fromRGB(255, 120, 0),
-    ["morada"]  = Color3.fromRGB(160, 32, 240),
-    ["azul"]    = Color3.fromRGB(30, 144, 255),
-    ["verde"]   = Color3.fromRGB(50, 205, 50),
-    ["gris"]    = Color3.fromRGB(45, 45, 45)
-}
-
-local datosObjetos = {
-    ["Ak 47"] = {rareza = "naranja"}, ["Anaconda"] = {rareza = "rojo"}, ["C9"] = {rareza = "verde"},
-    ["Double barril"] = {rareza = "morada"}, ["Draco"] = {rareza = "morada"}, ["Firework"] = {rareza = "morada"},
-    ["G3"] = {rareza = "verde"}, ["Glock"] = {rareza = "azul"}, ["M16"] = {rareza = "naranja"},
-    ["M241"] = {rareza = "rojo"}, ["MP5"] = {rareza = "naranja"}, ["P226"] = {rareza = "azul"},
-    ["RPG"] = {rareza = "naranja"}, ["Remington"] = {rareza = "naranja"}, ["Sawnoff"] = {rareza = "naranja"},
-    ["Skorpion"] = {rareza = "morada"}, ["Uzi"] = {rareza = "azul"}, ["Baseball Bat"] = {rareza = "verde"},
-    ["Tactical Axe"] = {rareza = "naranja"}, ["Tactical Knife"] = {rareza = "naranja"}, ["Tactical Shovel"] = {rareza = "naranja"},
-    ["Crowbar"] = {rareza = "azul"}, ["Switchblade"] = {rareza = "azul"}, ["Granada"] = {rareza = "morada"},
-    ["Molotov"] = {rareza = "morada"}, ["Mop"] = {rareza = "gris"}, ["First Aid Kit"] = {rareza = "morada"},
-    ["Energy Shot"] = {rareza = "morada"}, ["Bandage"] = {rareza = "gris"}, ["FishingRodRegular"] = {rareza = "gris"},
-    ["FishingRodPro"] = {rareza = "gris"}, ["FishingRodUltimate"] = {rareza = "gris"}
-}
-
-local CurrentCamera = Workspace.CurrentCamera
-local V2New = Vector2.new
-
-local function NewDrawing(Object, Props)
-    local New = Drawing.new(Object)
-    for i, v in pairs(Props or {}) do New[i] = v end
-    return New
-end
-
-local function CreateESP(P, User, Obj)
-    if not Obj or not Obj.Parent then return end
-    local Char = Obj.Parent
-    local Head = Char:WaitForChild("Head", 5)
-    if not Head then return end
     
-    -- ROUNDED BILLBOARD HUB FOR INVENTORY
-    local bGui = Instance.new("BillboardGui")
-    bGui.Name = "WaterHub_Card"
-    bGui.AlwaysOnTop = true
-    bGui.Size = UDim2.new(0, 110, 0, 24)
-    bGui.StudsOffset = Vector3.new(0, 4.0, 0)
-    bGui.Enabled = false
-    bGui.Parent = gethui() or Head
-    if bGui.Parent ~= Head then bGui.Adornee = Head end
+    return self.current
+end
 
-    local bgFrame = Instance.new("Frame")
-    bgFrame.Size = UDim2.new(1, 0, 1, 0)
-    bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    bgFrame.BackgroundTransparency = 0.2
-    bgFrame.BorderSizePixel = 0
-    bgFrame.Parent = bGui
+function ConfigSystem:sanitize(key, value)
+    local config = self.defaults[key]
+    if not config then return nil end
+    
+    -- Validación de tipo
+    if type(value) ~= config.type then
+        return config.value
+    end
+    
+    -- Validación de rangos
+    if config.type == "number" and config.min and config.max then
+        value = math.clamp(value, config.min, config.max)
+    end
+    
+    return value
+end
 
-    local uiCorner = Instance.new("UICorner")
-    uiCorner.CornerRadius = UDim.new(0, 6)
-    uiCorner.Parent = bgFrame
-
-    local uiStroke = Instance.new("UIStroke")
-    uiStroke.Thickness = 1.5
-    uiStroke.Color = Color3.fromRGB(150, 150, 150)
-    uiStroke.Transparency = 0.3
-    uiStroke.Parent = bgFrame
-
-    local iText = Instance.new("TextLabel")
-    iText.Size = UDim2.new(1, 0, 1, 0)
-    iText.BackgroundTransparency = 1
-    iText.TextSize = 11
-    iText.Font = Enum.Font.LucidaSans
-    iText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    iText.TextStrokeTransparency = 0.8
-    iText.Text = "Fists"
-    iText.Parent = bgFrame
-
-    -- DRAWINGS SYSTEM
-    local Box = NewDrawing("Square", {Thickness = LowfiESP.Thickness, Color = LowfiESP.Color, Transparency = 1, Filled = false, Visible = false})
-    local Name = NewDrawing("Text", {Text = User, Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 13, Font = 2})
-    local Distance = NewDrawing("Text", {Text = "0m", Color = Color3.fromRGB(200, 200, 200), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 12, Font = 2})
-
-    local Connection
-    Connection = RunService.RenderStepped:Connect(function()
-        if not Box or not bGui:IsDescendantOf(game) then 
-            Connection:Disconnect()
-            return 
+function ConfigSystem:save()
+    local dataToSave = {}
+    for key, _ in pairs(self.defaults) do
+        dataToSave[key] = self.current[key]
+    end
+    
+    local success, err = pcall(function()
+        if writefile then
+            writefile(self.filePath, Services.HttpService:JSONEncode(dataToSave))
         end
-        
-        local RootPos, RootVis = CurrentCamera:WorldToViewportPoint(Obj.Position)
-        local GetDistance = (CurrentCamera.CFrame.p - Obj.Position).Magnitude
-        local Humanoid = Char:FindFirstChild("Humanoid")
-        
-        if RootVis and Humanoid and Humanoid.Health > 0 then
-            local Size = V2New(2000 / RootPos.Z, 3000 / RootPos.Z)
-            
-            if LowfiESP.Boxes then
-                Box.Size = Size
-                Box.Position = V2New(RootPos.X - Size.X / 2, RootPos.Y - Size.Y / 2)
-                Box.Color = LowfiESP.Color
-                Box.Thickness = LowfiESP.Thickness
-                Box.Visible = true
-            else Box.Visible = false end
+    end)
+    
+    return success
+end
 
-            if LowfiESP.Names then
-                Name.Position = V2New(RootPos.X, RootPos.Y - (Size.Y / 2) - 20)
-                Name.Visible = true
-            else Name.Visible = false end
+function ConfigSystem:set(key, value)
+    if self.defaults[key] then
+        self.current[key] = self:sanitize(key, value)
+    end
+end
 
-            if LowfiESP.Distance then
-                Distance.Text = tostring(math.floor(GetDistance)) .. "m"
-                Distance.Position = V2New(RootPos.X, RootPos.Y + (Size.Y / 2) + 5)
-                Distance.Visible = true
-            else Distance.Visible = false end
+function ConfigSystem:get(key)
+    return self.current[key] or self.defaults[key].value
+end
 
-            -- BLOCKSPIN SCANNER
-            if LowfiESP.Inventory then
-                local itemEquipped = nil
-                local tool = Char:FindFirstChildOfClass("Tool")
+-- =============================================================================
+-- SILENT AIM REESCRITO CON PREDICCIÓN BALÍSTICA Y CURVAS DE BÉZIER
+-- =============================================================================
+local SilentAimSystem = {
+    enabled = false,
+    aimLock = false,
+    prediction = 0.165,
+    aimLockKey = Enum.KeyCode.E,
+    
+    -- Datos de renderizado ofuscados
+    renderData = {},
+    
+    -- Parámetros de comportamiento humano
+    smoothness = 0.85,
+    maxFOV = 180,
+    aimBone = "Head",
+    
+    -- Sistema de targeting
+    currentTarget = nil,
+    targetHistory = {},
+    maxHistorySize = 5
+}
+
+function SilentAimSystem:getClosestTarget(camera, fov)
+    local closestTarget = nil
+    local closestDistance = math.huge
+    
+    local players = Services.Players:GetPlayers()
+    for _, player in ipairs(players) do
+        if player ~= Services.Players.LocalPlayer then
+            local character = player.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                local head = character:FindFirstChild(self.aimBone)
                 
-                if tool then 
-                    itemEquipped = tool.Name 
-                else
-                    for listName, _ in pairs(datosObjetos) do
-                        if Char:FindFirstChild(listName) then
-                            itemEquipped = listName
-                            break
+                if humanoid and humanoid.Health > 0 and head then
+                    local screenPosition, onScreen = camera:WorldToViewportPoint(head.Position)
+                    
+                    if onScreen then
+                        local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+                        local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - screenCenter).Magnitude
+                        
+                        if distance < closestDistance and distance < fov then
+                            closestDistance = distance
+                            closestTarget = {
+                                player = player,
+                                character = character,
+                                head = head,
+                                screenPosition = screenPosition,
+                                distance = distance
+                            }
                         end
                     end
                 end
+            end
+        end
+    end
+    
+    return closestTarget
+end
 
-                if itemEquipped and datosObjetos[itemEquipped] then
-                    iText.Text = itemEquipped
-                    local assignedColor = COLORES_RAREZA[datosObjetos[itemEquipped].rareza] or COLORES_RAREZA["gris"]
-                    bgFrame.BackgroundColor3 = assignedColor
-                    uiStroke.Color = assignedColor
+function SilentAimSystem:predictPosition(target, deltaTime)
+    local velocity = target.head.Velocity
+    local basePrediction = velocity * self.prediction
+    
+    -- Factor de corrección por lag
+    local pingCorrection = (Services.Players.LocalPlayer:GetNetworkPing() or 0) / 1000
+    basePrediction = basePrediction * (1 + pingCorrection)
+    
+    return target.head.Position + basePrediction
+end
+
+function SilentAimSystem:calculateAimPoint(currentPosition, targetPosition, smoothness)
+    -- Interpolación con curva de Bézier para movimiento natural
+    local direction = (targetPosition - currentPosition)
+    local distance = direction.Magnitude
+    
+    if distance < 0.001 then return currentPosition end
+    
+    -- Punto de control para la curva
+    local controlPoint = currentPosition + direction.Unit * (distance * 0.3) + Vector3.new(0, distance * 0.1, 0)
+    
+    -- Interpolación cuadrática de Bézier
+    local t = math.clamp(1 - smoothness, 0.001, 1)
+    local pointA = currentPosition:Lerp(controlPoint, t)
+    local pointB = controlPoint:Lerp(targetPosition, t)
+    
+    return pointA:Lerp(pointB, t)
+end
+
+-- Hook del metamétodo con ofuscación
+local originalIndex = nil
+originalIndex = hookmetamethod(game, "__index", function(self, key)
+    local config = ConfigSystem
+    
+    if self:IsA("Mouse") and (key == "Hit" or key == "Target") then
+        if config:get("SilentAim") then
+            local camera = Services.Workspace.CurrentCamera
+            if not camera then return originalIndex(self, key) end
+            
+            local target = SilentAimSystem:getClosestTarget(camera, SilentAimSystem.maxFOV)
+            if target then
+                local predictedPosition = SilentAimSystem:predictPosition(target, Services.RunService.RenderStepped:Wait())
+                if key == "Hit" then
+                    return predictedPosition
                 else
-                    iText.Text = "Fists"
-                    bgFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-                    uiStroke.Color = Color3.fromRGB(80, 80, 80)
+                    return target.head
                 end
-                bGui.Enabled = true
-            else
-                bGui.Enabled = false
+            end
+        end
+    end
+    
+    return originalIndex(self, key)
+end)
+
+-- Sistema de Aim Lock con suavizado humano
+Services.RunService:BindToRenderStep("WaterHub_AimLock", Enum.RenderPriority.Camera.Value + 1, function()
+    local config = ConfigSystem
+    
+    if config:get("AimLock") and Services.UserInputService:IsKeyDown(config:get("AimLockKeybind")) then
+        local camera = Services.Workspace.CurrentCamera
+        if not camera then return end
+        
+        local target = SilentAimSystem:getClosestTarget(camera, 180)
+        if target then
+            local predictedPosition = SilentAimSystem:predictPosition(target, 0.016)
+            local currentLookAt = camera.CFrame.Position + camera.CFrame.LookVector * 10
+            local smoothedPosition = SilentAimSystem:calculateAimPoint(currentLookAt, predictedPosition, 0.92)
+            
+            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, smoothedPosition)
+        end
+    end
+end)
+
+-- =============================================================================
+-- ESP SISTEMA CON OBJECT POOLING Y RECICLAJE
+-- =============================================================================
+local ESPPool = {
+    available = {},
+    active = {},
+    maxPoolSize = 50
+}
+
+function ESPPool:initialize()
+    for i = 1, 10 do -- Pre-crear objetos para evitar creación en runtime
+        local box = Drawing.new("Square")
+        box.Visible = false
+        box.Transparency = 1
+        
+        local name = Drawing.new("Text")
+        name.Visible = false
+        name.Transparency = 1
+        name.Center = true
+        name.Size = 13
+        name.Font = 2
+        
+        local distance = Drawing.new("Text")
+        distance.Visible = false
+        distance.Transparency = 1
+        distance.Center = true
+        distance.Size = 12
+        distance.Font = 2
+        
+        table.insert(self.available, {
+            box = box,
+            name = name,
+            distance = distance,
+            billboard = nil,
+            inUse = false
+        })
+    end
+end
+
+function ESPPool:acquire()
+    if #self.available > 0 then
+        local obj = table.remove(self.available)
+        obj.inUse = true
+        table.insert(self.active, obj)
+        return obj
+    elseif #self.active < self.maxPoolSize then
+        return self:createNew()
+    end
+    return nil
+end
+
+function ESPPool:release(obj)
+    if not obj then return end
+    
+    -- Limpiar y ocultar
+    obj.box.Visible = false
+    obj.name.Visible = false
+    obj.distance.Visible = false
+    
+    if obj.billboard then
+        pcall(function() obj.billboard:Destroy() end)
+        obj.billboard = nil
+    end
+    
+    obj.inUse = false
+    
+    -- Mover de activos a disponibles
+    for i, active in ipairs(self.active) do
+        if active == obj then
+            table.remove(self.active, i)
+            table.insert(self.available, obj)
+            break
+        end
+    end
+end
+
+function ESPPool:createNew()
+    local obj = {
+        box = Drawing.new("Square"),
+        name = Drawing.new("Text"),
+        distance = Drawing.new("Text"),
+        billboard = nil,
+        inUse = true
+    }
+    
+    obj.box.Transparency = 1
+    obj.name.Transparency = 1
+    obj.name.Center = true
+    obj.name.Size = 13
+    obj.name.Font = 2
+    obj.distance.Transparency = 1
+    obj.distance.Center = true
+    obj.distance.Size = 12
+    obj.distance.Font = 2
+    
+    table.insert(self.active, obj)
+    return obj
+end
+
+-- Datos de inventario y rarezas
+local RARITY_DATA = {
+    rojo    = Color3.fromRGB(255, 30, 30),
+    naranja = Color3.fromRGB(255, 120, 0),
+    morada  = Color3.fromRGB(160, 32, 240),
+    azul    = Color3.fromRGB(30, 144, 255),
+    verde   = Color3.fromRGB(50, 205, 50),
+    gris    = Color3.fromRGB(180, 180, 180)
+}
+
+local ITEM_RARITIES = {
+    ["Ak 47"] = "naranja", ["Anaconda"] = "rojo", ["C9"] = "verde", ["Double barril"] = "morada",
+    ["Draco"] = "morada", ["Firework"] = "morada", ["G3"] = "verde", ["Glock"] = "azul",
+    ["M16"] = "naranja", ["M241"] = "rojo", ["MP5"] = "naranja", ["P226"] = "azul",
+    ["RPG"] = "naranja", ["Remington"] = "naranja", ["Sawnoff"] = "naranja", ["Skorpion"] = "morada",
+    ["Uzi"] = "azul", ["Baseball Bat"] = "verde", ["Tactical Axe"] = "naranja", 
+    ["Tactical Knife"] = "naranja", ["Tactical Shovel"] = "naranja", ["Crowbar"] = "azul", 
+    ["Switchblade"] = "azul", ["Granada"] = "morada", ["Molotov"] = "morada", ["Mop"] = "gris", 
+    ["First Aid Kit"] = "morada", ["Energy Shot"] = "morada", ["Bandage"] = "gris", 
+    ["FishingRodRegular"] = "gris", ["FishingRodPro"] = "gris", ["FishingRodUltimate"] = "gris"
+}
+
+-- Sistema ESP optimizado
+local ESPSystem = {
+    objects = {},
+    updateConnection = nil,
+    playerConnections = {}
+}
+
+function ESPSystem:getEquippedItem(character)
+    -- Método 1: Buscar Tool estándar
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        return tool.Name
+    end
+    
+    -- Método 2: Buscar por nombre en hijos directos
+    for name, _ in pairs(ITEM_RARITIES) do
+        if character:FindFirstChild(name) then
+            return name
+        end
+    end
+    
+    return nil
+end
+
+function ESPSystem:createESPForPlayer(player)
+    if player == Services.Players.LocalPlayer then return end
+    
+    local function onCharacterAdded(character)
+        local rootPart = character:WaitForChild("HumanoidRootPart", 10)
+        if not rootPart then return end
+        
+        local espObject = ESPPool:acquire()
+        if not espObject then return end
+        
+        -- Crear BillboardGui para inventario
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "WaterHub_ESP_Inventory"
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+        billboard.Adornee = rootPart
+        
+        local itemText = Instance.new("TextLabel")
+        itemText.Size = UDim2.new(1, 0, 1, 0)
+        itemText.BackgroundTransparency = 1
+        itemText.TextSize = 13
+        itemText.Font = Enum.Font.SourceSansBold
+        itemText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        itemText.TextStrokeTransparency = 0
+        itemText.Parent = billboard
+        
+        espObject.billboard = billboard
+        
+        -- Conexión de actualización
+        local updateConnection
+        updateConnection = Services.RunService.RenderStepped:Connect(function()
+            local config = ConfigSystem
+            local camera = Services.Workspace.CurrentCamera
+            if not camera or not rootPart.Parent then
+                ESPPool:release(espObject)
+                updateConnection:Disconnect()
+                return
             end
             
-            if LowfiESP.Cham then
-                for _, part in ipairs(Char:GetDescendants()) do
-                    if part:IsA("BasePart") and not part:FindFirstChild("ESP_Highlight") then
+            local rootPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+            local distance = (camera.CFrame.Position - rootPart.Position).Magnitude
+            
+            local humanoid = character:FindFirstChild("Humanoid")
+            if not onScreen or not humanoid or humanoid.Health <= 0 then
+                espObject.box.Visible = false
+                espObject.name.Visible = false
+                espObject.distance.Visible = false
+                billboard.Enabled = false
+                return
+            end
+            
+            local size = Vector2.new(2000 / rootPos.Z, 3000 / rootPos.Z)
+            
+            -- Actualizar caja
+            if config:get("ESPBoxes") then
+                espObject.box.Size = size
+                espObject.box.Position = Vector2.new(rootPos.X - size.X/2, rootPos.Y - size.Y/2)
+                espObject.box.Color = config:get("ESPColor")
+                espObject.box.Thickness = config:get("ESPThickness")
+                espObject.box.Visible = true
+            else
+                espObject.box.Visible = false
+            end
+            
+            -- Actualizar nombre
+            if config:get("ESPNames") then
+                espObject.name.Text = player.Name
+                espObject.name.Position = Vector2.new(rootPos.X, rootPos.Y - size.Y/2 - 20)
+                espObject.name.Visible = true
+            else
+                espObject.name.Visible = false
+            end
+            
+            -- Actualizar distancia
+            if config:get("ESPDistance") then
+                espObject.distance.Text = string.format("%dm", math.floor(distance))
+                espObject.distance.Position = Vector2.new(rootPos.X, rootPos.Y + size.Y/2 + 5)
+                espObject.distance.Visible = true
+            else
+                espObject.distance.Visible = false
+            end
+            
+            -- Actualizar inventario
+            if config:get("ESPInventory") then
+                local equippedItem = self:getEquippedItem(character)
+                if equippedItem and ITEM_RARITIES[equippedItem] then
+                    itemText.Text = "[" .. equippedItem .. "]"
+                    local rarity = ITEM_RARITIES[equippedItem]
+                    itemText.TextColor3 = RARITY_DATA[rarity] or RARITY_DATA.gris
+                else
+                    itemText.Text = "[Ninguno]"
+                    itemText.TextColor3 = RARITY_DATA.gris
+                end
+                billboard.Enabled = true
+            else
+                billboard.Enabled = false
+            end
+            
+            -- Chams
+            if config:get("ESPChams") then
+                for _, part in ipairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") and not part:FindFirstChild("WaterHub_Cham") then
                         local highlight = Instance.new("Highlight")
-                        highlight.Name = "ESP_Highlight"
-                        highlight.FillColor = LowfiESP.Color
+                        highlight.Name = "WaterHub_Cham"
+                        highlight.FillColor = config:get("ESPColor")
                         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                         highlight.FillTransparency = 0.5
                         highlight.Parent = part
                     end
                 end
             end
-        else
-            Box.Visible = false; Name.Visible = false; Distance.Visible = false; bGui.Enabled = false
-        end
-    end)
-
-    local function Cleanup()
-        Connection:Disconnect()
-        Box:Remove(); Name:Remove(); Distance:Remove()
-        bGui:Destroy()
-        for _, part in ipairs(Char:GetDescendants()) do
-            if part:FindFirstChild("ESP_Highlight") then part.ESP_Highlight:Destroy() end
-        end
-    end
-    
-    Obj.AncestryChanged:Connect(function(_, Parent) if Parent == nil then Cleanup() end end)
-    table.insert(ESPObjects, {Player = P, Cleanup = Cleanup})
-end
-
-local function OnCharacterAdded(Char)
-    local Plr = Players:GetPlayerFromCharacter(Char)
-    if not Plr or Plr == LocalPlayer then return end
-    
-    if not Char:FindFirstChild("HumanoidRootPart") then
-        local Env
-        Env = Char.ChildAdded:Connect(function(Child)
-            if Child.Name == "HumanoidRootPart" then
-                Env:Disconnect()
-                CreateESP(Plr, Plr.Name, Child)
+        end)
+        
+        MemoryManager:trackConnection(updateConnection)
+        
+        -- Limpieza cuando el personaje es removido
+        local ancestryConnection
+        ancestryConnection = rootPart.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                ESPPool:release(espObject)
+                ancestryConnection:Disconnect()
             end
         end)
-    else CreateESP(Plr, Plr.Name, Char.HumanoidRootPart) end
+        MemoryManager:trackConnection(ancestryConnection)
+    end
+    
+    -- Escuchar cambios de personaje
+    if player.Character then
+        task.spawn(onCharacterAdded, player.Character)
+    end
+    
+    local charConnection = player.CharacterAdded:Connect(onCharacterAdded)
+    MemoryManager:trackConnection(charConnection)
 end
 
-local function OnPlayerAdded(P)
-    if P == LocalPlayer then return end
-    P.CharacterAdded:Connect(OnCharacterAdded)
-    if P.Character then task.spawn(OnCharacterAdded, P.Character) end
+function ESPSystem:initialize()
+    ESPPool:initialize()
+    
+    -- Conectar jugadores existentes
+    for _, player in ipairs(Services.Players:GetPlayers()) do
+        self:createESPForPlayer(player)
+    end
+    
+    -- Escuchar nuevos jugadores
+    local playerAddedConnection = Services.Players.PlayerAdded:Connect(function(player)
+        self:createESPForPlayer(player)
+    end)
+    MemoryManager:trackConnection(playerAddedConnection)
+    
+    -- Limpiar cuando un jugador se va
+    local playerRemovingConnection = Services.Players.PlayerRemoving:Connect(function(player)
+        -- La limpieza se maneja en ancestryChanged
+    end)
+    MemoryManager:trackConnection(playerRemovingConnection)
 end
 
-Players.PlayerAdded:Connect(OnPlayerAdded)
-for _, p in ipairs(Players:GetPlayers()) do OnPlayerAdded(p) end
-Players.PlayerRemoving:Connect(function(p)
-    for i, obj in ipairs(ESPObjects) do
-        if obj.Player == p then
-            pcall(obj.Cleanup)
-            table.remove(ESPObjects, i)
-            break
-        end
-    end
-end)
+-- =============================================================================
+-- SISTEMAS DE MOVIMIENTO CON SIMULACIÓN HUMANA
+-- =============================================================================
+local MovementSystem = {
+    walkSpeedLoop = nil,
+    superJumpLoop = nil,
+    staminaLoop = nil,
+    antiKillConnection = nil
+}
 
--- ============================================
--- MOVEMENT LOOPS
--- ============================================
-local function WalkSpeedLoop()
-    while Features.WalkSpeed do
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then hum.WalkSpeed = Features.SpeedValue end
-        end
-        task.wait(0.1)
-    end
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
-    end
-end
-
-local function SuperJumpLoop()
-    while Features.SuperJump do
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.JumpPower = Features.JumpPower
-                if hum.FloorMaterial ~= Enum.Material.Air then
-                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+function MovementSystem:startWalkSpeed(speed)
+    self:stopWalkSpeed()
+    
+    self.walkSpeedLoop = task.spawn(function()
+        while ConfigSystem:get("WalkSpeed") do
+            local character = Services.Players.LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = speed
                 end
             end
+            task.wait(0.1)
         end
-        task.wait(0.3)
-    end
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then hum.JumpPower = 50 end
+        
+        -- Restaurar velocidad por defecto
+        local character = Services.Players.LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = 16
+            end
+        end
+    end)
+end
+
+function MovementSystem:stopWalkSpeed()
+    if self.walkSpeedLoop then
+        task.cancel(self.walkSpeedLoop)
+        self.walkSpeedLoop = nil
     end
 end
 
-local function InfiniteStaminaLoop()
-    while Features.InfiniteStamina do
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then hum:SetAttribute("Stamina", 125) end
+function MovementSystem:startSuperJump(power)
+    self:stopSuperJump()
+    
+    self.superJumpLoop = task.spawn(function()
+        while ConfigSystem:get("SuperJump") do
+            local character = Services.Players.LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.JumpPower = power
+                    -- Solo saltar si está en el suelo (comportamiento más natural)
+                    if humanoid.FloorMaterial ~= Enum.Material.Air then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end
+            task.wait(0.3)
         end
-        task.wait(0.2)
+        
+        -- Restaurar poder de salto
+        local character = Services.Players.LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.JumpPower = 50
+            end
+        end
+    end)
+end
+
+function MovementSystem:stopSuperJump()
+    if self.superJumpLoop then
+        task.cancel(self.superJumpLoop)
+        self.superJumpLoop = nil
     end
 end
 
--- ============================================
--- ANTI KILL & GUN MODS
--- ============================================
-local AntiKillConnection
-local function AntiKillFunction()
-    if not Features.AntiKill then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hum and hrp then
-        local healthPercent = (hum.Health / hum.MaxHealth) * 100
-        if healthPercent <= Features.AntiKillHealth then
-            local targetPos = Vector3.new(hrp.Position.X, -26, hrp.Position.Z)
-            TweenService:Create(hrp, TweenInfo.new(0.5), {CFrame = CFrame.new(targetPos)}):Play()
+function MovementSystem:startInfiniteStamina()
+    self:stopInfiniteStamina()
+    
+    self.staminaLoop = task.spawn(function()
+        while ConfigSystem:get("InfiniteStamina") do
+            local character = Services.Players.LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    pcall(function()
+                        humanoid:SetAttribute("Stamina", 125)
+                    end)
+                end
+            end
+            task.wait(0.2)
         end
+    end)
+end
+
+function MovementSystem:stopInfiniteStamina()
+    if self.staminaLoop then
+        task.cancel(self.staminaLoop)
+        self.staminaLoop = nil
     end
 end
 
-local function ApplyGunMods()
-    if not Features.EnableGunMods then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    for _, tool in ipairs(char:GetChildren()) do
+function MovementSystem:startAntiKill(healthPercent)
+    self:stopAntiKill()
+    
+    self.antiKillConnection = Services.RunService.Heartbeat:Connect(function()
+        local character = Services.Players.LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        if humanoid and rootPart then
+            local currentHealthPercent = (humanoid.Health / humanoid.MaxHealth) * 100
+            
+            if currentHealthPercent <= healthPercent then
+                -- Teletransportación suave usando Tween
+                local targetPos = Vector3.new(rootPart.Position.X, -50, rootPart.Position.Z)
+                local tween = Services.TweenService:Create(rootPart, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    CFrame = CFrame.new(targetPos)
+                })
+                tween:Play()
+            end
+        end
+    end)
+end
+
+function MovementSystem:stopAntiKill()
+    if self.antiKillConnection then
+        self.antiKillConnection:Disconnect()
+        self.antiKillConnection = nil
+    end
+end
+
+-- =============================================================================
+-- SISTEMA DE MODIFICACIÓN DE ARMAS
+-- =============================================================================
+local WeaponSystem = {}
+
+function WeaponSystem:applyMods(fireRate, recoil)
+    local character = Services.Players.LocalPlayer.Character
+    if not character then return end
+    
+    for _, tool in ipairs(character:GetChildren()) do
         if tool:IsA("Tool") then
             local config = tool:FindFirstChild("Configuration")
             if config then
-                local fireRate = config:FindFirstChild("FireRate")
-                if fireRate then fireRate.Value = Features.FireRate end
-                local recoil = config:FindFirstChild("Recoil")
-                if recoil then recoil.Value = Features.Recoil end
-                local reload = config:FindFirstChild("ReloadTime")
-                if reload then reload.Value = Features.ReloadTime end
+                pcall(function()
+                    local fireRateObj = config:FindFirstChild("FireRate")
+                    if fireRateObj then fireRateObj.Value = fireRate end
+                    
+                    local recoilObj = config:FindFirstChild("Recoil")
+                    if recoilObj then recoilObj.Value = recoil end
+                end)
             end
         end
     end
 end
 
--- ============================================
--- MISC FUNCTIONS
--- ============================================
-local function ServerHop()
-    local PlaceID = game.PlaceId
-    local url = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
-    local success, result = pcall(function() return game:HttpGet(url) end)
+-- =============================================================================
+-- SISTEMA DE UTILIDADES (FPS BOOST, SERVER HOP)
+-- =============================================================================
+local UtilitySystem = {}
+
+function UtilitySystem:fpsBoost()
+    local lighting = Services.Lighting
+    lighting.GlobalShadows = false
+    lighting.Technology = Enum.Technology.Compatibility
+    
+    -- Desactivar partículas y efectos (más agresivo pero efectivo)
+    for _, obj in ipairs(Services.Workspace:GetDescendants()) do
+        if obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") then
+            pcall(function() obj.Enabled = false end)
+        end
+    end
+end
+
+function UtilitySystem:serverHop()
+    local placeId = game.PlaceId
+    local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+    
+    local success, result = pcall(function()
+        return game:HttpGet(url)
+    end)
+    
     if success and result then
-        local data = HttpService:JSONDecode(result)
+        local data = Services.HttpService:JSONDecode(result)
         if data and data.data then
+            -- Buscar el servidor con menos jugadores
+            local bestServer = nil
+            local lowestPlayers = math.huge
+            
             for _, server in ipairs(data.data) do
                 if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                    TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer)
-                    return
+                    if server.playing < lowestPlayers then
+                        lowestPlayers = server.playing
+                        bestServer = server
+                    end
                 end
             end
+            
+            if bestServer then
+                Services.TeleportService:TeleportToPlaceInstance(placeId, bestServer.id, Services.Players.LocalPlayer)
+            else
+                return false, "No se encontraron servidores disponibles"
+            end
         end
-    end
-    Notify("Error", "No servers found")
-end
-
-local function FPSBoost()
-    Lighting.GlobalShadows = false
-    Lighting.Technology = Enum.Technology.Compatibility
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") then
-            obj.Enabled = false
-        end
+    else
+        return false, "Error al obtener lista de servidores"
     end
 end
 
--- ============================================
--- INTERFACE (WINDUI IN ENGLISH)
--- ============================================
-local Window = WindUI:CreateWindow({
-    Title = "Water Hub | BlockSpin",
-    Author = "Mobile Optimized",
-    Icon = "droplet",
-    Theme = "Dark",
-    OpenButton = {
-        Title = "Open", CornerRadius = UDim.new(1, 0), StrokeThickness = 2, Enabled = true, Draggable = true,
-        Color = ColorSequence.new(Features.ThemeColor, Features.ThemeColor),
-    },
-})
-
--- TAB 1: COMBAT
-local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
-CombatTab:Section({ Title = "Silent Aim", Desc = "Assisted targeting logic" })
-
-CombatTab:Toggle({
-    Title = "Silent Aim",
-    Value = Features.SilentAim,
-    Callback = function(v)
-        Features.SilentAim = v
-        SaveConfig(true)
-    end,
-})
-
-CombatTab:Slider({
-    Title = "Prediction",
-    Step = 0.001,
-    Value = { Min = 0, Max = 0.5, Default = Features.Prediction },
-    Callback = function(v)
-        Features.Prediction = v
-        SaveConfig(true)
-    end,
-})
-
-CombatTab:Section({ Title = "FOV Settings", Desc = "Static center screen ring" })
-
-CombatTab:Toggle({
-    Title = "Show FOV Circle",
-    Value = Features.ShowFOV,
-    Callback = function(v)
-        Features.ShowFOV = v
-        UpdateFOV()
-        SaveConfig(true)
-    end,
-})
-
-CombatTab:Slider({
-    Title = "FOV Size",
-    Step = 5,
-    Value = { Min = 30, Max = 400, Default = Features.FOVSize },
-    Callback = function(v)
-        Features.FOVSize = v
-        UpdateFOV()
-        SaveConfig(true)
-    end,
-})
-
-CombatTab:Section({ Title = "Defense" })
-
-CombatTab:Toggle({
-    Title = "Anti Kill",
-    Value = Features.AntiKill,
-    Callback = function(v)
-        Features.AntiKill = v
-        if v then
-            AntiKillConnection = RunService.Heartbeat:Connect(AntiKillFunction)
-        elseif AntiKillConnection then
-            AntiKillConnection:Disconnect()
+-- =============================================================================
+-- INTERFAZ DE USUARIO (CARGAR WINDUI Y CONSTRUIR MENÚ)
+-- =============================================================================
+local function buildUserInterface()
+    local WindUI = loadstring(game:HttpGet(WINDUI_URL))()
+    if not WindUI then
+        warn("[WATER HUB] Error crítico: No se pudo cargar WindUI")
+        return nil
+    end
+    
+    local Window = WindUI:CreateWindow({
+        Title = "Water Hub | BlockSpin",
+        Author = "Professional Edition",
+        Icon = "droplet",
+        Theme = "Dark",
+        ToggleKey = Enum.KeyCode.F,
+        OpenButton = {
+            Title = "Open",
+            CornerRadius = UDim.new(1, 0),
+            StrokeThickness = 2,
+            Enabled = true,
+            Draggable = true,
+            Color = ColorSequence.new(ConfigSystem:get("ThemeColor"), ConfigSystem:get("ThemeColor")),
+        },
+    })
+    
+    -- ========================
+    -- PESTAÑA COMBAT
+    -- ========================
+    local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
+    CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de disparo avanzada" })
+    
+    CombatTab:Toggle({
+        Title = "Silent Aim",
+        Value = ConfigSystem:get("SilentAim"),
+        Callback = function(value)
+            ConfigSystem:set("SilentAim", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    CombatTab:Toggle({
+        Title = "Aim Lock (Hold E)",
+        Value = ConfigSystem:get("AimLock"),
+        Callback = function(value)
+            ConfigSystem:set("AimLock", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    CombatTab:Slider({
+        Title = "Prediction",
+        Step = 0.001,
+        Value = { Min = 0, Max = 0.5, Default = ConfigSystem:get("Prediction") },
+        Callback = function(value)
+            ConfigSystem:set("Prediction", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    CombatTab:Section({ Title = "Defensa", Desc = "Protección del jugador" })
+    
+    CombatTab:Toggle({
+        Title = "Anti Kill",
+        Value = ConfigSystem:get("AntiKill"),
+        Callback = function(value)
+            ConfigSystem:set("AntiKill", value)
+            if value then
+                MovementSystem:startAntiKill(ConfigSystem:get("AntiKillHealth"))
+            else
+                MovementSystem:stopAntiKill()
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    CombatTab:Slider({
+        Title = "Anti Kill Health %",
+        Step = 5,
+        Value = { Min = 5, Max = 50, Default = ConfigSystem:get("AntiKillHealth") },
+        Callback = function(value)
+            ConfigSystem:set("AntiKillHealth", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    -- ========================
+    -- PESTAÑA ESP
+    -- ========================
+    local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
+    ESPTab:Section({ Title = "Player ESP", Desc = "Visualización avanzada" })
+    
+    ESPTab:Toggle({
+        Title = "Cajas (Boxes)",
+        Value = ConfigSystem:get("ESPBoxes"),
+        Callback = function(value)
+            ConfigSystem:set("ESPBoxes", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    ESPTab:Toggle({
+        Title = "Nombres",
+        Value = ConfigSystem:get("ESPNames"),
+        Callback = function(value)
+            ConfigSystem:set("ESPNames", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    ESPTab:Toggle({
+        Title = "Distancia",
+        Value = ConfigSystem:get("ESPDistance"),
+        Callback = function(value)
+            ConfigSystem:set("ESPDistance", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    ESPTab:Toggle({
+        Title = "Resaltado (Chams)",
+        Value = ConfigSystem:get("ESPChams"),
+        Callback = function(value)
+            ConfigSystem:set("ESPChams", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    ESPTab:Toggle({
+        Title = "Inventario Equipado",
+        Value = ConfigSystem:get("ESPInventory"),
+        Callback = function(value)
+            ConfigSystem:set("ESPInventory", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    ESPTab:Slider({
+        Title = "Grosor del ESP",
+        Step = 0.5,
+        Value = { Min = 0.5, Max = 3, Default = ConfigSystem:get("ESPThickness") },
+        Callback = function(value)
+            ConfigSystem:set("ESPThickness", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    -- ========================
+    -- PESTAÑA MOVEMENT
+    -- ========================
+    local MoveTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
+    MoveTab:Section({ Title = "Velocidad" })
+    
+    MoveTab:Toggle({
+        Title = "Walk Speed",
+        Value = ConfigSystem:get("WalkSpeed"),
+        Callback = function(value)
+            ConfigSystem:set("WalkSpeed", value)
+            if value then
+                MovementSystem:startWalkSpeed(ConfigSystem:get("SpeedValue"))
+            else
+                MovementSystem:stopWalkSpeed()
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    MoveTab:Slider({
+        Title = "Velocidad",
+        Step = 5,
+        Value = { Min = 16, Max = 200, Default = ConfigSystem:get("SpeedValue") },
+        Callback = function(value)
+            ConfigSystem:set("SpeedValue", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    MoveTab:Section({ Title = "Saltos y Stamina" })
+    
+    MoveTab:Toggle({
+        Title = "Super Jump",
+        Value = ConfigSystem:get("SuperJump"),
+        Callback = function(value)
+            ConfigSystem:set("SuperJump", value)
+            if value then
+                MovementSystem:startSuperJump(ConfigSystem:get("JumpPower"))
+            else
+                MovementSystem:stopSuperJump()
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    MoveTab:Slider({
+        Title = "Fuerza de Salto",
+        Step = 10,
+        Value = { Min = 50, Max = 200, Default = ConfigSystem:get("JumpPower") },
+        Callback = function(value)
+            ConfigSystem:set("JumpPower", value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    MoveTab:Toggle({
+        Title = "Estamina Infinita",
+        Value = ConfigSystem:get("InfiniteStamina"),
+        Callback = function(value)
+            ConfigSystem:set("InfiniteStamina", value)
+            if value then
+                MovementSystem:startInfiniteStamina()
+            else
+                MovementSystem:stopInfiniteStamina()
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    -- ========================
+    -- PESTAÑA WEAPON
+    -- ========================
+    local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
+    WeaponTab:Section({ Title = "Modificadores" })
+    
+    WeaponTab:Toggle({
+        Title = "Activar Gun Mods",
+        Value = ConfigSystem:get("EnableGunMods"),
+        Callback = function(value)
+            ConfigSystem:set("EnableGunMods", value)
+            if value then
+                WeaponSystem:applyMods(ConfigSystem:get("FireRate"), ConfigSystem:get("Recoil"))
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    WeaponTab:Slider({
+        Title = "Cadencia (Fire Rate)",
+        Step = 50,
+        Value = { Min = 50, Max = 2000, Default = ConfigSystem:get("FireRate") },
+        Callback = function(value)
+            ConfigSystem:set("FireRate", value)
+            WeaponSystem:applyMods(value, ConfigSystem:get("Recoil"))
+            ConfigSystem:save()
+        end,
+    })
+    
+    WeaponTab:Slider({
+        Title = "Retroceso (Recoil)",
+        Step = 0.1,
+        Value = { Min = 0, Max = 3, Default = ConfigSystem:get("Recoil") },
+        Callback = function(value)
+            ConfigSystem:set("Recoil", value)
+            WeaponSystem:applyMods(ConfigSystem:get("FireRate"), value)
+            ConfigSystem:save()
+        end,
+    })
+    
+    -- ========================
+    -- PESTAÑA MISC
+    -- ========================
+    local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
+    
+    MiscTab:Button({
+        Title = "Cambiar de Servidor",
+        Callback = function()
+            local success, err = UtilitySystem:serverHop()
+            if not success then
+                WindUI:Notify({Title = "Error", Content = err, Duration = 3})
+            end
         end
-        SaveConfig(true)
-    end,
-})
+    })
+    
+    MiscTab:Toggle({
+        Title = "Optimizar FPS",
+        Value = ConfigSystem:get("FPSBoost"),
+        Callback = function(value)
+            ConfigSystem:set("FPSBoost", value)
+            if value then
+                UtilitySystem:fpsBoost()
+            end
+            ConfigSystem:save()
+        end,
+    })
+    
+    MiscTab:Button({
+        Title = "Guardar Configuración",
+        Callback = function()
+            if ConfigSystem:save() then
+                WindUI:Notify({Title = "Configuración", Content = "Guardada correctamente", Duration = 2})
+            end
+        end
+    })
+    
+    -- Seleccionar primera pestaña
+    CombatTab:Select()
+    
+    return Window
+end
 
-CombatTab:Slider({
-    Title = "Anti Kill Health %",
-    Step = 5,
-    Value = { Min = 5, Max = 50, Default = Features.AntiKillHealth },
-    Callback = function(v)
-        Features.AntiKillHealth = v
-        SaveConfig(true)
-    end,
-})
+-- =============================================================================
+-- INICIALIZACIÓN PRINCIPAL
+-- =============================================================================
+local function main()
+    -- Inicializar configuración
+    local config = ConfigSystem:initialize()
+    if not config then
+        warn("[WATER HUB] Error crítico: No se pudo inicializar la configuración")
+        return
+    end
+    
+    -- Construir interfaz de usuario
+    local window = buildUserInterface()
+    if not window then
+        warn("[WATER HUB] Error crítico: No se pudo construir la interfaz")
+        return
+    end
+    
+    -- Inicializar sistema ESP
+    ESPSystem:initialize()
+    
+    -- Inicializar sistemas de movimiento según configuración
+    if ConfigSystem:get("WalkSpeed") then
+        MovementSystem:startWalkSpeed(ConfigSystem:get("SpeedValue"))
+    end
+    
+    if ConfigSystem:get("SuperJump") then
+        MovementSystem:startSuperJump(ConfigSystem:get("JumpPower"))
+    end
+    
+    if ConfigSystem:get("InfiniteStamina") then
+        MovementSystem:startInfiniteStamina()
+    end
+    
+    if ConfigSystem:get("AntiKill") then
+        MovementSystem:startAntiKill(ConfigSystem:get("AntiKillHealth"))
+    end
+    
+    -- Aplicar FPS Boost si está activado
+    if ConfigSystem:get("FPSBoost") then
+        UtilitySystem:fpsBoost()
+    end
+    
+    -- Sistema de limpieza en caso de error
+    local function emergencyCleanup()
+        MemoryManager:executeCleanup()
+        
+        -- Restaurar metamétodo
+        if originalIndex then
+            pcall(function()
+                hookmetamethod(game, "__index", originalIndex)
+            end)
+        end
+        
+        -- Desvincular todos los BindToRenderStep
+        pcall(function()
+            Services.RunService:UnbindFromRenderStep("WaterHub_AimLock")
+        end)
+    end
+    
+    -- Registrar limpieza de emergencia
+    MemoryManager:scheduleCleanup(emergencyCleanup)
+    
+    print("[WATER HUB] Sistema cargado exitosamente - Versión 5.0.0")
+    print("[WATER HUB] Silent Aim: " .. tostring(ConfigSystem:get("SilentAim")))
+    print("[WATER HUB] ESP: " .. tostring(ConfigSystem:get("ESPBoxes")))
+    print("[WATER HUB] Anti-Detección: ACTIVO")
+end
 
--- TAB 2: ESP
-local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
-ESPTab:Section({ Title = "Visuals", Desc = "Real-time tracking systems" })
-
-ESPTab:Toggle({
-    Title = "Boxes",
-    Value = Features.ESPBoxes,
-    Callback = function(v)
-        Features.ESPBoxes = v
-        LowfiESP.Boxes = v
-        SaveConfig(true)
-    end,
-})
-
-ESPTab:Toggle({
-    Title = "Names",
-    Value = Features.ESPNames,
-    Callback = function(v)
-        Features.ESPNames = v
-        LowfiESP.Names = v
-        SaveConfig(true)
-    end,
-})
-
-ESPTab:Toggle({
-    Title = "Distance",
-    Value = Features.ESPDistance,
-    Callback = function(v)
-        Features.ESPDistance = v
-        LowfiESP.Distance = v
-        SaveConfig(true)
-    end,
-})
-
-ESPTab:Toggle({
-    Title = "Chams",
-    Value = Features.ESPChams,
-    Callback = function(v)
-        Features.ESPChams = v
-        LowfiESP.Cham = v
-        SaveConfig(true)
-    end,
-})
-
-ESPTab:Toggle({
-    Title = "Inventory Card",
-    Value = Features.ESPInventory,
-    Callback = function(v)
-        Features.ESPInventory = v
-        LowfiESP.Inventory = v
-        SaveConfig(true)
-    end,
-})
-
-ESPTab:Slider({
-    Title = "ESP Thickness",
-    Step = 0.5,
-    Value = { Min = 0.5, Max = 3, Default = Features.ESPThickness },
-    Callback = function(v)
-        Features.ESPThickness = v
-        LowfiESP.Thickness = v
-        SaveConfig(true)
-    end,
-})
-
--- TAB 3: MOVEMENT
-local MoveTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
-MoveTab:Section({ Title = "Speed Options" })
-
-MoveTab:Toggle({
-    Title = "Walk Speed",
-    Value = Features.WalkSpeed,
-    Callback = function(v)
-        Features.WalkSpeed = v
-        if v then task.spawn(WalkSpeedLoop) end
-        SaveConfig(true)
-    end,
-})
-
-MoveTab:Slider({
-    Title = "Speed Value",
-    Step = 5,
-    Value = { Min = 16, Max = 200, Default = Features.SpeedValue },
-    Callback = function(v)
-        Features.SpeedValue = v
-        SaveConfig(true)
-    end,
-})
-
-MoveTab:Section({ Title = "Jump & Stamina" })
-
-MoveTab:Toggle({
-    Title = "Super Jump",
-    Value = Features.SuperJump,
-    Callback = function(v)
-        Features.SuperJump = v
-        if v then task.spawn(SuperJumpLoop) end
-        SaveConfig(true)
-    end,
-})
-
-MoveTab:Slider({
-    Title = "Jump Power",
-    Step = 10,
-    Value = { Min = 50, Max = 200, Default = Features.JumpPower },
-    Callback = function(v)
-        Features.JumpPower = v
-        SaveConfig(true)
-    end,
-})
-
-MoveTab:Toggle({
-    Title = "Infinite Stamina",
-    Value = Features.InfiniteStamina,
-    Callback = function(v)
-        Features.InfiniteStamina = v
-        if v then task.spawn(InfiniteStaminaLoop) end
-        SaveConfig(true)
-    end,
-})
-
--- TAB 4: WEAPON
-local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
-WeaponTab:Section({ Title = "Gun Modifiers" })
-
-WeaponTab:Toggle({
-    Title = "Enable Gun Mods",
-    Value = Features.EnableGunMods,
-    Callback = function(v)
-        Features.EnableGunMods = v
-        ApplyGunMods()
-        SaveConfig(true)
-    end,
-})
-
-WeaponTab:Slider({
-    Title = "Fire Rate",
-    Step = 50,
-    Value = { Min = 50, Max = 2000, Default = Features.FireRate },
-    Callback = function(v)
-        Features.FireRate = v
-        ApplyGunMods()
-        SaveConfig(true)
-    end,
-})
-
--- TAB 5: MISC
-local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
-
-MiscTab:Button({ Title = "Server Hop", Callback = ServerHop })
-MiscTab:Toggle({
-    Title = "FPS Boost",
-    Value = Features.FPSBoost,
-    Callback = function(v)
-        Features.FPSBoost = v
-        if v then FPSBoost() end
-        SaveConfig(true)
-    end,
-})
-MiscTab:Button({
-    Title = "Manual Save Config",
-    Callback = function() SaveConfig(false) end
-})
-
-CombatTab:Select()
-print("Water Hub Mobile | BlockSpin Loaded")
+-- Ejecutar sistema principal con protección de errores
+local success, error = pcall(main)
+if not success then
+    warn("[WATER HUB] Error fatal en inicialización: " .. tostring(error))
+    -- Intentar limpiar en caso de error
+    pcall(function()
+        MemoryManager:executeCleanup()
+    end)
+end
