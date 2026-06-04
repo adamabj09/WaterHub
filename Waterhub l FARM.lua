@@ -1,6 +1,6 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSION OPTIMIZADA
-    Silent Aim + ESP Mejorados | Sin Farm
+    WATER HUB | BLOCKSPIN - VERSION MAESTRA
+    Silent Aim + FOV Fijo + ESP Inventario Visual Redondeado
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -32,14 +32,17 @@ end
 -- ============================================
 -- CONFIGURACIÓN PRINCIPAL
 -- ============================================
-local ConfigFile = "WaterHub_BlockSpin_v4.json"
+local ConfigFile = "WaterHub_BlockSpin_v5.json"
 
 local Features = {
-    -- SILENT AIM
+    -- SILENT AIM & FOV
     SilentAim = false,
     AimLock = false,
     Prediction = 0.165,
     AimLockKeybind = Enum.KeyCode.E,
+    ShowFOV = false,
+    FOVSize = 100,
+    FOVColor = Color3.fromRGB(0, 150, 255),
     
     -- ESP
     ESPBoxes = false,
@@ -78,7 +81,12 @@ local function LoadConfig()
         if success and data then
             for key, value in pairs(data) do
                 if Features[key] ~= nil then
-                    Features[key] = value
+                    -- Corrección para cargar colores guardados en JSON
+                    if type(value) == "table" and value.R then
+                        Features[key] = Color3.fromRGB(value.R * 255, value.G * 255, value.B * 255)
+                    else
+                        Features[key] = value
+                    end
                 end
             end
         end
@@ -87,7 +95,7 @@ end
 LoadConfig()
 
 -- ============================================
--- NOTIFICACIONES Y GUARDADO
+-- NOTIFICACIONES Y GUARDADO SIlENCIOSO
 -- ============================================
 local function Notify(title, message)
     pcall(function()
@@ -95,28 +103,15 @@ local function Notify(title, message)
     end)
 end
 
--- Añadido parámetro "silent" para que no salten notificaciones como locas con los sliders
 local function SaveConfig(silent)
-    local dataToSave = {
-        SilentAim = Features.SilentAim,
-        AimLock = Features.AimLock,
-        Prediction = Features.Prediction,
-        ESPBoxes = Features.ESPBoxes,
-        ESPNames = Features.ESPNames,
-        ESPDistance = Features.ESPDistance,
-        ESPChams = Features.ESPChams,
-        ESPInventory = Features.ESPInventory,
-        WalkSpeed = Features.WalkSpeed,
-        SpeedValue = Features.SpeedValue,
-        SuperJump = Features.SuperJump,
-        JumpPower = Features.JumpPower,
-        InfiniteStamina = Features.InfiniteStamina,
-        AntiKill = Features.AntiKill,
-        EnableGunMods = Features.EnableGunMods,
-        FireRate = Features.FireRate,
-        Recoil = Features.Recoil,
-        ThemeColor = Features.ThemeColor
-    }
+    local dataToSave = {}
+    for k, v in pairs(Features) do
+        if type(v) == "Color3" then
+            dataToSave[k] = {R = v.R, G = v.G, B = v.B}
+        else
+            dataToSave[k] = v
+        end
+    end
     pcall(function()
         writefile(ConfigFile, HttpService:JSONEncode(dataToSave))
         if not silent then
@@ -126,17 +121,31 @@ local function SaveConfig(silent)
 end
 
 -- ============================================
--- SILENT AIM + AIMLOCK (BLOCKSPIN SYSTEM)
+-- CÍRCULO FOV FIJO (ESTÁTICO EN EL CENTRO)
+-- ============================================
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.8
+
+local function UpdateFOV()
+    FOVCircle.Visible = Features.ShowFOV
+    FOVCircle.Radius = Features.FOVSize
+    FOVCircle.Color = Features.FOVColor
+    -- Forzar posición fija en el centro absoluto de la cámara
+    local Center = Workspace.CurrentCamera.ViewportSize / 2
+    FOVCircle.Position = Vector2.new(Center.X, Center.Y)
+end
+
+-- Mantener el FOV centrado en tiempo real si cambia la resolución
+Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateFOV)
+RunService.RenderStepped:Connect(UpdateFOV)
+
+-- ============================================
+-- SILENT AIM + AIMLOCK (BLOCKSPIN)
 -- ============================================
 local Aiming = loadstring(game:HttpGet("https://raw.githubusercontent.com/RapperDeluxe/scripts/main/silent%20aim%20module"))()
 Aiming.TeamCheck(false)
-
-local CombatSettings = {
-    SilentAim = Features.SilentAim,
-    AimLock = Features.AimLock,
-    Prediction = Features.Prediction,
-    AimLockKeybind = Features.AimLockKeybind
-}
 
 function Aiming.Check()
     if not (Aiming.Enabled == true and Aiming.Selected ~= LocalPlayer and Aiming.SelectedPart ~= nil) then
@@ -149,29 +158,43 @@ function Aiming.Check()
     local Humanoid = Character:FindFirstChild("Humanoid")
     if not Humanoid or Humanoid.Health <= 0 then return false end
     
+    -- Validar si el objetivo está dentro de nuestro FOV fijo del centro
+    if Features.ShowFOV then
+        local RootPos, OnScreen = Workspace.CurrentCamera:WorldToViewportPoint(Aiming.SelectedPart.Position)
+        if OnScreen then
+            local Center = Workspace.CurrentCamera.ViewportSize / 2
+            local DistanceFromCenter = (Vector2.new(RootPos.X, RootPos.Y) - Center).Magnitude
+            if DistanceFromCenter > Features.FOVSize then
+                return false
+            end
+        else
+            return false
+        end
+    end
+    
     return true
 end
 
 local __index
 __index = hookmetamethod(game, "__index", function(t, k)
-    if (t:IsA("Mouse") and (k == "Hit" or k == "Target") and Aiming.Check() and CombatSettings.SilentAim) then
+    if (t:IsA("Mouse") and (k == "Hit" or k == "Target") and Aiming.Check() and Features.SilentAim) then
         local SelectedPart = Aiming.SelectedPart
-        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * CombatSettings.Prediction)
+        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * Features.Prediction)
         return (k == "Hit" and Hit or SelectedPart)
     end
     return __index(t, k)
 end)
 
 RunService:BindToRenderStep("AimLock", 0, function()
-    if (CombatSettings.AimLock and Aiming.Check() and UserInputService:IsKeyDown(CombatSettings.AimLockKeybind)) then
+    if (Features.AimLock and Aiming.Check() and UserInputService:IsKeyDown(Features.AimLockKeybind)) then
         local SelectedPart = Aiming.SelectedPart
-        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * CombatSettings.Prediction)
+        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * Features.Prediction)
         Workspace.CurrentCamera.CFrame = CFrame.lookAt(Workspace.CurrentCamera.CFrame.Position, Hit.Position)
     end
 end)
 
 -- ============================================
--- ESP SYSTEM + BLOCKSPIN INVENTORY SCANNER
+-- ESP SYSTEM + INVENTARIO REDONDEADO (UI CORNER)
 -- ============================================
 local ESPObjects = {}
 local LowfiESP = {
@@ -190,7 +213,7 @@ local COLORES_RAREZA = {
     ["morada"]  = Color3.fromRGB(160, 32, 240),
     ["azul"]    = Color3.fromRGB(30, 144, 255),
     ["verde"]   = Color3.fromRGB(50, 205, 50),
-    ["gris"]    = Color3.fromRGB(180, 180, 180)
+    ["gris"]    = Color3.fromRGB(45, 45, 45) -- Gris oscuro de fondo base
 }
 
 local datosObjetos = {
@@ -222,25 +245,47 @@ local function CreateESP(P, User, Obj)
     local Head = Char:WaitForChild("Head", 5)
     if not Head then return end
     
+    -- INTERFAZ GUI REDONDEADA SOBRE LA CABEZA (Bypass Real)
     local bGui = Instance.new("BillboardGui")
-    bGui.Name = "WaterHub_InvESP"
+    bGui.Name = "WaterHub_InvVisual"
     bGui.AlwaysOnTop = true
-    bGui.Size = UDim2.new(0, 200, 0, 50)
-    bGui.StudsOffset = Vector3.new(0, 3.5, 0)
+    bGui.Size = UDim2.new(0, 110, 0, 24) -- Tamaño de tarjeta limpia
+    bGui.StudsOffset = Vector3.new(0, 4.2, 0)
     bGui.Enabled = false
     bGui.Parent = gethui() or Head
     if bGui.Parent ~= Head then bGui.Adornee = Head end
 
+    -- Fondo contenedor con redondeo
+    local bgFrame = Instance.new("Frame")
+    bgFrame.Size = UDim2.new(1, 0, 1, 0)
+    bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    bgFrame.BackgroundTransparency = 0.2
+    bgFrame.BorderSizePixel = 0
+    bgFrame.Parent = bGui
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 6) -- Redondeo suave
+    uiCorner.Parent = bgFrame
+
+    -- Línea de borde estético redondeado
+    local uiStroke = Instance.new("UIStroke")
+    uiStroke.Thickness = 1.5
+    uiStroke.Color = Color3.fromRGB(150, 150, 150)
+    uiStroke.Transparency = 0.3
+    uiStroke.Parent = bgFrame
+
+    -- Texto del Arma
     local iText = Instance.new("TextLabel")
     iText.Size = UDim2.new(1, 0, 1, 0)
     iText.BackgroundTransparency = 1
-    iText.TextSize = 13
-    iText.Font = Enum.Font.SourceSansBold
+    iText.TextSize = 11
+    iText.Font = Enum.Font.LucidaSans
     iText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    iText.TextStrokeTransparency = 0
-    iText.Text = "[Fists]"
-    iText.Parent = bGui
+    iText.TextStrokeTransparency = 0.8
+    iText.Text = "Fists"
+    iText.Parent = bgFrame
 
+    -- Dibujos nativos
     local Box = NewDrawing("Square", {Thickness = LowfiESP.Thickness, Color = LowfiESP.Color, Transparency = 1, Filled = false, Visible = false})
     local Name = NewDrawing("Text", {Text = User, Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 13, Font = 2})
     local Distance = NewDrawing("Text", {Text = "0m", Color = Color3.fromRGB(200, 200, 200), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 12, Font = 2})
@@ -278,16 +323,14 @@ local function CreateESP(P, User, Obj)
                 Distance.Visible = true
             else Distance.Visible = false end
 
-            -- Escáner de inventario para BlockSpin (Lee Tools nativas y Modelos 3D pegados al jugador)
+            -- Lógica del Escáner de Inventario de BlockSpin con Interfaz Adaptativa
             if LowfiESP.Inventory then
                 local objetoEquipado = nil
-                
-                -- Busca herramientas estándar
                 local tool = Char:FindFirstChildOfClass("Tool")
+                
                 if tool then 
                     objetoEquipado = tool.Name 
                 else
-                    -- Si no hay tool, escanea los objetos pegados al personaje por si el juego usa accesorios/modelos como armas
                     for nombreEnLista, _ in pairs(datosObjetos) do
                         if Char:FindFirstChild(nombreEnLista) then
                             objetoEquipado = nombreEnLista
@@ -297,11 +340,14 @@ local function CreateESP(P, User, Obj)
                 end
 
                 if objetoEquipado and datosObjetos[objetoEquipado] then
-                    iText.Text = "[" .. objetoEquipado .. "]"
-                    iText.TextColor3 = COLORES_RAREZA[datosObjetos[objetoEquipado].rareza] or COLORES_RAREZA["gris"]
+                    iText.Text = objetoEquipado
+                    local colorAsignado = COLORES_RAREZA[datosObjetos[objetoEquipado].rareza] or COLORES_RAREZA["gris"]
+                    bgFrame.BackgroundColor3 = colorAsignado
+                    uiStroke.Color = colorAsignado
                 else
-                    iText.Text = "[Ninguno]"
-                    iText.TextColor3 = COLORES_RAREZA["gris"]
+                    iText.Text = "Fists"
+                    bgFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                    uiStroke.Color = Color3.fromRGB(80, 80, 80)
                 end
                 bGui.Enabled = true
             else
@@ -372,7 +418,7 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ============================================
--- MOVIMIENTO
+-- LOOPS DE MOVIMIENTO
 -- ============================================
 local function WalkSpeedLoop()
     while Features.WalkSpeed do
@@ -423,7 +469,7 @@ local function InfiniteStaminaLoop()
 end
 
 -- ============================================
--- ANTI KILL
+-- ANTI KILL & GUN MODS
 -- ============================================
 local AntiKillConnection
 local function AntiKillFunction()
@@ -441,9 +487,6 @@ local function AntiKillFunction()
     end
 end
 
--- ============================================
--- GUN MODS
--- ============================================
 local function ApplyGunMods()
     if not Features.EnableGunMods then return end
     local char = LocalPlayer.Character
@@ -464,7 +507,7 @@ local function ApplyGunMods()
 end
 
 -- ============================================
--- SERVER HOP & FPS BOOST
+-- MISC FUNCTIONS
 -- ============================================
 local function ServerHop()
     local PlaceID = game.PlaceId
@@ -495,7 +538,7 @@ local function FPSBoost()
 end
 
 -- ============================================
--- UI (WINDUI)
+-- INTERFAZ DE USUARIO (WINDUI)
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
@@ -504,25 +547,20 @@ local Window = WindUI:CreateWindow({
     Theme = "Dark",
     ToggleKey = Enum.KeyCode.F,
     OpenButton = {
-        Title = "Open",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
+        Title = "Open", CornerRadius = UDim.new(1, 0), StrokeThickness = 2, Enabled = true, Draggable = true,
         Color = ColorSequence.new(Features.ThemeColor, Features.ThemeColor),
     },
 })
 
--- 1. COMBAT
+-- PESTAÑA 1: COMBAT
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
-CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de disparo silenciosa" })
+CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de apuntado avanzada" })
 
 CombatTab:Toggle({
     Title = "Silent Aim",
     Value = Features.SilentAim,
     Callback = function(v)
         Features.SilentAim = v
-        CombatSettings.SilentAim = v
         SaveConfig(true)
     end,
 })
@@ -532,7 +570,6 @@ CombatTab:Toggle({
     Value = Features.AimLock,
     Callback = function(v)
         Features.AimLock = v
-        CombatSettings.AimLock = v
         SaveConfig(true)
     end,
 })
@@ -543,12 +580,34 @@ CombatTab:Slider({
     Value = { Min = 0, Max = 0.5, Default = Features.Prediction },
     Callback = function(v)
         Features.Prediction = v
-        CombatSettings.Prediction = v
         SaveConfig(true)
     end,
 })
 
-CombatTab:Section({ Title = "Defensa", Desc = "Protección del jugador" })
+CombatTab:Section({ Title = "Configuración del FOV", Desc = "Círculo de rango fijo en el medio" })
+
+CombatTab:Toggle({
+    Title = "Mostrar Círculo FOV",
+    Value = Features.ShowFOV,
+    Callback = function(v)
+        Features.ShowFOV = v
+        UpdateFOV()
+        SaveConfig(true)
+    end,
+})
+
+CombatTab:Slider({
+    Title = "Tamaño de FOV",
+    Step = 5,
+    Value = { Min = 30, Max = 400, Default = Features.FOVSize },
+    Callback = function(v)
+        Features.FOVSize = v
+        UpdateFOV()
+        SaveConfig(true)
+    end,
+})
+
+CombatTab:Section({ Title = "Defensa" })
 
 CombatTab:Toggle({
     Title = "Anti Kill",
@@ -574,9 +633,9 @@ CombatTab:Slider({
     end,
 })
 
--- 2. ESP
+-- PESTAÑA 2: ESP
 local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
-ESPTab:Section({ Title = "Player ESP", Desc = "Indicadores visuales y de inventario" })
+ESPTab:Section({ Title = "Visuales", Desc = "Rastreadores en tiempo real" })
 
 ESPTab:Toggle({
     Title = "Cajas (Boxes)",
@@ -619,7 +678,7 @@ ESPTab:Toggle({
 })
 
 ESPTab:Toggle({
-    Title = "Inventario Equipado",
+    Title = "ESP Tarjeta Inventario Redondeada",
     Value = Features.ESPInventory,
     Callback = function(v)
         Features.ESPInventory = v
@@ -639,9 +698,9 @@ ESPTab:Slider({
     end,
 })
 
--- 3. MOVEMENT
+-- PESTAÑA 3: MOVEMENT
 local MoveTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
-MoveTab:Section({ Title = "Movimiento" })
+MoveTab:Section({ Title = "Velocidad" })
 
 MoveTab:Toggle({
     Title = "Walk Speed",
@@ -663,7 +722,7 @@ MoveTab:Slider({
     end,
 })
 
-MoveTab:Section({ Title = "Saltos y Stamina" })
+MoveTab:Section({ Title = "Saltos y Estamina" })
 
 MoveTab:Toggle({
     Title = "Super Jump",
@@ -695,9 +754,9 @@ MoveTab:Toggle({
     end,
 })
 
--- 4. WEAPON
+-- PESTAÑA 4: WEAPON
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
-WeaponTab:Section({ Title = "Modificadores de Armas" })
+WeaponTab:Section({ Title = "Gun Mods" })
 
 WeaponTab:Toggle({
     Title = "Activar Gun Mods",
@@ -710,7 +769,7 @@ WeaponTab:Toggle({
 })
 
 WeaponTab:Slider({
-    Title = "Cadencia (Fire Rate)",
+    Title = "Cadencia",
     Step = 50,
     Value = { Min = 50, Max = 2000, Default = Features.FireRate },
     Callback = function(v)
@@ -720,25 +779,10 @@ WeaponTab:Slider({
     end,
 })
 
-WeaponTab:Slider({
-    Title = "Retroceso (Recoil)",
-    Step = 0.1,
-    Value = { Min = 0, Max = 3, Default = Features.Recoil },
-    Callback = function(v)
-        Features.Recoil = v
-        ApplyGunMods()
-        SaveConfig(true)
-    end,
-})
-
--- 5. MISC
+-- PESTAÑA 5: MISC
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
-MiscTab:Button({
-    Title = "Cambiar de Servidor",
-    Callback = ServerHop
-})
-
+MiscTab:Button({ Title = "Cambiar de Servidor", Callback = ServerHop })
 MiscTab:Toggle({
     Title = "Optimizar FPS",
     Value = Features.FPSBoost,
@@ -748,15 +792,10 @@ MiscTab:Toggle({
         SaveConfig(true)
     end,
 })
-
 MiscTab:Button({
     Title = "Guardar Configuración Manual",
-    Callback = function()
-        SaveConfig(false) -- Aquí el 'false' hace que SÍ muestre la notificación
-    end
+    Callback = function() SaveConfig(false) end
 })
 
--- Seleccionar primera pestaña
 CombatTab:Select()
-
-print("Water Hub | BlockSpin - Cargado con éxito")
+print("Water Hub Master | BlockSpin - Cargado Correctamente")
