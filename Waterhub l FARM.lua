@@ -41,11 +41,12 @@ local Features = {
     Prediction = 0.165,
     AimLockKeybind = Enum.KeyCode.E,
     
-    -- ESP (NUEVO SISTEMA LOWFI)
+    -- ESP (SISTEMA INTEGRADO)
     ESPBoxes = false,
     ESPNames = false,
     ESPDistance = false,
     ESPChams = false,
+    ESPInventory = false, -- Nueva opción añadida
     ESPColor = Color3.fromRGB(0, 150, 255),
     ESPThickness = 1,
     
@@ -144,7 +145,7 @@ RunService:BindToRenderStep("AimLock", 0, function()
 end)
 
 -- ============================================
--- ESP SYSTEM (LOWFI STYLE)
+-- ESP SYSTEM + INVENTORY ESP (LOWFI STYLE)
 -- ============================================
 local ESPObjects = {}
 local LowfiESP = {
@@ -152,8 +153,38 @@ local LowfiESP = {
     Names = false,
     Distance = false,
     Cham = false,
+    Inventory = false, -- Nueva bandera interna
     Color = Color3.fromRGB(0, 150, 255),
     Thickness = 1
+}
+
+-- Datos de Configuración de tus armas e IDs
+local COLORES_RAREZA = {
+    ["rojo"]    = Color3.fromRGB(255, 30, 30),
+    ["naranja"] = Color3.fromRGB(255, 120, 0),
+    ["morada"]  = Color3.fromRGB(160, 32, 240),
+    ["azul"]    = Color3.fromRGB(30, 144, 255),
+    ["verde"]   = Color3.fromRGB(50, 205, 50),
+    ["gris"]    = Color3.fromRGB(180, 180, 180)
+}
+
+local datosObjetos = {
+    ["Ak 47"]         = {rareza = "naranja"}, ["Anaconda"]      = {rareza = "rojo"},
+    ["C9"]            = {rareza = "verde"},   ["Double barril"] = {rareza = "morada"},
+    ["Draco"]         = {rareza = "morada"},  ["Firework"]      = {rareza = "morada"},
+    ["G3"]            = {rareza = "verde"},   ["Glock"]         = {rareza = "azul"},
+    ["M16"]           = {rareza = "naranja"}, ["M241"]          = {rareza = "rojo"},
+    ["MP5"]           = {rareza = "naranja"}, ["P226"]          = {rareza = "azul"},
+    ["RPG"]           = {rareza = "naranja"}, ["Remington"]     = {rareza = "naranja"},
+    ["Sawnoff"]       = {rareza = "naranja"}, ["Skorpion"]      = {rareza = "morada"},
+    ["Uzi"]           = {rareza = "azul"},    ["Baseball Bat"]     = {rareza = "verde"},
+    ["Tactical Axe"]     = {rareza = "naranja"}, ["Tactical Knife"]   = {rareza = "naranja"},
+    ["Tactical Shovel"]  = {rareza = "naranja"}, ["Crowbar"]          = {rareza = "azul"},
+    ["Switchblade"]      = {rareza = "azul"},    ["Granada"]          = {rareza = "morada"},
+    ["Molotov"]          = {rareza = "morada"},  ["Mop"]              = {rareza = "gris"},
+    ["First Aid Kit"]    = {rareza = "morada"},  ["Energy Shot"]      = {rareza = "morada"},
+    ["Bandage"]          = {rareza = "gris"},    ["FishingRodRegular"]  = {rareza = "gris"},
+    ["FishingRodPro"]      = {rareza = "gris"},    ["FishingRodUltimate"] = {rareza = "gris"}
 }
 
 local CurrentCamera = Workspace.CurrentCamera
@@ -172,38 +203,25 @@ local function CreateESP(P, User, Obj)
     if not Obj then return end
     
     local Box = NewDrawing("Square", {
-        Thickness = LowfiESP.Thickness,
-        Color = LowfiESP.Color,
-        Transparency = 1,
-        Filled = false,
-        Visible = false
+        Thickness = LowfiESP.Thickness, Color = LowfiESP.Color, Transparency = 1, Filled = false, Visible = false
     })
 
     local Name = NewDrawing("Text", {
-        Text = User,
-        Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 1,
-        Outline = true,
-        Center = true,
-        Visible = false,
-        Size = 13,
-        Font = 2
+        Text = User, Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 13, Font = 2
     })
 
     local Distance = NewDrawing("Text", {
-        Text = "0m",
-        Color = Color3.fromRGB(200, 200, 200),
-        Transparency = 1,
-        Outline = true,
-        Center = true,
-        Visible = false,
-        Size = 12,
-        Font = 2
+        Text = "0m", Color = Color3.fromRGB(200, 200, 200), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 12, Font = 2
+    })
+
+    -- Nuevo Texto en Render para el Arma de los Rivales
+    local InventoryText = NewDrawing("Text", {
+        Text = "[Ninguno]", Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 11, Font = 2
     })
 
     local Connection
     Connection = RunService.RenderStepped:Connect(function()
-        if not Box or not Name or not Distance then 
+        if not Box or not Name or not Distance or not InventoryText then 
             Connection:Disconnect()
             return 
         end
@@ -215,9 +233,10 @@ local function CreateESP(P, User, Obj)
         local Humanoid = Char and Char:FindFirstChild("Humanoid")
         
         if RootVis and Humanoid and Humanoid.Health > 0 then
+            local Size = V2New(2000 / RootPos.Z, 3000 / RootPos.Z)
+            
             -- Box
             if LowfiESP.Boxes then
-                local Size = V2New(2000 / RootPos.Z, 3000 / RootPos.Z)
                 Box.Size = Size
                 Box.Position = V2New(RootPos.X - Size.X / 2, RootPos.Y - Size.Y / 2)
                 Box.Color = LowfiESP.Color
@@ -229,8 +248,7 @@ local function CreateESP(P, User, Obj)
 
             -- Name
             if LowfiESP.Names then
-                Name.Position = V2New(Box.Position.X + (Box.Size.X / 2), Box.Position.Y - 20)
-                Name.Color = Color3.fromRGB(255, 255, 255)
+                Name.Position = V2New(RootPos.X, RootPos.Y - (Size.Y / 2) - 20)
                 Name.Visible = true
             else
                 Name.Visible = false
@@ -239,11 +257,34 @@ local function CreateESP(P, User, Obj)
             -- Distance
             if LowfiESP.Distance then
                 Distance.Text = tostring(math.floor(GetDistance)) .. "m"
-                Distance.Position = V2New(Box.Position.X + (Box.Size.X / 2), Box.Position.Y + Box.Size.Y + 5)
-                Distance.Color = Color3.fromRGB(200, 200, 200)
+                Distance.Position = V2New(RootPos.X, RootPos.Y + (Size.Y / 2) + 5)
                 Distance.Visible = true
             else
                 Distance.Visible = false
+            end
+
+            -- Lógica del ESP Inventory (Muestra herramienta equipada en texto coloreado)
+            if LowfiESP.Inventory and Char then
+                local HerramientaEquipada = Char:FindFirstChildOfClass("Tool")
+                if HerramientaEquipada then
+                    InventoryText.Text = "[" .. HerramientaEquipada.Name .. "]"
+                    local datos = datosObjetos[HerramientaEquipada.Name]
+                    if datos then
+                        InventoryText.Color = COLORES_RAREZA[datos.rareza] or COLORES_RAREZA["gris"]
+                    else
+                        InventoryText.Color = COLORES_RAREZA["gris"]
+                    end
+                else
+                    InventoryText.Text = "[Fists]"
+                    InventoryText.Color = COLORES_RAREZA["gris"]
+                end
+                
+                -- Lo posicionamos justo debajo del nombre, o abajo del todo si la distancia está activa
+                local offsetAbajo = LowfiESP.Distance and 20 or 5
+                InventoryText.Position = V2New(RootPos.X, RootPos.Y + (Size.Y / 2) + offsetAbajo)
+                InventoryText.Visible = true
+            else
+                InventoryText.Visible = false
             end
             
             -- Chams (Highlight)
@@ -264,6 +305,7 @@ local function CreateESP(P, User, Obj)
             Box.Visible = false
             Name.Visible = false
             Distance.Visible = false
+            InventoryText.Visible = false
         end
     end)
 
@@ -273,6 +315,7 @@ local function CreateESP(P, User, Obj)
         Box:Remove()
         Name:Remove()
         Distance:Remove()
+        InventoryText:Remove()
         if P.Character then
             for _, part in ipairs(P.Character:GetDescendants()) do
                 if part:FindFirstChild("ESP_Highlight") then
@@ -467,6 +510,7 @@ local function SaveConfig()
         ESPNames = Features.ESPNames,
         ESPDistance = Features.ESPDistance,
         ESPChams = Features.ESPChams,
+        ESPInventory = Features.ESPInventory, -- Añadido al JSON de guardado
         WalkSpeed = Features.WalkSpeed,
         SpeedValue = Features.SpeedValue,
         SuperJump = Features.SuperJump,
@@ -565,7 +609,7 @@ CombatTab:Slider({
     end,
 })
 
--- 2. ESP (NUEVO SISTEMA)
+-- 2. ESP (SISTEMA DE RENDERIZADO MEJORADO)
 local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
 
 ESPTab:Section({ Title = "Player ESP", Desc = "Visual indicators" })
@@ -606,6 +650,17 @@ ESPTab:Toggle({
     Callback = function(v)
         Features.ESPChams = v
         LowfiESP.Cham = v
+        SaveConfig()
+    end,
+})
+
+-- NUEVO TOGGLE DE ESP INVENTORY INTEGRADO
+ESPTab:Toggle({
+    Title = "ESP Inventory",
+    Value = Features.ESPInventory,
+    Callback = function(v)
+        Features.ESPInventory = v
+        LowfiESP.Inventory = v
         SaveConfig()
     end,
 })
@@ -742,4 +797,4 @@ MiscTab:Button({
 CombatTab:Select()
 
 print("Water Hub | BlockSpin - Loaded Successfully")
-print("Silent Aim + ESP System Ready")
+print("Silent Aim + ESP System Ready with Inventory Tracker")
