@@ -30,23 +30,23 @@ if not WindUI then
 end
 
 -- ============================================
--- CONFIGURACIÓN
+-- CONFIGURACIÓN PRINCIPAL
 -- ============================================
-local ConfigFile = "WaterHub_BlockSpin_v3.json"
+local ConfigFile = "WaterHub_BlockSpin_v4.json"
 
 local Features = {
-    -- SILENT AIM (NUEVO SISTEMA)
+    -- SILENT AIM
     SilentAim = false,
     AimLock = false,
     Prediction = 0.165,
     AimLockKeybind = Enum.KeyCode.E,
     
-    -- ESP (SISTEMA INTEGRADO)
+    -- ESP
     ESPBoxes = false,
     ESPNames = false,
     ESPDistance = false,
     ESPChams = false,
-    ESPInventory = false, -- Nueva opción añadida
+    ESPInventory = false,
     ESPColor = Color3.fromRGB(0, 150, 255),
     ESPThickness = 1,
     
@@ -70,7 +70,6 @@ local Features = {
     ThemeColor = Color3.fromHex("#0096FF")
 }
 
--- Cargar config
 local function LoadConfig()
     if isfile(ConfigFile) then
         local success, data = pcall(function()
@@ -88,28 +87,57 @@ end
 LoadConfig()
 
 -- ============================================
--- NOTIFICACIONES
+-- NOTIFICACIONES Y GUARDADO
 -- ============================================
 local function Notify(title, message)
     pcall(function()
-        WindUI:Notify({Title = title, Content = message, Duration = 3})
+        WindUI:Notify({Title = title, Content = message, Duration = 2.5})
+    end)
+end
+
+-- Añadido parámetro "silent" para que no salten notificaciones como locas con los sliders
+local function SaveConfig(silent)
+    local dataToSave = {
+        SilentAim = Features.SilentAim,
+        AimLock = Features.AimLock,
+        Prediction = Features.Prediction,
+        ESPBoxes = Features.ESPBoxes,
+        ESPNames = Features.ESPNames,
+        ESPDistance = Features.ESPDistance,
+        ESPChams = Features.ESPChams,
+        ESPInventory = Features.ESPInventory,
+        WalkSpeed = Features.WalkSpeed,
+        SpeedValue = Features.SpeedValue,
+        SuperJump = Features.SuperJump,
+        JumpPower = Features.JumpPower,
+        InfiniteStamina = Features.InfiniteStamina,
+        AntiKill = Features.AntiKill,
+        EnableGunMods = Features.EnableGunMods,
+        FireRate = Features.FireRate,
+        Recoil = Features.Recoil,
+        ThemeColor = Features.ThemeColor
+    }
+    pcall(function()
+        writefile(ConfigFile, HttpService:JSONEncode(dataToSave))
+        if not silent then
+            Notify("Configuración", "Guardada correctamente.")
+        end
     end)
 end
 
 -- ============================================
--- SILENT AIM + AIMLOCK (SISTEMA DA HOOD)
+-- SILENT AIM + AIMLOCK (BLOCKSPIN SYSTEM)
 -- ============================================
 local Aiming = loadstring(game:HttpGet("https://raw.githubusercontent.com/RapperDeluxe/scripts/main/silent%20aim%20module"))()
 Aiming.TeamCheck(false)
 
-local DaHoodSettings = {
-    SilentAim = false,
-    AimLock = false,
-    Prediction = 0.165,
-    AimLockKeybind = Enum.KeyCode.E
+local CombatSettings = {
+    SilentAim = Features.SilentAim,
+    AimLock = Features.AimLock,
+    Prediction = Features.Prediction,
+    AimLockKeybind = Features.AimLockKeybind
 }
 
--- Overwrite para verificar estado del jugador
 function Aiming.Check()
     if not (Aiming.Enabled == true and Aiming.Selected ~= LocalPlayer and Aiming.SelectedPart ~= nil) then
         return false
@@ -124,41 +152,38 @@ function Aiming.Check()
     return true
 end
 
--- Hook del Silent Aim
 local __index
 __index = hookmetamethod(game, "__index", function(t, k)
-    if (t:IsA("Mouse") and (k == "Hit" or k == "Target") and Aiming.Check() and DaHoodSettings.SilentAim) then
+    if (t:IsA("Mouse") and (k == "Hit" or k == "Target") and Aiming.Check() and CombatSettings.SilentAim) then
         local SelectedPart = Aiming.SelectedPart
-        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * DaHoodSettings.Prediction)
+        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * CombatSettings.Prediction)
         return (k == "Hit" and Hit or SelectedPart)
     end
     return __index(t, k)
 end)
 
--- AimLock loop
 RunService:BindToRenderStep("AimLock", 0, function()
-    if (DaHoodSettings.AimLock and Aiming.Check() and UserInputService:IsKeyDown(DaHoodSettings.AimLockKeybind)) then
+    if (CombatSettings.AimLock and Aiming.Check() and UserInputService:IsKeyDown(CombatSettings.AimLockKeybind)) then
         local SelectedPart = Aiming.SelectedPart
-        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * DaHoodSettings.Prediction)
+        local Hit = SelectedPart.CFrame + (SelectedPart.Velocity * CombatSettings.Prediction)
         Workspace.CurrentCamera.CFrame = CFrame.lookAt(Workspace.CurrentCamera.CFrame.Position, Hit.Position)
     end
 end)
 
 -- ============================================
--- ESP SYSTEM + INVENTORY ESP (LOWFI STYLE)
+-- ESP SYSTEM + BLOCKSPIN INVENTORY SCANNER
 -- ============================================
 local ESPObjects = {}
 local LowfiESP = {
-    Boxes = false,
-    Names = false,
-    Distance = false,
-    Cham = false,
-    Inventory = false, -- Nueva bandera interna
-    Color = Color3.fromRGB(0, 150, 255),
-    Thickness = 1
+    Boxes = Features.ESPBoxes,
+    Names = Features.ESPNames,
+    Distance = Features.ESPDistance,
+    Cham = Features.ESPChams,
+    Inventory = Features.ESPInventory,
+    Color = Features.ESPColor,
+    Thickness = Features.ESPThickness
 }
 
--- Datos de Configuración de tus armas e IDs
 local COLORES_RAREZA = {
     ["rojo"]    = Color3.fromRGB(255, 30, 30),
     ["naranja"] = Color3.fromRGB(255, 120, 0),
@@ -169,126 +194,121 @@ local COLORES_RAREZA = {
 }
 
 local datosObjetos = {
-    ["Ak 47"]         = {rareza = "naranja"}, ["Anaconda"]      = {rareza = "rojo"},
-    ["C9"]            = {rareza = "verde"},   ["Double barril"] = {rareza = "morada"},
-    ["Draco"]         = {rareza = "morada"},  ["Firework"]      = {rareza = "morada"},
-    ["G3"]            = {rareza = "verde"},   ["Glock"]         = {rareza = "azul"},
-    ["M16"]           = {rareza = "naranja"}, ["M241"]          = {rareza = "rojo"},
-    ["MP5"]           = {rareza = "naranja"}, ["P226"]          = {rareza = "azul"},
-    ["RPG"]           = {rareza = "naranja"}, ["Remington"]     = {rareza = "naranja"},
-    ["Sawnoff"]       = {rareza = "naranja"}, ["Skorpion"]      = {rareza = "morada"},
-    ["Uzi"]           = {rareza = "azul"},    ["Baseball Bat"]     = {rareza = "verde"},
-    ["Tactical Axe"]     = {rareza = "naranja"}, ["Tactical Knife"]   = {rareza = "naranja"},
-    ["Tactical Shovel"]  = {rareza = "naranja"}, ["Crowbar"]          = {rareza = "azul"},
-    ["Switchblade"]      = {rareza = "azul"},    ["Granada"]          = {rareza = "morada"},
-    ["Molotov"]          = {rareza = "morada"},  ["Mop"]              = {rareza = "gris"},
-    ["First Aid Kit"]    = {rareza = "morada"},  ["Energy Shot"]      = {rareza = "morada"},
-    ["Bandage"]          = {rareza = "gris"},    ["FishingRodRegular"]  = {rareza = "gris"},
-    ["FishingRodPro"]      = {rareza = "gris"},    ["FishingRodUltimate"] = {rareza = "gris"}
+    ["Ak 47"] = {rareza = "naranja"}, ["Anaconda"] = {rareza = "rojo"}, ["C9"] = {rareza = "verde"},
+    ["Double barril"] = {rareza = "morada"}, ["Draco"] = {rareza = "morada"}, ["Firework"] = {rareza = "morada"},
+    ["G3"] = {rareza = "verde"}, ["Glock"] = {rareza = "azul"}, ["M16"] = {rareza = "naranja"},
+    ["M241"] = {rareza = "rojo"}, ["MP5"] = {rareza = "naranja"}, ["P226"] = {rareza = "azul"},
+    ["RPG"] = {rareza = "naranja"}, ["Remington"] = {rareza = "naranja"}, ["Sawnoff"] = {rareza = "naranja"},
+    ["Skorpion"] = {rareza = "morada"}, ["Uzi"] = {rareza = "azul"}, ["Baseball Bat"] = {rareza = "verde"},
+    ["Tactical Axe"] = {rareza = "naranja"}, ["Tactical Knife"] = {rareza = "naranja"}, ["Tactical Shovel"] = {rareza = "naranja"},
+    ["Crowbar"] = {rareza = "azul"}, ["Switchblade"] = {rareza = "azul"}, ["Granada"] = {rareza = "morada"},
+    ["Molotov"] = {rareza = "morada"}, ["Mop"] = {rareza = "gris"}, ["First Aid Kit"] = {rareza = "morada"},
+    ["Energy Shot"] = {rareza = "morada"}, ["Bandage"] = {rareza = "gris"}, ["FishingRodRegular"] = {rareza = "gris"},
+    ["FishingRodPro"] = {rareza = "gris"}, ["FishingRodUltimate"] = {rareza = "gris"}
 }
 
 local CurrentCamera = Workspace.CurrentCamera
 local V2New = Vector2.new
-local V3New = Vector3.new
 
 local function NewDrawing(Object, Props)
     local New = Drawing.new(Object)
-    for i, v in pairs(Props or {}) do
-        New[i] = v
-    end
+    for i, v in pairs(Props or {}) do New[i] = v end
     return New
 end
 
 local function CreateESP(P, User, Obj)
-    if not Obj then return end
+    if not Obj or not Obj.Parent then return end
+    local Char = Obj.Parent
+    local Head = Char:WaitForChild("Head", 5)
+    if not Head then return end
     
-    local Box = NewDrawing("Square", {
-        Thickness = LowfiESP.Thickness, Color = LowfiESP.Color, Transparency = 1, Filled = false, Visible = false
-    })
+    local bGui = Instance.new("BillboardGui")
+    bGui.Name = "WaterHub_InvESP"
+    bGui.AlwaysOnTop = true
+    bGui.Size = UDim2.new(0, 200, 0, 50)
+    bGui.StudsOffset = Vector3.new(0, 3.5, 0)
+    bGui.Enabled = false
+    bGui.Parent = gethui() or Head
+    if bGui.Parent ~= Head then bGui.Adornee = Head end
 
-    local Name = NewDrawing("Text", {
-        Text = User, Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 13, Font = 2
-    })
+    local iText = Instance.new("TextLabel")
+    iText.Size = UDim2.new(1, 0, 1, 0)
+    iText.BackgroundTransparency = 1
+    iText.TextSize = 13
+    iText.Font = Enum.Font.SourceSansBold
+    iText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    iText.TextStrokeTransparency = 0
+    iText.Text = "[Fists]"
+    iText.Parent = bGui
 
-    local Distance = NewDrawing("Text", {
-        Text = "0m", Color = Color3.fromRGB(200, 200, 200), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 12, Font = 2
-    })
-
-    -- Nuevo Texto en Render para el Arma de los Rivales
-    local InventoryText = NewDrawing("Text", {
-        Text = "[Ninguno]", Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 11, Font = 2
-    })
+    local Box = NewDrawing("Square", {Thickness = LowfiESP.Thickness, Color = LowfiESP.Color, Transparency = 1, Filled = false, Visible = false})
+    local Name = NewDrawing("Text", {Text = User, Color = Color3.fromRGB(255, 255, 255), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 13, Font = 2})
+    local Distance = NewDrawing("Text", {Text = "0m", Color = Color3.fromRGB(200, 200, 200), Transparency = 1, Outline = true, Center = true, Visible = false, Size = 12, Font = 2})
 
     local Connection
     Connection = RunService.RenderStepped:Connect(function()
-        if not Box or not Name or not Distance or not InventoryText then 
+        if not Box or not bGui:IsDescendantOf(game) then 
             Connection:Disconnect()
             return 
         end
         
         local RootPos, RootVis = CurrentCamera:WorldToViewportPoint(Obj.Position)
         local GetDistance = (CurrentCamera.CFrame.p - Obj.Position).Magnitude
-        
-        local Char = P.Character
-        local Humanoid = Char and Char:FindFirstChild("Humanoid")
+        local Humanoid = Char:FindFirstChild("Humanoid")
         
         if RootVis and Humanoid and Humanoid.Health > 0 then
             local Size = V2New(2000 / RootPos.Z, 3000 / RootPos.Z)
             
-            -- Box
             if LowfiESP.Boxes then
                 Box.Size = Size
                 Box.Position = V2New(RootPos.X - Size.X / 2, RootPos.Y - Size.Y / 2)
                 Box.Color = LowfiESP.Color
                 Box.Thickness = LowfiESP.Thickness
                 Box.Visible = true
-            else
-                Box.Visible = false
-            end
+            else Box.Visible = false end
 
-            -- Name
             if LowfiESP.Names then
                 Name.Position = V2New(RootPos.X, RootPos.Y - (Size.Y / 2) - 20)
                 Name.Visible = true
-            else
-                Name.Visible = false
-            end
+            else Name.Visible = false end
 
-            -- Distance
             if LowfiESP.Distance then
                 Distance.Text = tostring(math.floor(GetDistance)) .. "m"
                 Distance.Position = V2New(RootPos.X, RootPos.Y + (Size.Y / 2) + 5)
                 Distance.Visible = true
-            else
-                Distance.Visible = false
-            end
+            else Distance.Visible = false end
 
-            -- Lógica del ESP Inventory (Muestra herramienta equipada en texto coloreado)
-            if LowfiESP.Inventory and Char then
-                local HerramientaEquipada = Char:FindFirstChildOfClass("Tool")
-                if HerramientaEquipada then
-                    InventoryText.Text = "[" .. HerramientaEquipada.Name .. "]"
-                    local datos = datosObjetos[HerramientaEquipada.Name]
-                    if datos then
-                        InventoryText.Color = COLORES_RAREZA[datos.rareza] or COLORES_RAREZA["gris"]
-                    else
-                        InventoryText.Color = COLORES_RAREZA["gris"]
-                    end
-                else
-                    InventoryText.Text = "[Fists]"
-                    InventoryText.Color = COLORES_RAREZA["gris"]
-                end
+            -- Escáner de inventario para BlockSpin (Lee Tools nativas y Modelos 3D pegados al jugador)
+            if LowfiESP.Inventory then
+                local objetoEquipado = nil
                 
-                -- Lo posicionamos justo debajo del nombre, o abajo del todo si la distancia está activa
-                local offsetAbajo = LowfiESP.Distance and 20 or 5
-                InventoryText.Position = V2New(RootPos.X, RootPos.Y + (Size.Y / 2) + offsetAbajo)
-                InventoryText.Visible = true
+                -- Busca herramientas estándar
+                local tool = Char:FindFirstChildOfClass("Tool")
+                if tool then 
+                    objetoEquipado = tool.Name 
+                else
+                    -- Si no hay tool, escanea los objetos pegados al personaje por si el juego usa accesorios/modelos como armas
+                    for nombreEnLista, _ in pairs(datosObjetos) do
+                        if Char:FindFirstChild(nombreEnLista) then
+                            objetoEquipado = nombreEnLista
+                            break
+                        end
+                    end
+                end
+
+                if objetoEquipado and datosObjetos[objetoEquipado] then
+                    iText.Text = "[" .. objetoEquipado .. "]"
+                    iText.TextColor3 = COLORES_RAREZA[datosObjetos[objetoEquipado].rareza] or COLORES_RAREZA["gris"]
+                else
+                    iText.Text = "[Ninguno]"
+                    iText.TextColor3 = COLORES_RAREZA["gris"]
+                end
+                bGui.Enabled = true
             else
-                InventoryText.Visible = false
+                bGui.Enabled = false
             end
             
-            -- Chams (Highlight)
-            if LowfiESP.Cham and Char then
+            if LowfiESP.Cham then
                 for _, part in ipairs(Char:GetDescendants()) do
                     if part:IsA("BasePart") and not part:FindFirstChild("ESP_Highlight") then
                         local highlight = Instance.new("Highlight")
@@ -296,39 +316,25 @@ local function CreateESP(P, User, Obj)
                         highlight.FillColor = LowfiESP.Color
                         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                         highlight.FillTransparency = 0.5
-                        highlight.OutlineTransparency = 0
                         highlight.Parent = part
                     end
                 end
             end
         else
-            Box.Visible = false
-            Name.Visible = false
-            Distance.Visible = false
-            InventoryText.Visible = false
+            Box.Visible = false; Name.Visible = false; Distance.Visible = false; bGui.Enabled = false
         end
     end)
 
-    -- Cleanup
     local function Cleanup()
         Connection:Disconnect()
-        Box:Remove()
-        Name:Remove()
-        Distance:Remove()
-        InventoryText:Remove()
-        if P.Character then
-            for _, part in ipairs(P.Character:GetDescendants()) do
-                if part:FindFirstChild("ESP_Highlight") then
-                    part.ESP_Highlight:Destroy()
-                end
-            end
+        Box:Remove(); Name:Remove(); Distance:Remove()
+        bGui:Destroy()
+        for _, part in ipairs(Char:GetDescendants()) do
+            if part:FindFirstChild("ESP_Highlight") then part.ESP_Highlight:Destroy() end
         end
     end
     
-    Obj.AncestryChanged:Connect(function(_, Parent)
-        if Parent == nil then Cleanup() end
-    end)
-    
+    Obj.AncestryChanged:Connect(function(_, Parent) if Parent == nil then Cleanup() end end)
     table.insert(ESPObjects, {Player = P, Cleanup = Cleanup})
 end
 
@@ -344,24 +350,17 @@ local function OnCharacterAdded(Char)
                 CreateESP(Plr, Plr.Name, Child)
             end
         end)
-    else
-        CreateESP(Plr, Plr.Name, Char.HumanoidRootPart)
-    end
+    else CreateESP(Plr, Plr.Name, Char.HumanoidRootPart) end
 end
 
 local function OnPlayerAdded(P)
     if P == LocalPlayer then return end
     P.CharacterAdded:Connect(OnCharacterAdded)
-    if P.Character then
-        task.spawn(OnCharacterAdded, P.Character)
-    end
+    if P.Character then task.spawn(OnCharacterAdded, P.Character) end
 end
 
 Players.PlayerAdded:Connect(OnPlayerAdded)
-for _, p in ipairs(Players:GetPlayers()) do
-    OnPlayerAdded(p)
-end
-
+for _, p in ipairs(Players:GetPlayers()) do OnPlayerAdded(p) end
 Players.PlayerRemoving:Connect(function(p)
     for i, obj in ipairs(ESPObjects) do
         if obj.Player == p then
@@ -465,7 +464,7 @@ local function ApplyGunMods()
 end
 
 -- ============================================
--- SERVER HOP
+-- SERVER HOP & FPS BOOST
 -- ============================================
 local function ServerHop()
     local PlaceID = game.PlaceId
@@ -482,12 +481,9 @@ local function ServerHop()
             end
         end
     end
-    Notify("Error", "No servers found")
+    Notify("Error", "No se encontraron servidores")
 end
 
--- ============================================
--- FPS BOOST
--- ============================================
 local function FPSBoost()
     Lighting.GlobalShadows = false
     Lighting.Technology = Enum.Technology.Compatibility
@@ -496,36 +492,6 @@ local function FPSBoost()
             obj.Enabled = false
         end
     end
-end
-
--- ============================================
--- GUARDAR CONFIG
--- ============================================
-local function SaveConfig()
-    local dataToSave = {
-        SilentAim = Features.SilentAim,
-        AimLock = Features.AimLock,
-        Prediction = Features.Prediction,
-        ESPBoxes = Features.ESPBoxes,
-        ESPNames = Features.ESPNames,
-        ESPDistance = Features.ESPDistance,
-        ESPChams = Features.ESPChams,
-        ESPInventory = Features.ESPInventory, -- Añadido al JSON de guardado
-        WalkSpeed = Features.WalkSpeed,
-        SpeedValue = Features.SpeedValue,
-        SuperJump = Features.SuperJump,
-        JumpPower = Features.JumpPower,
-        InfiniteStamina = Features.InfiniteStamina,
-        AntiKill = Features.AntiKill,
-        EnableGunMods = Features.EnableGunMods,
-        FireRate = Features.FireRate,
-        Recoil = Features.Recoil,
-        ThemeColor = Features.ThemeColor
-    }
-    pcall(function()
-        writefile(ConfigFile, HttpService:JSONEncode(dataToSave))
-        Notify("Config", "Saved!")
-    end)
 end
 
 -- ============================================
@@ -547,18 +513,17 @@ local Window = WindUI:CreateWindow({
     },
 })
 
--- 1. COMBAT (SILENT AIM + AIMLOCK)
+-- 1. COMBAT
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
-
-CombatTab:Section({ Title = "Silent Aim", Desc = "Prediction based targeting" })
+CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de disparo silenciosa" })
 
 CombatTab:Toggle({
     Title = "Silent Aim",
     Value = Features.SilentAim,
     Callback = function(v)
         Features.SilentAim = v
-        DaHoodSettings.SilentAim = v
-        SaveConfig()
+        CombatSettings.SilentAim = v
+        SaveConfig(true)
     end,
 })
 
@@ -567,8 +532,8 @@ CombatTab:Toggle({
     Value = Features.AimLock,
     Callback = function(v)
         Features.AimLock = v
-        DaHoodSettings.AimLock = v
-        SaveConfig()
+        CombatSettings.AimLock = v
+        SaveConfig(true)
     end,
 })
 
@@ -578,12 +543,12 @@ CombatTab:Slider({
     Value = { Min = 0, Max = 0.5, Default = Features.Prediction },
     Callback = function(v)
         Features.Prediction = v
-        DaHoodSettings.Prediction = v
-        SaveConfig()
+        CombatSettings.Prediction = v
+        SaveConfig(true)
     end,
 })
 
-CombatTab:Section({ Title = "Defense", Desc = "Auto protection" })
+CombatTab:Section({ Title = "Defensa", Desc = "Protección del jugador" })
 
 CombatTab:Toggle({
     Title = "Anti Kill",
@@ -595,7 +560,7 @@ CombatTab:Toggle({
         elseif AntiKillConnection then
             AntiKillConnection:Disconnect()
         end
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
@@ -605,81 +570,78 @@ CombatTab:Slider({
     Value = { Min = 5, Max = 50, Default = Features.AntiKillHealth },
     Callback = function(v)
         Features.AntiKillHealth = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
--- 2. ESP (SISTEMA DE RENDERIZADO MEJORADO)
+-- 2. ESP
 local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
-
-ESPTab:Section({ Title = "Player ESP", Desc = "Visual indicators" })
+ESPTab:Section({ Title = "Player ESP", Desc = "Indicadores visuales y de inventario" })
 
 ESPTab:Toggle({
-    Title = "Boxes",
+    Title = "Cajas (Boxes)",
     Value = Features.ESPBoxes,
     Callback = function(v)
         Features.ESPBoxes = v
         LowfiESP.Boxes = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 ESPTab:Toggle({
-    Title = "Names",
+    Title = "Nombres",
     Value = Features.ESPNames,
     Callback = function(v)
         Features.ESPNames = v
         LowfiESP.Names = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 ESPTab:Toggle({
-    Title = "Distance",
+    Title = "Distancia",
     Value = Features.ESPDistance,
     Callback = function(v)
         Features.ESPDistance = v
         LowfiESP.Distance = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 ESPTab:Toggle({
-    Title = "Chams (Highlight)",
+    Title = "Resaltado (Chams)",
     Value = Features.ESPChams,
     Callback = function(v)
         Features.ESPChams = v
         LowfiESP.Cham = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
--- NUEVO TOGGLE DE ESP INVENTORY INTEGRADO
 ESPTab:Toggle({
-    Title = "ESP Inventory",
+    Title = "Inventario Equipado",
     Value = Features.ESPInventory,
     Callback = function(v)
         Features.ESPInventory = v
         LowfiESP.Inventory = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 ESPTab:Slider({
-    Title = "ESP Thickness",
+    Title = "Grosor del ESP",
     Step = 0.5,
     Value = { Min = 0.5, Max = 3, Default = Features.ESPThickness },
     Callback = function(v)
         Features.ESPThickness = v
         LowfiESP.Thickness = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 -- 3. MOVEMENT
 local MoveTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
-
-MoveTab:Section({ Title = "Speed" })
+MoveTab:Section({ Title = "Movimiento" })
 
 MoveTab:Toggle({
     Title = "Walk Speed",
@@ -687,21 +649,21 @@ MoveTab:Toggle({
     Callback = function(v)
         Features.WalkSpeed = v
         if v then task.spawn(WalkSpeedLoop) end
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 MoveTab:Slider({
-    Title = "Speed Value",
+    Title = "Velocidad",
     Step = 5,
     Value = { Min = 16, Max = 200, Default = Features.SpeedValue },
     Callback = function(v)
         Features.SpeedValue = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
-MoveTab:Section({ Title = "Jump" })
+MoveTab:Section({ Title = "Saltos y Stamina" })
 
 MoveTab:Toggle({
     Title = "Super Jump",
@@ -709,64 +671,63 @@ MoveTab:Toggle({
     Callback = function(v)
         Features.SuperJump = v
         if v then task.spawn(SuperJumpLoop) end
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 MoveTab:Slider({
-    Title = "Jump Power",
+    Title = "Fuerza de Salto",
     Step = 10,
     Value = { Min = 50, Max = 200, Default = Features.JumpPower },
     Callback = function(v)
         Features.JumpPower = v
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 MoveTab:Toggle({
-    Title = "Infinite Stamina",
+    Title = "Estamina Infinita",
     Value = Features.InfiniteStamina,
     Callback = function(v)
         Features.InfiniteStamina = v
         if v then task.spawn(InfiniteStaminaLoop) end
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 -- 4. WEAPON
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
-
-WeaponTab:Section({ Title = "Gun Mods" })
+WeaponTab:Section({ Title = "Modificadores de Armas" })
 
 WeaponTab:Toggle({
-    Title = "Enable Gun Mods",
+    Title = "Activar Gun Mods",
     Value = Features.EnableGunMods,
     Callback = function(v)
         Features.EnableGunMods = v
         ApplyGunMods()
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 WeaponTab:Slider({
-    Title = "Fire Rate",
+    Title = "Cadencia (Fire Rate)",
     Step = 50,
     Value = { Min = 50, Max = 2000, Default = Features.FireRate },
     Callback = function(v)
         Features.FireRate = v
         ApplyGunMods()
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 WeaponTab:Slider({
-    Title = "Recoil",
+    Title = "Retroceso (Recoil)",
     Step = 0.1,
     Value = { Min = 0, Max = 3, Default = Features.Recoil },
     Callback = function(v)
         Features.Recoil = v
         ApplyGunMods()
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
@@ -774,27 +735,28 @@ WeaponTab:Slider({
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
 MiscTab:Button({
-    Title = "Server Hop",
+    Title = "Cambiar de Servidor",
     Callback = ServerHop
 })
 
 MiscTab:Toggle({
-    Title = "FPS Boost",
+    Title = "Optimizar FPS",
     Value = Features.FPSBoost,
     Callback = function(v)
         Features.FPSBoost = v
         if v then FPSBoost() end
-        SaveConfig()
+        SaveConfig(true)
     end,
 })
 
 MiscTab:Button({
-    Title = "Save Config",
-    Callback = SaveConfig
+    Title = "Guardar Configuración Manual",
+    Callback = function()
+        SaveConfig(false) -- Aquí el 'false' hace que SÍ muestre la notificación
+    end
 })
 
 -- Seleccionar primera pestaña
 CombatTab:Select()
 
-print("Water Hub | BlockSpin - Loaded Successfully")
-print("Silent Aim + ESP System Ready with Inventory Tracker")
+print("Water Hub | BlockSpin - Cargado con éxito")
