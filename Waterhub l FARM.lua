@@ -1,109 +1,95 @@
 -- ============================================
--- CARGAR WINDUI
+-- WATER HUB | MM2 - By: AdamABJ
 -- ============================================
-local success, WindUI = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
 
-if not success or not WindUI then
-    warn("Error cargando WindUI. Revisa la URL o tu conexión.")
-    return
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+if not WindUI then 
+    warn("Error cargando WindUI") 
+    return 
 end
 
--- ============================================
--- CREAR VENTANA PRINCIPAL
--- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | MM2",
     Author = "By: AdamABJ",
-    Icon = "rbxassetid://120258375748753",
+    Icon = "rbxassetid://10734950309",
     Theme = "Dark",
     Transparent = true,
     ToggleKey = Enum.KeyCode.RightShift,
-    Position = "Center",
-    Size = UDim2.new(0, 550, 0, 400),
-    Draggable = true,
-    Resizable = false
 })
 
--- ============================================
--- VARIABLES
--- ============================================
-local player = game:GetService("Players").LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local UIS = game:GetService("UserInputService")
+-- Variables
 local Players = game:GetService("Players")
-local cam = game:GetService("Workspace").Camera
-local Mouse = player:GetMouse()
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
--- Variables de vuelo
-local flying = false
-local speedfly = 1
-local CONTROL = {F = 0, B = 0, L = 0, R = 0}
-local lCONTROL = {F = 0, B = 0, L = 0, R = 0}
-local SPEED = 0
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
 
--- Actualizar character al morir
-player.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
+LocalPlayer.CharacterAdded:Connect(function(new)
+    character = new
+    humanoid = new:WaitForChild("Humanoid")
+    root = new:WaitForChild("HumanoidRootPart")
 end)
 
 -- ============================================
--- PESTAÑAS Y SECCIONES
+-- TABS
 -- ============================================
-local function crearSeccionMovimiento(Window)
-    local MovementTab = Window:NewTab("Movement")
-    local SpeedSection = MovementTab:NewSection("Speed")
+local Movement = Window:Tab({Title = "Movement"})
+local Render = Window:Tab({Title = "Render"})
+local Teleport = Window:Tab({Title = "Teleport"})
+local Murderer = Window:Tab({Title = "Murderer"})
 
-    SpeedSection:NewSlider({
-        Name = "Walk Speed",
-        Min = 0,
-        Max = 500,
-        Default = 16,
-        Step = 2,
-        Callback = function(Value)
-            if character and character:FindFirstChild("Humanoid") then
-                character.Humanoid.WalkSpeed = Value
-            end
-        end
-    })
-    -- Otros elementos se pueden añadir siguiendo la lógica del script.
-end
+-- MOVEMENT
+Movement:Section({Title = "Movement"})
 
-local function crearSeccionRender(Window)
-    local RenderTab = Window:NewTab("Render")
-    local ESPSection = RenderTab:NewSection("ESP")
-    ESPSection:NewToggle({
-        Name = "Murderer ESP",
-        Default = false,
-        Callback = function(Value)
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= player and v.Character then
-                    local backpack = v.Character:FindFirstChild("Backpack")
-                    if backpack and backpack:FindFirstChild("Knife") then
-                        local ESP = v.Character:FindFirstChild("ESP") or Instance.new("Highlight")
-                        ESP.Name = "ESP"
-                        ESP.Parent = v.Character
-                        ESP.FillColor = Color3.fromRGB(255, 0, 0)
-                        ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        ESP.FillTransparency = 0.3
-                        ESP.OutlineTransparency = 0
-                        ESP.Enabled = Value
-                    end
-                end
-            end
-        end
-    })
-    -- Puedes completar esta función con más características de renderizado.
-end
+Movement:Slider({Title = "WalkSpeed", Min = 16, Max = 500, Default = 16, Callback = function(v) humanoid.WalkSpeed = v end})
+Movement:Slider({Title = "JumpPower", Min = 50, Max = 500, Default = 50, Callback = function(v) humanoid.JumpPower = v end})
+Movement:Slider({Title = "FOV", Min = 50, Max = 120, Default = 70, Callback = function(v) Workspace.CurrentCamera.FieldOfView = v end})
 
--- ============================================
--- CREAR TODAS LAS SECCIONES
--- ============================================
-crearSeccionMovimiento(Window)
-crearSeccionRender(Window)
+Movement:Button({Title = "Infinite Jump", Callback = function()
+    UserInputService.JumpRequest:Connect(function() humanoid:ChangeState("Jumping") end)
+    WindUI:Notify({Title = "Infinite Jump", Content = "Activado"})
+end})
 
--- ============================================
--- NOTIFICACIÓN DE CARGA
--- ============================================
-WindUI:Notification("Water Hub", "MM2 script loaded successfully!", 5)
+-- RENDER
+Render:Section({Title = "ESP"})
+
+Render:Toggle({Title = "Murderer ESP", Callback = function(v) print("Murderer ESP:", v) end})
+Render:Toggle({Title = "Sheriff ESP", Callback = function(v) print("Sheriff ESP:", v) end})
+Render:Toggle({Title = "Show Names", Callback = function(v)
+    game.StarterPlayer.NameDisplayDistance = v and 100 or 0
+end})
+
+-- TELEPORT
+Teleport:Section({Title = "Teleports"})
+
+local tpName = ""
+Teleport:Textbox({Title = "Player Name", PlaceholderText = "Nombre...", Callback = function(t) tpName = t end})
+Teleport:Button({Title = "Teleport to Player", Callback = function()
+    if tpName and Players:FindFirstChild(tpName) then
+        root.CFrame = Players[tpName].Character.HumanoidRootPart.CFrame
+    end
+end})
+
+Teleport:Button({Title = "Teleport to Lobby", Callback = function() root.CFrame = CFrame.new(-108.5, 145, 0.6) end})
+Teleport:Button({Title = "Teleport to Map", Callback = function() print("TP Map") end})
+Teleport:Button({Title = "Teleport to Murderer", Callback = function() print("TP Murderer") end})
+Teleport:Button({Title = "Teleport to Sheriff", Callback = function() print("TP Sheriff") end})
+
+-- MURDERER
+Murderer:Button({Title = "Grab Gun", Callback = function()
+    if Workspace:FindFirstChild("GunDrop") then
+        local old = root.CFrame
+        root.CFrame = Workspace.GunDrop.CFrame
+        task.wait(0.3)
+        root.CFrame = old
+    end
+end})
+
+Murderer:Button({Title = "Kill All (Murderer)", Callback = function()
+    WindUI:Notify({Title = "Kill All", Content = "En desarrollo..."})
+end})
+
+print("💧 Water Hub | MM2 cargado correctamente - By: AdamABJ")
