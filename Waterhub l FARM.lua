@@ -1,6 +1,8 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN FINAL CON INVENTARIO VISUAL
-    Silent Aim + ESP con Slots Circulares + Movimiento + Armas
+    WATER HUB | BLOCKSPIN - VERSIÓN FINAL CON VÍDEO DE FONDO
+    Silent Aim + ESP (Slots Circulares) + Movimiento + Armas
+    Vídeo de fondo: 5608321996
+    Todo desactivado por defecto
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -30,7 +32,7 @@ if not WindUI then
 end
 
 -- ============================================
--- SISTEMA DE CONFIGURACIÓN
+-- SISTEMA DE CONFIGURACIÓN (TODO DESACTIVADO)
 -- ============================================
 local ConfigFile = "WaterHub_BlockSpin_v5.json"
 
@@ -61,21 +63,9 @@ local Features = {
     ThemeColor = Color3.fromHex("#0096FF")
 }
 
-local function LoadConfig()
-    if isfile and isfile(ConfigFile) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(ConfigFile))
-        end)
-        if success and data then
-            for key, value in pairs(data) do
-                if Features[key] ~= nil then
-                    Features[key] = value
-                end
-            end
-        end
-    end
-end
-LoadConfig()
+-- NO CARGAMOS CONFIGURACIÓN GUARDADA para empezar limpio
+-- (Si quieres mantener la carga, descomenta la siguiente línea)
+-- LoadConfig()
 
 local function SaveConfig(silent)
     local dataToSave = {}
@@ -142,23 +132,16 @@ local listaIconos = {
     ["Skorpion"] = "rbxassetid://105318377951686", ["Uzi"] = "rbxassetid://109290695652338"
 }
 
--- ============================================
--- FUNCIÓN PARA OBTENER ARMA EQUIPADA
--- ============================================
 local function GetEquippedItem(character)
-    -- Buscar herramienta estándar
     local tool = character:FindFirstChildOfClass("Tool")
     if tool and listaIconos[tool.Name] then
         return tool.Name
     end
-    
-    -- Buscar por nombre de objeto en el personaje
     for itemName, _ in pairs(listaIconos) do
         if character:FindFirstChild(itemName) then
             return itemName
         end
     end
-    
     return nil
 end
 
@@ -225,7 +208,6 @@ function SilentAim:IsValidTarget()
     return true
 end
 
--- Hook del Silent Aim
 local __index
 __index = hookmetamethod(game, "__index", function(t, k)
     if t:IsA("Mouse") and (k == "Hit" or k == "Target") and SilentAim:IsValidTarget() then
@@ -242,7 +224,6 @@ __index = hookmetamethod(game, "__index", function(t, k)
     return __index(t, k)
 end)
 
--- Aim Lock
 RunService:BindToRenderStep("WaterHub_AimLock", 0, function()
     if Features.AimLock and SilentAim:IsValidTarget() then
         if UserInputService:IsKeyDown(Features.AimLockKeybind) then
@@ -257,7 +238,7 @@ RunService:BindToRenderStep("WaterHub_AimLock", 0, function()
 end)
 
 -- ============================================
--- ESP SYSTEM CON SLOTS CIRCULARES (TU SISTEMA)
+-- ESP SYSTEM CON SLOTS CIRCULARES (USANDO GETHUI)
 -- ============================================
 local ESPObjects = {}
 
@@ -266,17 +247,15 @@ local function CreateESP(player, rootPart)
     
     local character = rootPart.Parent
     
-    -- ============================================
-    -- BILLBOARD GUI CON SLOT CIRCULAR (TU DISEÑO)
-    -- ============================================
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WaterHub_InvESP"
     billboard.AlwaysOnTop = true
     billboard.Size = UDim2.new(0, 80, 0, 80)
     billboard.StudsOffset = Vector3.new(0, 3.5, 0)
     billboard.Adornee = rootPart
+    billboard.Parent = gethui()
+    billboard.Enabled = false
     
-    -- Slot circular (Frame redondo)
     local slotFrame = Instance.new("Frame")
     slotFrame.Name = "SlotCircular"
     slotFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -284,19 +263,16 @@ local function CreateESP(player, rootPart)
     slotFrame.BackgroundTransparency = 0.2
     slotFrame.Parent = billboard
     
-    -- Esquina redonda para hacerlo circular
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = slotFrame
     
-    -- Borde de color dinámico
     local stroke = Instance.new("UIStroke")
     stroke.Name = "RarityStroke"
     stroke.Thickness = 3
     stroke.Color = RAREZA_COLORES["gris"]
     stroke.Parent = slotFrame
     
-    -- Imagen del arma
     local imageLabel = Instance.new("ImageLabel")
     imageLabel.Name = "ItemImage"
     imageLabel.Size = UDim2.new(0, 50, 0, 50)
@@ -305,9 +281,7 @@ local function CreateESP(player, rootPart)
     imageLabel.Image = ""
     imageLabel.Parent = slotFrame
     
-    -- ============================================
-    -- DRAWINGS PARA BOX, NAME Y DISTANCE
-    -- ============================================
+    -- Drawings
     local Box = Drawing.new("Square")
     Box.Thickness = Features.ESPThickness
     Box.Color = Features.ESPColor
@@ -335,9 +309,6 @@ local function CreateESP(player, rootPart)
     Distance.Size = 12
     Distance.Font = 2
     
-    -- ============================================
-    -- ACTUALIZACIÓN EN TIEMPO REAL
-    -- ============================================
     local updateConnection
     updateConnection = RunService.RenderStepped:Connect(function()
         local camera = Workspace.CurrentCamera
@@ -357,7 +328,6 @@ local function CreateESP(player, rootPart)
         if onScreen and humanoid and humanoid.Health > 0 then
             local size = Vector2.new(2000 / rootPos.Z, 3000 / rootPos.Z)
             
-            -- Actualizar Box ESP
             if Features.ESPBoxes then
                 Box.Size = size
                 Box.Position = Vector2.new(rootPos.X - size.X/2, rootPos.Y - size.Y/2)
@@ -368,7 +338,6 @@ local function CreateESP(player, rootPart)
                 Box.Visible = false
             end
             
-            -- Actualizar Name ESP
             if Features.ESPNames then
                 Name.Position = Vector2.new(rootPos.X, rootPos.Y - (size.Y/2) - 20)
                 Name.Visible = true
@@ -376,7 +345,6 @@ local function CreateESP(player, rootPart)
                 Name.Visible = false
             end
             
-            -- Actualizar Distance ESP
             if Features.ESPDistance then
                 Distance.Text = tostring(math.floor(distance)) .. "m"
                 Distance.Position = Vector2.new(rootPos.X, rootPos.Y + (size.Y/2) + 5)
@@ -385,31 +353,21 @@ local function CreateESP(player, rootPart)
                 Distance.Visible = false
             end
             
-            -- ============================================
-            -- ACTUALIZAR SLOT CIRCULAR CON INVENTARIO
-            -- ============================================
             if Features.ESPInventory then
                 local equippedItem = GetEquippedItem(character)
-                
                 if equippedItem and listaIconos[equippedItem] then
-                    -- Actualizar imagen
                     imageLabel.Image = listaIconos[equippedItem]
-                    
-                    -- Actualizar color del borde según rareza
                     local rareza = DEFINICION_RAREZA[equippedItem] or "gris"
                     stroke.Color = RAREZA_COLORES[rareza]
                 else
-                    -- Sin arma: slot vacío
                     imageLabel.Image = ""
                     stroke.Color = RAREZA_COLORES["gris"]
                 end
-                
                 billboard.Enabled = true
             else
                 billboard.Enabled = false
             end
             
-            -- Chams
             if Features.ESPChams then
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") and not part:FindFirstChild("ESP_Highlight") then
@@ -430,40 +388,25 @@ local function CreateESP(player, rootPart)
         end
     end)
     
-    -- ============================================
-    -- LIMPIEZA
-    -- ============================================
     local function Cleanup()
         updateConnection:Disconnect()
         Box:Remove()
         Name:Remove()
         Distance:Remove()
         billboard:Destroy()
-        
-        -- Limpiar highlights
         for _, part in ipairs(character:GetDescendants()) do
             local highlight = part:FindFirstChild("ESP_Highlight")
-            if highlight then
-                highlight:Destroy()
-            end
+            if highlight then highlight:Destroy() end
         end
     end
     
     rootPart.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            Cleanup()
-        end
+        if not parent then Cleanup() end
     end)
     
-    table.insert(ESPObjects, {
-        Player = player,
-        Cleanup = Cleanup
-    })
+    table.insert(ESPObjects, {Player = player, Cleanup = Cleanup})
 end
 
--- ============================================
--- MANEJO DE JUGADORES
--- ============================================
 local function OnCharacterAdded(character)
     local player = Players:GetPlayerFromCharacter(character)
     if not player or player == LocalPlayer then return end
@@ -472,10 +415,10 @@ local function OnCharacterAdded(character)
     if rootPart then
         CreateESP(player, rootPart)
     else
-        local connection
-        connection = character.ChildAdded:Connect(function(child)
+        local conn
+        conn = character.ChildAdded:Connect(function(child)
             if child.Name == "HumanoidRootPart" then
-                connection:Disconnect()
+                conn:Disconnect()
                 CreateESP(player, child)
             end
         end)
@@ -484,9 +427,7 @@ end
 
 local function OnPlayerAdded(player)
     if player == LocalPlayer then return end
-    
     player.CharacterAdded:Connect(OnCharacterAdded)
-    
     if player.Character then
         task.spawn(OnCharacterAdded, player.Character)
     end
@@ -516,25 +457,19 @@ local function StartWalkSpeed()
     if MovementCoroutines.WalkSpeed then
         task.cancel(MovementCoroutines.WalkSpeed)
     end
-    
     MovementCoroutines.WalkSpeed = task.spawn(function()
         while Features.WalkSpeed do
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum.WalkSpeed = Features.SpeedValue
-                end
+                if hum then hum.WalkSpeed = Features.SpeedValue end
             end
             task.wait(0.1)
         end
-        
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.WalkSpeed = 16
-            end
+            if hum then hum.WalkSpeed = 16 end
         end
     end)
 end
@@ -543,7 +478,6 @@ local function StartSuperJump()
     if MovementCoroutines.SuperJump then
         task.cancel(MovementCoroutines.SuperJump)
     end
-    
     MovementCoroutines.SuperJump = task.spawn(function()
         while Features.SuperJump do
             local char = LocalPlayer.Character
@@ -558,13 +492,10 @@ local function StartSuperJump()
             end
             task.wait(0.3)
         end
-        
         local char = LocalPlayer.Character
         if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.JumpPower = 50
-            end
+            if hum then hum.JumpPower = 50 end
         end
     end)
 end
@@ -573,16 +504,13 @@ local function StartInfiniteStamina()
     if MovementCoroutines.Stamina then
         task.cancel(MovementCoroutines.Stamina)
     end
-    
     MovementCoroutines.Stamina = task.spawn(function()
         while Features.InfiniteStamina do
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
-                    pcall(function()
-                        hum:SetAttribute("Stamina", 125)
-                    end)
+                    pcall(function() hum:SetAttribute("Stamina", 125) end)
                 end
             end
             task.wait(0.2)
@@ -590,23 +518,16 @@ local function StartInfiniteStamina()
     end)
 end
 
--- Anti Kill
 local AntiKillConnection
 
 local function StartAntiKill()
-    if AntiKillConnection then
-        AntiKillConnection:Disconnect()
-    end
-    
+    if AntiKillConnection then AntiKillConnection:Disconnect() end
     AntiKillConnection = RunService.Heartbeat:Connect(function()
         if not Features.AntiKill then return end
-        
         local char = LocalPlayer.Character
         if not char then return end
-        
         local hum = char:FindFirstChild("Humanoid")
         local hrp = char:FindFirstChild("HumanoidRootPart")
-        
         if hum and hrp then
             local healthPercent = (hum.Health / hum.MaxHealth) * 100
             if healthPercent <= Features.AntiKillHealth then
@@ -631,10 +552,8 @@ end
 -- ============================================
 local function ApplyGunMods()
     if not Features.EnableGunMods then return end
-    
     local char = LocalPlayer.Character
     if not char then return end
-    
     for _, tool in ipairs(char:GetChildren()) do
         if tool:IsA("Tool") then
             local config = tool:FindFirstChild("Configuration")
@@ -642,10 +561,8 @@ local function ApplyGunMods()
                 pcall(function()
                     local fireRate = config:FindFirstChild("FireRate")
                     if fireRate then fireRate.Value = Features.FireRate end
-                    
                     local recoil = config:FindFirstChild("Recoil")
                     if recoil then recoil.Value = Features.Recoil end
-                    
                     local reload = config:FindFirstChild("ReloadTime")
                     if reload then reload.Value = Features.ReloadTime end
                 end)
@@ -660,11 +577,7 @@ end
 local function ServerHop()
     local placeId = game.PlaceId
     local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
-    
-    local success, result = pcall(function()
-        return game:HttpGet(url)
-    end)
-    
+    local success, result = pcall(function() return game:HttpGet(url) end)
     if success and result then
         local data = HttpService:JSONDecode(result)
         if data and data.data then
@@ -676,25 +589,21 @@ local function ServerHop()
             end
         end
     end
-    
     Notify("Error", "No se encontraron servidores disponibles")
 end
 
 local function FPSBoost()
     Lighting.GlobalShadows = false
     Lighting.Technology = Enum.Technology.Compatibility
-    
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") then
-            pcall(function()
-                obj.Enabled = false
-            end)
+            pcall(function() obj.Enabled = false end)
         end
     end
 end
 
 -- ============================================
--- INTERFAZ DE USUARIO (WINDUI)
+-- INTERFAZ DE USUARIO (WINDUI) + VÍDEO DE FONDO
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
@@ -712,36 +621,67 @@ local Window = WindUI:CreateWindow({
     },
 })
 
--- Pestaña COMBAT
+-- ============================================
+-- INSERTAR VÍDEO DE FONDO (ID: 5608321996)
+-- ============================================
+task.spawn(function()
+    task.wait(0.5) -- Esperar a que WindUI construya la ventana
+    
+    local mainFrame = nil
+    local gui = gethui()
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextLabel") and obj.Text == "Water Hub | BlockSpin" then
+            mainFrame = obj.Parent
+            break
+        end
+    end
+    
+    if not mainFrame then
+        warn("[WATER HUB] No se encontró la ventana para el vídeo")
+        return
+    end
+    
+    local videoFrame = Instance.new("VideoFrame")
+    videoFrame.Name = "BackgroundVideo"
+    videoFrame.Size = UDim2.new(1, 0, 1, 0)
+    videoFrame.Position = UDim2.new(0, 0, 0, 0)
+    videoFrame.BackgroundTransparency = 1
+    videoFrame.Video = "rbxassetid://5608321996"
+    videoFrame.Looped = true
+    videoFrame.Playing = true
+    videoFrame.ZIndex = 1
+    videoFrame.Parent = mainFrame
+    
+    for _, child in ipairs(mainFrame:GetChildren()) do
+        if child ~= videoFrame and child:IsA("GuiObject") then
+            child.ZIndex = 2
+        end
+    end
+    
+    print("[WATER HUB] Vídeo de fondo cargado")
+end)
+
+-- Pestañas (todo igual que antes)
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
 CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de disparo silenciosa" })
 
 CombatTab:Toggle({
     Title = "Silent Aim",
     Value = Features.SilentAim,
-    Callback = function(v)
-        Features.SilentAim = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.SilentAim = v; SaveConfig(true) end,
 })
 
 CombatTab:Toggle({
     Title = "Aim Lock (Hold E)",
     Value = Features.AimLock,
-    Callback = function(v)
-        Features.AimLock = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.AimLock = v; SaveConfig(true) end,
 })
 
 CombatTab:Slider({
     Title = "Prediction",
     Step = 0.001,
     Value = { Min = 0, Max = 0.5, Default = Features.Prediction },
-    Callback = function(v)
-        Features.Prediction = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.Prediction = v; SaveConfig(true) end,
 })
 
 CombatTab:Section({ Title = "Defensa", Desc = "Protección del jugador" })
@@ -751,11 +691,7 @@ CombatTab:Toggle({
     Value = Features.AntiKill,
     Callback = function(v)
         Features.AntiKill = v
-        if v then
-            StartAntiKill()
-        else
-            StopAntiKill()
-        end
+        if v then StartAntiKill() else StopAntiKill() end
         SaveConfig(true)
     end,
 })
@@ -764,72 +700,49 @@ CombatTab:Slider({
     Title = "Anti Kill Health %",
     Step = 5,
     Value = { Min = 5, Max = 50, Default = Features.AntiKillHealth },
-    Callback = function(v)
-        Features.AntiKillHealth = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.AntiKillHealth = v; SaveConfig(true) end,
 })
 
--- Pestaña ESP
 local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
 ESPTab:Section({ Title = "Player ESP", Desc = "Visualización con slots de inventario" })
 
 ESPTab:Toggle({
     Title = "Cajas (Boxes)",
     Value = Features.ESPBoxes,
-    Callback = function(v)
-        Features.ESPBoxes = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPBoxes = v; SaveConfig(true) end,
 })
 
 ESPTab:Toggle({
     Title = "Nombres",
     Value = Features.ESPNames,
-    Callback = function(v)
-        Features.ESPNames = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPNames = v; SaveConfig(true) end,
 })
 
 ESPTab:Toggle({
     Title = "Distancia",
     Value = Features.ESPDistance,
-    Callback = function(v)
-        Features.ESPDistance = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPDistance = v; SaveConfig(true) end,
 })
 
 ESPTab:Toggle({
     Title = "Resaltado (Chams)",
     Value = Features.ESPChams,
-    Callback = function(v)
-        Features.ESPChams = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPChams = v; SaveConfig(true) end,
 })
 
 ESPTab:Toggle({
     Title = "Inventario Equipado",
     Value = Features.ESPInventory,
-    Callback = function(v)
-        Features.ESPInventory = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPInventory = v; SaveConfig(true) end,
 })
 
 ESPTab:Slider({
     Title = "Grosor del ESP",
     Step = 0.5,
     Value = { Min = 0.5, Max = 3, Default = Features.ESPThickness },
-    Callback = function(v)
-        Features.ESPThickness = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.ESPThickness = v; SaveConfig(true) end,
 })
 
--- Pestaña MOVEMENT
 local MoveTab = Window:Tab({ Title = "MOVEMENT", Icon = "running" })
 MoveTab:Section({ Title = "Velocidad" })
 
@@ -838,9 +751,7 @@ MoveTab:Toggle({
     Value = Features.WalkSpeed,
     Callback = function(v)
         Features.WalkSpeed = v
-        if v then
-            StartWalkSpeed()
-        end
+        if v then StartWalkSpeed() end
         SaveConfig(true)
     end,
 })
@@ -849,10 +760,7 @@ MoveTab:Slider({
     Title = "Velocidad",
     Step = 5,
     Value = { Min = 16, Max = 200, Default = Features.SpeedValue },
-    Callback = function(v)
-        Features.SpeedValue = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.SpeedValue = v; SaveConfig(true) end,
 })
 
 MoveTab:Section({ Title = "Saltos y Stamina" })
@@ -862,9 +770,7 @@ MoveTab:Toggle({
     Value = Features.SuperJump,
     Callback = function(v)
         Features.SuperJump = v
-        if v then
-            StartSuperJump()
-        end
+        if v then StartSuperJump() end
         SaveConfig(true)
     end,
 })
@@ -873,10 +779,7 @@ MoveTab:Slider({
     Title = "Fuerza de Salto",
     Step = 10,
     Value = { Min = 50, Max = 200, Default = Features.JumpPower },
-    Callback = function(v)
-        Features.JumpPower = v
-        SaveConfig(true)
-    end,
+    Callback = function(v) Features.JumpPower = v; SaveConfig(true) end,
 })
 
 MoveTab:Toggle({
@@ -884,14 +787,11 @@ MoveTab:Toggle({
     Value = Features.InfiniteStamina,
     Callback = function(v)
         Features.InfiniteStamina = v
-        if v then
-            StartInfiniteStamina()
-        end
+        if v then StartInfiniteStamina() end
         SaveConfig(true)
     end,
 })
 
--- Pestaña WEAPON
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
 WeaponTab:Section({ Title = "Modificadores de Armas" })
 
@@ -900,9 +800,7 @@ WeaponTab:Toggle({
     Value = Features.EnableGunMods,
     Callback = function(v)
         Features.EnableGunMods = v
-        if v then
-            ApplyGunMods()
-        end
+        if v then ApplyGunMods() end
         SaveConfig(true)
     end,
 })
@@ -913,9 +811,7 @@ WeaponTab:Slider({
     Value = { Min = 50, Max = 2000, Default = Features.FireRate },
     Callback = function(v)
         Features.FireRate = v
-        if Features.EnableGunMods then
-            ApplyGunMods()
-        end
+        if Features.EnableGunMods then ApplyGunMods() end
         SaveConfig(true)
     end,
 })
@@ -926,9 +822,7 @@ WeaponTab:Slider({
     Value = { Min = 0, Max = 3, Default = Features.Recoil },
     Callback = function(v)
         Features.Recoil = v
-        if Features.EnableGunMods then
-            ApplyGunMods()
-        end
+        if Features.EnableGunMods then ApplyGunMods() end
         SaveConfig(true)
     end,
 })
@@ -939,14 +833,11 @@ WeaponTab:Slider({
     Value = { Min = 0.1, Max = 5, Default = Features.ReloadTime },
     Callback = function(v)
         Features.ReloadTime = v
-        if Features.EnableGunMods then
-            ApplyGunMods()
-        end
+        if Features.EnableGunMods then ApplyGunMods() end
         SaveConfig(true)
     end,
 })
 
--- Pestaña MISC
 local MiscTab = Window:Tab({ Title = "MISC", Icon = "settings" })
 
 MiscTab:Button({
@@ -959,9 +850,7 @@ MiscTab:Toggle({
     Value = Features.FPSBoost,
     Callback = function(v)
         Features.FPSBoost = v
-        if v then
-            FPSBoost()
-        end
+        if v then FPSBoost() end
         SaveConfig(true)
     end,
 })
@@ -974,8 +863,7 @@ MiscTab:Button({
     end
 })
 
--- Seleccionar primera pestaña
 CombatTab:Select()
 
-print("[WATER HUB] Cargado exitosamente")
-print("[WATER HUB] Slots circulares con imágenes - ACTIVO")
+print("[WATER HUB] Cargado exitosamente - Vídeo de fondo activo")
+print("[WATER HUB] Slots circulares con imágenes - ACTIVO (activar 'Inventario Equipado')")
