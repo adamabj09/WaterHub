@@ -1,7 +1,7 @@
 -- ============================================
--- CARGAR WINDUI
+-- CARGAR WINDUI (URL alternativa que funciona)
 -- ============================================
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/AikaVOID/WindUI/main/source.lua"))()
 
 if not WindUI then
     warn("Error cargando WindUI")
@@ -14,9 +14,14 @@ end
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | MM2",
     Author = "By: AdamABJ",
+    Icon = "rbxassetid://120258375748753",
     Theme = "Dark",
+    Transparent = true,
     ToggleKey = Enum.KeyCode.RightShift,
-    Size = UDim2.new(0, 550, 0, 400)
+    Position = "Center",
+    Size = UDim2.new(0, 550, 0, 400),
+    Draggable = true,
+    Resizable = false
 })
 
 -- ============================================
@@ -42,23 +47,24 @@ player.CharacterAdded:Connect(function(newCharacter)
 end)
 
 -- ============================================
--- PESTAÑAS (usando el método correcto de WindUI)
+-- PESTAÑAS
 -- ============================================
-local MovementTab = Window:AddTab("Movement")
-local RenderTab = Window:AddTab("Render")
-local MurdererTab = Window:AddTab("Murderer")
-local TeleportTab = Window:AddTab("Teleport")
+local MovementTab = Window:NewTab("Movement")
+local RenderTab = Window:NewTab("Render")
+local MurdererTab = Window:NewTab("Murderer")
+local TeleportTab = Window:NewTab("Teleport")
 
 -- ============================================
 -- MOVEMENT TAB
 -- ============================================
-local SpeedSection = MovementTab:AddSection("Speed")
+local SpeedSection = MovementTab:NewSection("Speed")
 
-SpeedSection:AddSlider({
+SpeedSection:NewSlider({
     Name = "Walk Speed",
     Min = 0,
     Max = 500,
     Default = 16,
+    Step = 2,
     Callback = function(Value)
         if character and character:FindFirstChild("Humanoid") then
             character.Humanoid.WalkSpeed = Value
@@ -66,13 +72,14 @@ SpeedSection:AddSlider({
     end
 })
 
-local JumpSection = MovementTab:AddSection("Jump")
+local JumpSection = MovementTab:NewSection("Jump")
 
-JumpSection:AddSlider({
+JumpSection:NewSlider({
     Name = "Jump Power",
     Min = 0,
     Max = 500,
     Default = 50,
+    Step = 4,
     Callback = function(Value)
         if character and character:FindFirstChild("Humanoid") then
             character.Humanoid.JumpPower = Value
@@ -80,21 +87,22 @@ JumpSection:AddSlider({
     end
 })
 
-local FOVSection = MovementTab:AddSection("Camera")
+local FOVSection = MovementTab:NewSection("Camera")
 
-FOVSection:AddSlider({
+FOVSection:NewSlider({
     Name = "Field of View",
     Min = 50,
     Max = 120,
     Default = 70,
+    Step = 1,
     Callback = function(Value)
         cam.FieldOfView = Value
     end
 })
 
-local FlySection = MovementTab:AddSection("Fly")
+local FlySection = MovementTab:NewSection("Fly")
 
-FlySection:AddToggle({
+FlySection:NewToggle({
     Name = "Fly",
     Default = false,
     Callback = function(Value)
@@ -110,7 +118,7 @@ FlySection:AddToggle({
             BV.maxForce = Vector3.new(9e9, 9e9, 9e9)
 
             spawn(function()
-                repeat task.wait()
+                repeat wait()
                     if character:FindFirstChild("Humanoid") then
                         character.Humanoid.PlatformStand = true
                     end
@@ -120,14 +128,14 @@ FlySection:AddToggle({
                         SPEED = 0
                     end
                     if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 then
-                        BV.velocity = ((cam.CFrame.LookVector * (CONTROL.F + CONTROL.B)) + ((cam.CFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B) * 0.2, 0).p) - cam.CFrame.p)) * SPEED
+                        BV.velocity = ((cam.CoordinateFrame.lookVector * (CONTROL.F + CONTROL.B)) + ((cam.CoordinateFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B) * 0.2, 0).p) - cam.CoordinateFrame.p)) * SPEED
                         lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
                     elseif (CONTROL.L + CONTROL.R) == 0 and (CONTROL.F + CONTROL.B) == 0 and SPEED ~= 0 then
-                        BV.velocity = ((cam.CFrame.LookVector * (lCONTROL.F + lCONTROL.B)) + ((cam.CFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B) * 0.2, 0).p) - cam.CFrame.p)) * SPEED
+                        BV.velocity = ((cam.CoordinateFrame.lookVector * (lCONTROL.F + lCONTROL.B)) + ((cam.CoordinateFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B) * 0.2, 0).p) - cam.CoordinateFrame.p)) * SPEED
                     else
                         BV.velocity = Vector3.new(0, 0.1, 0)
                     end
-                    BG.cframe = cam.CFrame
+                    BG.cframe = cam.CoordinateFrame
                 until not flying
                 CONTROL = {F = 0, B = 0, L = 0, R = 0}
                 lCONTROL = {F = 0, B = 0, L = 0, R = 0}
@@ -156,7 +164,7 @@ FlySection:AddToggle({
                 end
             end)
 
-            while flying do task.wait() end
+            while flying do wait() end
             keyDownConn:Disconnect()
             keyUpConn:Disconnect()
         else
@@ -165,9 +173,9 @@ FlySection:AddToggle({
     end
 })
 
-local OtherSection = MovementTab:AddSection("Other")
+local OtherSection = MovementTab:NewSection("Other")
 
-OtherSection:AddButton({
+OtherSection:NewButton({
     Name = "Infinite Jump",
     Callback = function()
         local JumpConn
@@ -180,7 +188,7 @@ OtherSection:AddButton({
     end
 })
 
-OtherSection:AddToggle({
+OtherSection:NewToggle({
     Name = "NoClip",
     Default = false,
     Callback = function(Value)
@@ -194,7 +202,7 @@ OtherSection:AddToggle({
     end
 })
 
-OtherSection:AddButton({
+OtherSection:NewButton({
     Name = "Grab Gun",
     Callback = function()
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -202,7 +210,7 @@ OtherSection:AddButton({
             local pos = root.CFrame
             if workspace:FindFirstChild("GunDrop") then
                 root.CFrame = workspace.GunDrop.CFrame
-                task.wait(0.25)
+                wait(0.25)
                 root.CFrame = pos
                 WindUI:Notification("Success", "Teleported to gun drop", 3)
             else
@@ -215,9 +223,9 @@ OtherSection:AddButton({
 -- ============================================
 -- RENDER TAB
 -- ============================================
-local ESPSection = RenderTab:AddSection("ESP")
+local ESPSection = RenderTab:NewSection("ESP")
 
-ESPSection:AddToggle({
+ESPSection:NewToggle({
     Name = "Murderer ESP",
     Default = false,
     Callback = function(Value)
@@ -244,7 +252,7 @@ ESPSection:AddToggle({
     end
 })
 
-ESPSection:AddToggle({
+ESPSection:NewToggle({
     Name = "Sheriff ESP",
     Default = false,
     Callback = function(Value)
@@ -271,9 +279,9 @@ ESPSection:AddToggle({
     end
 })
 
-local NamesSection = RenderTab:AddSection("Names")
+local NamesSection = RenderTab:NewSection("Names")
 
-NamesSection:AddToggle({
+NamesSection:NewToggle({
     Name = "Show Names",
     Default = false,
     Callback = function(Value)
@@ -284,16 +292,16 @@ NamesSection:AddToggle({
 -- ============================================
 -- MURDERER TAB
 -- ============================================
-local MurderSection = MurdererTab:AddSection("Murderer")
+local MurderSection = MurdererTab:NewSection("Murderer")
 
-MurderSection:AddButton({
+MurderSection:NewButton({
     Name = "Kill All",
     Callback = function()
         local backpack = player:FindFirstChild("Backpack") or (character and character:FindFirstChild("Backpack"))
         if backpack and backpack:FindFirstChild("Knife") then
             for _, Victim in pairs(Players:GetPlayers()) do
                 if Victim ~= player and Victim.Character and Victim.Character:FindFirstChild("HumanoidRootPart") then
-                    repeat task.wait()
+                    repeat wait()
                         if character and character:FindFirstChild("HumanoidRootPart") and Victim.Character and Victim.Character:FindFirstChild("HumanoidRootPart") then
                             character.HumanoidRootPart.CFrame = Victim.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
                         end
@@ -310,9 +318,9 @@ MurderSection:AddButton({
 -- ============================================
 -- TELEPORT TAB
 -- ============================================
-local TeleportSection = TeleportTab:AddSection("Teleports")
+local TeleportSection = TeleportTab:NewSection("Teleports")
 
-TeleportSection:AddButton({
+TeleportSection:NewButton({
     Name = "Teleport to Lobby",
     Callback = function()
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -321,7 +329,7 @@ TeleportSection:AddButton({
     end
 })
 
-TeleportSection:AddButton({
+TeleportSection:NewButton({
     Name = "Teleport to Map",
     Callback = function()
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -335,7 +343,7 @@ TeleportSection:AddButton({
     end
 })
 
-TeleportSection:AddButton({
+TeleportSection:NewButton({
     Name = "Teleport to Murderer",
     Callback = function()
         for _, v in pairs(Players:GetPlayers()) do
@@ -350,7 +358,7 @@ TeleportSection:AddButton({
     end
 })
 
-TeleportSection:AddButton({
+TeleportSection:NewButton({
     Name = "Teleport to Sheriff",
     Callback = function()
         for _, v in pairs(Players:GetPlayers()) do
@@ -365,14 +373,20 @@ TeleportSection:AddButton({
     end
 })
 
-local TPPlayerSection = TeleportTab:AddSection("Player Teleport")
+local TPPlayerSection = TeleportTab:NewSection("Player Teleport")
 
 local selectedPlayer
-local dropdown = TPPlayerSection:AddDropdown({
+TPPlayerSection:NewDropdown({
     Name = "Select Player",
-    Options = {},
+    List = {},
     Callback = function(Value)
         selectedPlayer = Value
+    end
+})
+
+TPPlayerSection:NewButton({
+    Name = "Teleport to Player",
+    Callback = function()
         if selectedPlayer then
             local target = Players:FindFirstChild(selectedPlayer)
             if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
@@ -382,18 +396,19 @@ local dropdown = TPPlayerSection:AddDropdown({
     end
 })
 
--- Actualizar lista de jugadores
-task.spawn(function()
-    while task.wait(3) do
+-- ============================================
+-- ACTUALIZAR LISTA DE JUGADORES
+-- ============================================
+spawn(function()
+    while wait(3) do
         local playerList = {}
         for _, plr in pairs(Players:GetPlayers()) do
             if plr ~= player then
                 table.insert(playerList, plr.Name)
             end
         end
-        dropdown:SetOptions(playerList)
     end
-end})
+end)
 
 -- ============================================
 -- NOTIFICACIÓN DE CARGA
