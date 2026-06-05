@@ -1,7 +1,7 @@
 --[[
-    WATER HUB | BLOCKSPIN - VERSIÓN FINAL CON VÍDEO DE FONDO
+    WATER HUB | BLOCKSPIN - VERSIÓN FINAL CORREGIDA
     Silent Aim + ESP (Slots Circulares) + Movimiento + Armas
-    Vídeo de fondo: 5608321996
+    Vídeo de fondo: 5608321996 (silenciado)
     Todo desactivado por defecto
 ]]
 
@@ -32,7 +32,7 @@ if not WindUI then
 end
 
 -- ============================================
--- SISTEMA DE CONFIGURACIÓN (TODO DESACTIVADO)
+-- CONFIGURACIÓN (TODO DESACTIVADO)
 -- ============================================
 local ConfigFile = "WaterHub_BlockSpin_v5.json"
 
@@ -63,10 +63,6 @@ local Features = {
     ThemeColor = Color3.fromHex("#0096FF")
 }
 
--- NO CARGAMOS CONFIGURACIÓN GUARDADA para empezar limpio
--- (Si quieres mantener la carga, descomenta la siguiente línea)
--- LoadConfig()
-
 local function SaveConfig(silent)
     local dataToSave = {}
     for key, _ in pairs(Features) do
@@ -81,16 +77,12 @@ end
 
 local function Notify(title, message)
     pcall(function()
-        WindUI:Notify({
-            Title = title,
-            Content = message,
-            Duration = 2.5
-        })
+        WindUI:Notify({Title = title, Content = message, Duration = 2.5})
     end)
 end
 
 -- ============================================
--- DATOS DE INVENTARIO (TUS IDs Y RAREZAS)
+-- INVENTARIO (DATOS)
 -- ============================================
 local RAREZA_COLORES = {
     ["rojo"]    = Color3.fromRGB(255, 30, 30),
@@ -132,24 +124,35 @@ local listaIconos = {
     ["Skorpion"] = "rbxassetid://105318377951686", ["Uzi"] = "rbxassetid://109290695652338"
 }
 
+-- Detección mejorada para BlockSpin (armas como Model, no Tool)
 local function GetEquippedItem(character)
+    -- 1. Buscar Tool estándar
     local tool = character:FindFirstChildOfClass("Tool")
     if tool and listaIconos[tool.Name] then
         return tool.Name
     end
+    
+    -- 2. Buscar Model cuyo nombre coincida con la lista y tenga un "Handle" dentro
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("Model") and listaIconos[child.Name] and child:FindFirstChild("Handle", true) then
+            return child.Name
+        end
+    end
+    
+    -- 3. Búsqueda por nombre directo (caso extremo)
     for itemName, _ in pairs(listaIconos) do
         if character:FindFirstChild(itemName) then
             return itemName
         end
     end
+    
     return nil
 end
 
 -- ============================================
--- SILENT AIM SYSTEM
+-- SILENT AIM
 -- ============================================
 local SilentAim = {
-    Enabled = false,
     Selected = nil,
     SelectedPart = nil
 }
@@ -160,50 +163,33 @@ function SilentAim:GetClosestTarget()
     local camera = Workspace.CurrentCamera
     if not camera then return nil end
     
-    local players = Players:GetPlayers()
-    for _, player in ipairs(players) do
+    for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local character = player.Character
             if character then
                 local humanoid = character:FindFirstChild("Humanoid")
                 local head = character:FindFirstChild("Head")
-                
                 if humanoid and humanoid.Health > 0 and head then
                     local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-                    
                     if onScreen then
-                        local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                        
-                        if distance < closestDistance then
-                            closestDistance = distance
-                            closestTarget = {
-                                Player = player,
-                                Character = character,
-                                Head = head
-                            }
+                        local screenCenter = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                        if dist < closestDistance then
+                            closestDistance = dist
+                            closestTarget = {Character = character, Head = head}
                         end
                     end
                 end
             end
         end
     end
-    
     return closestTarget
 end
 
 function SilentAim:IsValidTarget()
     if not Features.SilentAim then return false end
-    
     local target = self:GetClosestTarget()
     if not target then return false end
-    
-    local character = target.Character
-    local humanoid = character and character:FindFirstChild("Humanoid")
-    
-    if not humanoid or humanoid.Health <= 0 then return false end
-    
-    self.Selected = target.Player
     self.SelectedPart = target.Head
     return true
 end
@@ -211,13 +197,13 @@ end
 local __index
 __index = hookmetamethod(game, "__index", function(t, k)
     if t:IsA("Mouse") and (k == "Hit" or k == "Target") and SilentAim:IsValidTarget() then
-        local selectedPart = SilentAim.SelectedPart
-        if selectedPart then
-            local predictedPosition = selectedPart.CFrame + (selectedPart.Velocity * Features.Prediction)
+        local part = SilentAim.SelectedPart
+        if part then
+            local predicted = part.CFrame + (part.Velocity * Features.Prediction)
             if k == "Hit" then
-                return predictedPosition
+                return predicted
             else
-                return selectedPart
+                return part
             end
         end
     end
@@ -227,61 +213,56 @@ end)
 RunService:BindToRenderStep("WaterHub_AimLock", 0, function()
     if Features.AimLock and SilentAim:IsValidTarget() then
         if UserInputService:IsKeyDown(Features.AimLockKeybind) then
-            local selectedPart = SilentAim.SelectedPart
-            if selectedPart then
+            local part = SilentAim.SelectedPart
+            if part then
                 local camera = Workspace.CurrentCamera
-                local predictedPosition = selectedPart.CFrame + (selectedPart.Velocity * Features.Prediction)
-                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, predictedPosition.Position)
+                local predicted = part.CFrame + (part.Velocity * Features.Prediction)
+                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, predicted.Position)
             end
         end
     end
 end)
 
 -- ============================================
--- ESP SYSTEM CON SLOTS CIRCULARES (USANDO GETHUI)
+-- ESP CON SLOTS CIRCULARES (CORREGIDO)
 -- ============================================
 local ESPObjects = {}
 
 local function CreateESP(player, rootPart)
     if not rootPart or not rootPart.Parent then return end
-    
     local character = rootPart.Parent
     
+    -- BillboardGui (slot circular)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WaterHub_InvESP"
     billboard.AlwaysOnTop = true
     billboard.Size = UDim2.new(0, 80, 0, 80)
     billboard.StudsOffset = Vector3.new(0, 3.5, 0)
     billboard.Adornee = rootPart
-    billboard.Parent = gethui()
+    billboard.Parent = gethui()  -- seguro
     billboard.Enabled = false
     
     local slotFrame = Instance.new("Frame")
-    slotFrame.Name = "SlotCircular"
     slotFrame.Size = UDim2.new(1, 0, 1, 0)
     slotFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     slotFrame.BackgroundTransparency = 0.2
     slotFrame.Parent = billboard
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = slotFrame
+    Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(1, 0)
     
     local stroke = Instance.new("UIStroke")
-    stroke.Name = "RarityStroke"
     stroke.Thickness = 3
     stroke.Color = RAREZA_COLORES["gris"]
     stroke.Parent = slotFrame
     
     local imageLabel = Instance.new("ImageLabel")
-    imageLabel.Name = "ItemImage"
     imageLabel.Size = UDim2.new(0, 50, 0, 50)
     imageLabel.Position = UDim2.new(0.5, -25, 0.5, -25)
     imageLabel.BackgroundTransparency = 1
     imageLabel.Image = ""
     imageLabel.Parent = slotFrame
     
-    -- Drawings
+    -- Drawings (ESP clásico)
     local Box = Drawing.new("Square")
     Box.Thickness = Features.ESPThickness
     Box.Color = Features.ESPColor
@@ -322,7 +303,7 @@ local function CreateESP(player, rootPart)
         end
         
         local rootPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
-        local distance = (camera.CFrame.Position - rootPart.Position).Magnitude
+        local dist = (camera.CFrame.Position - rootPart.Position).Magnitude
         local humanoid = character:FindFirstChild("Humanoid")
         
         if onScreen and humanoid and humanoid.Health > 0 then
@@ -339,25 +320,25 @@ local function CreateESP(player, rootPart)
             end
             
             if Features.ESPNames then
-                Name.Position = Vector2.new(rootPos.X, rootPos.Y - (size.Y/2) - 20)
+                Name.Position = Vector2.new(rootPos.X, rootPos.Y - size.Y/2 - 20)
                 Name.Visible = true
             else
                 Name.Visible = false
             end
             
             if Features.ESPDistance then
-                Distance.Text = tostring(math.floor(distance)) .. "m"
-                Distance.Position = Vector2.new(rootPos.X, rootPos.Y + (size.Y/2) + 5)
+                Distance.Text = tostring(math.floor(dist)) .. "m"
+                Distance.Position = Vector2.new(rootPos.X, rootPos.Y + size.Y/2 + 5)
                 Distance.Visible = true
             else
                 Distance.Visible = false
             end
             
             if Features.ESPInventory then
-                local equippedItem = GetEquippedItem(character)
-                if equippedItem and listaIconos[equippedItem] then
-                    imageLabel.Image = listaIconos[equippedItem]
-                    local rareza = DEFINICION_RAREZA[equippedItem] or "gris"
+                local item = GetEquippedItem(character)
+                if item and listaIconos[item] then
+                    imageLabel.Image = listaIconos[item]
+                    local rareza = DEFINICION_RAREZA[item] or "gris"
                     stroke.Color = RAREZA_COLORES[rareza]
                 else
                     imageLabel.Image = ""
@@ -371,12 +352,12 @@ local function CreateESP(player, rootPart)
             if Features.ESPChams then
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") and not part:FindFirstChild("ESP_Highlight") then
-                        local highlight = Instance.new("Highlight")
-                        highlight.Name = "ESP_Highlight"
-                        highlight.FillColor = Features.ESPColor
-                        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        highlight.FillTransparency = 0.5
-                        highlight.Parent = part
+                        local hl = Instance.new("Highlight")
+                        hl.Name = "ESP_Highlight"
+                        hl.FillColor = Features.ESPColor
+                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        hl.FillTransparency = 0.5
+                        hl.Parent = part
                     end
                 end
             end
@@ -395,8 +376,8 @@ local function CreateESP(player, rootPart)
         Distance:Remove()
         billboard:Destroy()
         for _, part in ipairs(character:GetDescendants()) do
-            local highlight = part:FindFirstChild("ESP_Highlight")
-            if highlight then highlight:Destroy() end
+            local hl = part:FindFirstChild("ESP_Highlight")
+            if hl then hl:Destroy() end
         end
     end
     
@@ -439,9 +420,9 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 
 Players.PlayerRemoving:Connect(function(player)
-    for i, espObj in ipairs(ESPObjects) do
-        if espObj.Player == player then
-            pcall(espObj.Cleanup)
+    for i, obj in ipairs(ESPObjects) do
+        if obj.Player == player then
+            pcall(obj.Cleanup)
             table.remove(ESPObjects, i)
             break
         end
@@ -449,14 +430,12 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- ============================================
--- SISTEMA DE MOVIMIENTO
+-- MOVIMIENTO
 -- ============================================
 local MovementCoroutines = {}
 
 local function StartWalkSpeed()
-    if MovementCoroutines.WalkSpeed then
-        task.cancel(MovementCoroutines.WalkSpeed)
-    end
+    if MovementCoroutines.WalkSpeed then task.cancel(MovementCoroutines.WalkSpeed) end
     MovementCoroutines.WalkSpeed = task.spawn(function()
         while Features.WalkSpeed do
             local char = LocalPlayer.Character
@@ -475,9 +454,7 @@ local function StartWalkSpeed()
 end
 
 local function StartSuperJump()
-    if MovementCoroutines.SuperJump then
-        task.cancel(MovementCoroutines.SuperJump)
-    end
+    if MovementCoroutines.SuperJump then task.cancel(MovementCoroutines.SuperJump) end
     MovementCoroutines.SuperJump = task.spawn(function()
         while Features.SuperJump do
             local char = LocalPlayer.Character
@@ -501,9 +478,7 @@ local function StartSuperJump()
 end
 
 local function StartInfiniteStamina()
-    if MovementCoroutines.Stamina then
-        task.cancel(MovementCoroutines.Stamina)
-    end
+    if MovementCoroutines.Stamina then task.cancel(MovementCoroutines.Stamina) end
     MovementCoroutines.Stamina = task.spawn(function()
         while Features.InfiniteStamina do
             local char = LocalPlayer.Character
@@ -548,7 +523,7 @@ local function StopAntiKill()
 end
 
 -- ============================================
--- SISTEMA DE ARMAS
+-- ARMAS
 -- ============================================
 local function ApplyGunMods()
     if not Features.EnableGunMods then return end
@@ -589,7 +564,7 @@ local function ServerHop()
             end
         end
     end
-    Notify("Error", "No se encontraron servidores disponibles")
+    Notify("Error", "No se encontraron servidores")
 end
 
 local function FPSBoost()
@@ -603,7 +578,7 @@ local function FPSBoost()
 end
 
 -- ============================================
--- INTERFAZ DE USUARIO (WINDUI) + VÍDEO DE FONDO
+-- INTERFAZ WINDUI + VÍDEO DE FONDO (SILENCIADO)
 -- ============================================
 local Window = WindUI:CreateWindow({
     Title = "Water Hub | BlockSpin",
@@ -621,26 +596,37 @@ local Window = WindUI:CreateWindow({
     },
 })
 
--- ============================================
--- INSERTAR VÍDEO DE FONDO (ID: 5608321996)
--- ============================================
+-- Insertar vídeo de fondo correctamente (ocupando toda la ventana, detrás del contenido, sin sonido)
 task.spawn(function()
-    task.wait(0.5) -- Esperar a que WindUI construya la ventana
+    task.wait(0.5)  -- dar tiempo a WindUI
     
+    -- Buscar el Frame principal de la ventana (el que contiene el título)
     local mainFrame = nil
     local gui = gethui()
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextLabel") and obj.Text == "Water Hub | BlockSpin" then
-            mainFrame = obj.Parent
+            -- Subir hasta el Frame que es hijo directo de un ScrollingFrame o del ScreenGui
+            local parent = obj.Parent
+            while parent and not parent:IsA("ScreenGui") and parent ~= gui do
+                if parent:IsA("Frame") and parent:FindFirstChild("Water Hub") then -- pista adicional
+                    mainFrame = parent
+                    break
+                end
+                parent = parent.Parent
+            end
+            if not mainFrame and obj.Parent.Parent:IsA("Frame") then
+                mainFrame = obj.Parent.Parent  -- normalmente el Frame contenedor principal
+            end
             break
         end
     end
     
     if not mainFrame then
-        warn("[WATER HUB] No se encontró la ventana para el vídeo")
+        warn("[WATER HUB] No se encontró el frame principal para el vídeo")
         return
     end
     
+    -- Crear VideoFrame que ocupe todo el mainFrame
     local videoFrame = Instance.new("VideoFrame")
     videoFrame.Name = "BackgroundVideo"
     videoFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -649,21 +635,25 @@ task.spawn(function()
     videoFrame.Video = "rbxassetid://5608321996"
     videoFrame.Looped = true
     videoFrame.Playing = true
+    videoFrame.Volume = 0          -- SIN SONIDO
     videoFrame.ZIndex = 1
     videoFrame.Parent = mainFrame
     
+    -- Asegurar que todos los demás elementos tengan ZIndex > 1 para que estén encima
     for _, child in ipairs(mainFrame:GetChildren()) do
         if child ~= videoFrame and child:IsA("GuiObject") then
-            child.ZIndex = 2
+            child.ZIndex = math.max(child.ZIndex, 2)
         end
     end
     
-    print("[WATER HUB] Vídeo de fondo cargado")
+    print("[WATER HUB] Vídeo de fondo colocado (silenciado)")
 end)
 
--- Pestañas (todo igual que antes)
+-- ============================================
+-- PESTAÑAS (todo igual que antes, con toggles desactivados)
+-- ============================================
 local CombatTab = Window:Tab({ Title = "COMBAT", Icon = "crosshair" })
-CombatTab:Section({ Title = "Silent Aim", Desc = "Asistencia de disparo silenciosa" })
+CombatTab:Section({ Title = "Silent Aim" })
 
 CombatTab:Toggle({
     Title = "Silent Aim",
@@ -684,7 +674,7 @@ CombatTab:Slider({
     Callback = function(v) Features.Prediction = v; SaveConfig(true) end,
 })
 
-CombatTab:Section({ Title = "Defensa", Desc = "Protección del jugador" })
+CombatTab:Section({ Title = "Defensa" })
 
 CombatTab:Toggle({
     Title = "Anti Kill",
@@ -704,7 +694,7 @@ CombatTab:Slider({
 })
 
 local ESPTab = Window:Tab({ Title = "ESP", Icon = "eye" })
-ESPTab:Section({ Title = "Player ESP", Desc = "Visualización con slots de inventario" })
+ESPTab:Section({ Title = "Player ESP" })
 
 ESPTab:Toggle({
     Title = "Cajas (Boxes)",
@@ -793,7 +783,7 @@ MoveTab:Toggle({
 })
 
 local WeaponTab = Window:Tab({ Title = "WEAPON", Icon = "target" })
-WeaponTab:Section({ Title = "Modificadores de Armas" })
+WeaponTab:Section({ Title = "Modificadores" })
 
 WeaponTab:Toggle({
     Title = "Activar Gun Mods",
@@ -806,7 +796,7 @@ WeaponTab:Toggle({
 })
 
 WeaponTab:Slider({
-    Title = "Cadencia (Fire Rate)",
+    Title = "Cadencia",
     Step = 50,
     Value = { Min = 50, Max = 2000, Default = Features.FireRate },
     Callback = function(v)
@@ -817,7 +807,7 @@ WeaponTab:Slider({
 })
 
 WeaponTab:Slider({
-    Title = "Retroceso (Recoil)",
+    Title = "Retroceso",
     Step = 0.1,
     Value = { Min = 0, Max = 3, Default = Features.Recoil },
     Callback = function(v)
@@ -865,5 +855,4 @@ MiscTab:Button({
 
 CombatTab:Select()
 
-print("[WATER HUB] Cargado exitosamente - Vídeo de fondo activo")
-print("[WATER HUB] Slots circulares con imágenes - ACTIVO (activar 'Inventario Equipado')")
+print("[WATER HUB] Cargado - Vídeo sin sonido - Slots mejorados para BlockSpin")
