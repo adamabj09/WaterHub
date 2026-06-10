@@ -1,16 +1,21 @@
-loadstring([[
-local L = loadstring(game:HttpGet("https://raw.githubusercontent.com/x2zu/OPEN-SOURCE-UI-ROBLOX/refs/heads/main/X2ZU%20UI%20ROBLOX%20OPEN%20SOURCE/DummyUi-leak-by-x2zu/fetching-main/Tools/Framework.luau"))()
+-- ============================================================================
+--                          MONA HUB v1.2 - CÓDIGO PURO
+-- ============================================================================
+
+-- Inicialización de la Librería Visual
+local FrameworkURL = "https://raw.githubusercontent.com/x2zu/OPEN-SOURCE-UI-ROBLOX/refs/heads/main/X2ZU%20UI%20ROBLOX%20OPEN%20SOURCE/DummyUi-leak-by-x2zu/fetching-main/Tools/Framework.luau"
+local L = loadstring(game:HttpGet(FrameworkURL))()
 task.wait(0.4)
 
--- Servicios y Variables Globales
-local P = game.Players.LocalPlayer
-local RS = game:GetService("RunService")
-local WS = game:GetService("Workspace")
+-- Servicios del Sistema
+local P   = game.Players.LocalPlayer
+local RS  = game:GetService("RunService")
+local WS  = game:GetService("Workspace")
 local UIS = game:GetService("UserInputService")
-local TS = game:GetService("TeleportService")
-local HS = game:GetService("HttpService")
+local TS  = game:GetService("TeleportService")
+local HS  = game:GetService("HttpService")
 
--- Configuración de la Ventana Principal
+-- Configuración y Creación de la Ventana
 local W = L:Window({
     Title = "MONA HUB",
     Desc = "x2zu on top",
@@ -26,15 +31,15 @@ local W = L:Window({
     }
 })
 
--- ============================================
--- PESTAÑA: PLAYER (Jugador)
--- ============================================
+-- ============================================================================
+-- PESTAÑA 1: PLAYER (Controles del Jugador)
+-- ============================================================================
 local PT = W:Tab({ Title = "Player", Icon = "star" })
 PT:Section({ Title = "Player Controls" })
 
 local ws, jb, wsD, jbD = 16, 0, 16, 0
 
--- Control de Velocidad (WalkSpeed)
+-- Modificador de Velocidad
 PT:Slider({
     Title = "Walk Speed",
     Min = 16,
@@ -47,7 +52,7 @@ PT:Slider({
     end
 })
 
--- Control de Salto (Jump Boost)
+-- Modificador de Fuerza de Salto
 PT:Slider({
     Title = "Jump Boost",
     Min = 0,
@@ -58,7 +63,7 @@ PT:Slider({
     end
 })
 
--- Lógica del Jump Boost (BodyVelocity)
+-- Conexión física para el salto modificado
 UIS.JumpRequest:Connect(function()
     if jb > 0 and P.Character and P.Character:FindFirstChild("HumanoidRootPart") then
         local bv = Instance.new("BodyVelocity")
@@ -70,9 +75,9 @@ UIS.JumpRequest:Connect(function()
     end
 end)
 
--- Botón de Reinicio de Valores
+-- Botón para restablecer valores de fábrica
 PT:Button({
-    Title = "รีเซ็ตค่า", -- Botón de reinicio
+    Title = "รีเซ็ตค่า",
     Callback = function()
         if P.Character and P.Character:FindFirstChild("Humanoid") then
             P.Character.Humanoid.WalkSpeed = wsD
@@ -86,9 +91,9 @@ PT:Button({
     end
 })
 
--- ============================================
--- PESTAÑA: ESP (Visuales y Optimización)
--- ============================================
+-- ============================================================================
+-- PESTAÑA 2: ESP (Visuales e Inventarios)
+-- ============================================================================
 local ESP_TAB = W:Tab({ Title = "ESP", Icon = "eye" })
 ESP_TAB:Section({ Title = "ESP Controls" })
 
@@ -103,7 +108,7 @@ ESP_TAB:Toggle({
 })
 
 ESP_TAB:Toggle({
-    Title = "ESP ชื่อผู้เล่น", -- Mostrar nombres
+    Title = "ESP ชื่อผู้เล่น",
     Value = true,
     Callback = function(v)
         ShowNames = v
@@ -111,28 +116,28 @@ ESP_TAB:Toggle({
 })
 
 ESP_TAB:Toggle({
-    Title = "ดูของผู้เล่น", -- Ver ítems
+    Title = "ดูของผู้เล่น",
     Value = true,
     Callback = function(v)
         ShowItems = v
     end
 })
 
--- Diccionario de traducción de ítems
+-- IDs de ítems mapeados
 local ItemNameMapping = {
     ["1001"] = "Spin Fruit",
     ["1002"] = "Sword",
     ["1003"] = "Shield"
 }
 
--- Función para dibujar el ESP (BillboardGui)
+-- Constructor de elementos visuales (Etiquetas en pantalla)
 local function CreateESP(p, text, color, name, offset)
     local b = Instance.new("BillboardGui")
     b.Name = name
     b.Adornee = p
     b.Size = UDim2.new(0, 150, 0, 35)
     b.AlwaysOnTop = true
-    b.Value = offset or Vector3.new(0, 2, 0)
+    b.StudsOffset = offset or Vector3.new(0, 2, 0)
     
     local l = Instance.new("TextLabel")
     l.Size = UDim2.new(1, 0, 1, 0)
@@ -147,7 +152,7 @@ local function CreateESP(p, text, color, name, offset)
     return b
 end
 
--- Función para leer los inventarios
+-- Lector dinámico de mochilas e inventarios de otros jugadores
 local function GetInventory(plr)
     if plr == P then 
         return "ตัวเรา" 
@@ -164,7 +169,6 @@ local function GetInventory(plr)
             end
         end
     else
-        -- Lectura alternativa por Backpack estándar
         for _, i in pairs(plr.Backpack:GetChildren()) do
             if i:IsA("Tool") then
                 txt = txt .. i.Name .. ", "
@@ -179,15 +183,15 @@ local function GetInventory(plr)
         end
     end
     
-    if txt ~= "" then
-        txt = txt:sub(1, -3)
-    else
-        txt = "ไม่มีของ"
+    if txt ~= "" then 
+        txt = txt:sub(1, -3) 
+    else 
+        txt = "ไม่มีของ" 
     end
     return txt
 end
 
--- Función para reducir gráficos (Boost FPS)
+-- Optimización de Texturas (Reducción de carga gráfica)
 local function ApplyBoostFPS()
     for _, o in pairs(WS:GetDescendants()) do
         if o:IsA("BasePart") and o.Parent ~= P.Character then
@@ -198,7 +202,7 @@ local function ApplyBoostFPS()
     end
 end
 
--- Bucles de Renderizado para ESP y FPS
+-- Conexiones de Renderizado en bucle
 RS.Heartbeat:Connect(function()
     if BoostFPS then 
         ApplyBoostFPS() 
@@ -210,7 +214,7 @@ RS.RenderStepped:Connect(function()
         if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local HRP = plr.Character.HumanoidRootPart
             
-            -- Lógica para pintar nombres
+            -- Actualización de Nombres
             if ShowNames and plr ~= P then
                 if not HRP:FindFirstChild("ESP_Name") then
                     CreateESP(HRP, plr.Name, Color3.new(1, 0, 0), "ESP_Name", Vector3.new(0, 2, 0))
@@ -221,7 +225,7 @@ RS.RenderStepped:Connect(function()
                 HRP.ESP_Name:Destroy()
             end
             
-            -- Lógica para pintar ítems de inventario
+            -- Actualización de Ítems visibles
             if ShowItems and plr ~= P then
                 local inv = GetInventory(plr)
                 if not HRP:FindFirstChild("ESP_Items") then
@@ -236,9 +240,9 @@ RS.RenderStepped:Connect(function()
     end
 end)
 
--- ============================================
--- PESTAÑA: PVP (Combate)
--- ============================================
+-- ============================================================================
+-- PESTAÑA 3: PVP (Combate)
+-- ============================================================================
 local PV = W:Tab({ Title = "PVP", Icon = "sword" })
 PV:Section({ Title = "Combat Features" })
 
@@ -263,15 +267,15 @@ PV:Toggle({
     end
 })
 
--- ============================================
--- PESTAÑA: SERVER (Gestión de Servidores)
--- ============================================
+-- ============================================================================
+-- PESTAÑA 4: SERVER (Buscador de Servidores y Datos)
+-- ============================================================================
 local ST = W:Tab({ Title = "Server", Icon = "server" })
 ST:Section({ Title = "Server Features" })
 
--- Cambiar de servidor de forma automática (Server Hop)
+-- Saltador de servidores optimizado (Server Hop)
 ST:Button({
-    Title = "เปลี่ยนเซิร์ฟ", -- Cambiar servidor
+    Title = "เปลี่ยนเซิร์ฟ",
     Callback = function()
         local PID = game.PlaceId
         local c = ""
@@ -307,7 +311,7 @@ ST:Button({
     end
 })
 
--- Mostrar información del servidor actual
+-- Notificador de Información interna
 ST:Button({
     Title = "Server Info",
     Callback = function()
@@ -319,9 +323,9 @@ ST:Button({
     end
 })
 
--- ============================================
--- PESTAÑA: UI (Configuración de Interfaz)
--- ============================================
+-- ============================================================================
+-- PESTAÑA 5: UI (Opciones de Ventana)
+-- ============================================================================
 local UT = W:Tab({ Title = "UI", Icon = "desktop" })
 UT:Section({ Title = "UI Controls" })
 
@@ -341,10 +345,9 @@ UT:Toggle({
     end
 })
 
--- Notificación de Carga Completa
+-- Lanzar Alerta de Éxito al finalizar
 W:Notify({
     Title = "MONA HUB v1.2",
     Desc = "Loaded!",
     Time = 4
 })
-]])()
