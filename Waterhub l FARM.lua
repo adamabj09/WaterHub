@@ -1,353 +1,147 @@
--- ============================================================================
---                          MONA HUB v1.2 - CÓDIGO PURO
--- ============================================================================
+-- WindUI Integration & Farm Script
+-- Author: GLM 4.7 Flash Heretic
 
--- Inicialización de la Librería Visual
-local FrameworkURL = "https://raw.githubusercontent.com/x2zu/OPEN-SOURCE-UI-ROBLOX/refs/heads/main/X2ZU%20UI%20ROBLOX%20OPEN%20SOURCE/DummyUi-leak-by-x2zu/fetching-main/Tools/Framework.luau"
-local L = loadstring(game:HttpGet(FrameworkURL))()
-task.wait(0.4)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Servicios del Sistema
-local P   = game.Players.LocalPlayer
-local RS  = game:GetService("RunService")
-local WS  = game:GetService("Workspace")
-local UIS = game:GetService("UserInputService")
-local TS  = game:GetService("TeleportService")
-local HS  = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
--- Configuración y Creación de la Ventana
-local W = L:Window({
-    Title = "MONA HUB",
-    Desc = "x2zu on top",
-    Icon = 105059922903197,
-    Theme = "Dark",
-    Config = {
-        Keybind = Enum.KeyCode.LeftControl,
-        Size = UDim2.new(0, 500, 0, 400)
-    },
-    CloseUIButton = {
-        Enabled = true,
-        Text = "x2zu"
-    }
-})
-
--- ============================================================================
--- PESTAÑA 1: PLAYER (Controles del Jugador)
--- ============================================================================
-local PT = W:Tab({ Title = "Player", Icon = "star" })
-PT:Section({ Title = "Player Controls" })
-
-local ws, jb, wsD, jbD = 16, 0, 16, 0
-
--- Modificador de Velocidad
-PT:Slider({
-    Title = "Walk Speed",
-    Min = 16,
-    Max = 200,
-    Default = ws,
-    Callback = function(v)
-        if P.Character and P.Character:FindFirstChild("Humanoid") then
-            P.Character.Humanoid.WalkSpeed = v
-        end
-    end
-})
-
--- Modificador de Fuerza de Salto
-PT:Slider({
-    Title = "Jump Boost",
-    Min = 0,
-    Max = 200,
-    Default = jb,
-    Callback = function(v)
-        jb = v
-    end
-})
-
--- Conexión física para el salto modificado
-UIS.JumpRequest:Connect(function()
-    if jb > 0 and P.Character and P.Character:FindFirstChild("HumanoidRootPart") then
-        local bv = Instance.new("BodyVelocity")
-        bv.Velocity = Vector3.new(0, jb, 0)
-        bv.MaxForce = Vector3.new(0, math.huge, 0)
-        bv.P = 10000
-        bv.Parent = P.Character.HumanoidRootPart
-        game.Debris:AddItem(bv, 0.3)
-    end
-end)
-
--- Botón para restablecer valores de fábrica
-PT:Button({
-    Title = "รีเซ็ตค่า",
-    Callback = function()
-        if P.Character and P.Character:FindFirstChild("Humanoid") then
-            P.Character.Humanoid.WalkSpeed = wsD
-        end
-        jb = jbD
-        W:Notify({
-            Title = "รีเซ็ตสำเร็จ!",
-            Desc = "กลับไปค่าเริ่มต้น",
-            Time = 3
-        })
-    end
-})
-
--- ============================================================================
--- PESTAÑA 2: ESP (Visuales e Inventarios)
--- ============================================================================
-local ESP_TAB = W:Tab({ Title = "ESP", Icon = "eye" })
-ESP_TAB:Section({ Title = "ESP Controls" })
-
-local BoostFPS, ShowNames, ShowItems = true, true, true
-
-ESP_TAB:Toggle({
-    Title = "Boost FPS",
-    Value = false,
-    Callback = function(v)
-        BoostFPS = v
-    end
-})
-
-ESP_TAB:Toggle({
-    Title = "ESP ชื่อผู้เล่น",
-    Value = true,
-    Callback = function(v)
-        ShowNames = v
-    end
-})
-
-ESP_TAB:Toggle({
-    Title = "ดูของผู้เล่น",
-    Value = true,
-    Callback = function(v)
-        ShowItems = v
-    end
-})
-
--- IDs de ítems mapeados
-local ItemNameMapping = {
-    ["1001"] = "Spin Fruit",
-    ["1002"] = "Sword",
-    ["1003"] = "Shield"
-}
-
--- Constructor de elementos visuales (Etiquetas en pantalla)
-local function CreateESP(p, text, color, name, offset)
-    local b = Instance.new("BillboardGui")
-    b.Name = name
-    b.Adornee = p
-    b.Size = UDim2.new(0, 150, 0, 35)
-    b.AlwaysOnTop = true
-    b.StudsOffset = offset or Vector3.new(0, 2, 0)
-    
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1, 0, 1, 0)
-    l.BackgroundTransparency = 1
-    l.TextColor3 = color
-    l.TextScaled = true
-    l.Font = Enum.Font.SourceSansBold
-    l.Text = text
-    l.Parent = b
-    
-    b.Parent = p
-    return b
+-- WindUI Loader
+local WindUI
+if RunService:IsStudio() then
+	WindUI = require(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init"))
+else
+	local success, result = pcall(function()
+		return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+	end)
+	WindUI = success and result or nil
 end
 
--- Lector dinámico de mochilas e inventarios de otros jugadores
-local function GetInventory(plr)
-    if plr == P then 
-        return "ตัวเรา" 
-    end
-    
-    local txt = ""
-    local pd = WS:FindFirstChild("PlayerData")
-    
-    if pd and pd:FindFirstChild(plr.Name) then
-        local inv = pd[plr.Name]:FindFirstChild("Inventory")
-        if inv then
-            for _, i in pairs(inv:GetChildren()) do
-                txt = txt .. (ItemNameMapping[i.Name] or i.Name) .. ", "
-            end
-        end
-    else
-        for _, i in pairs(plr.Backpack:GetChildren()) do
-            if i:IsA("Tool") then
-                txt = txt .. i.Name .. ", "
-            end
-        end
-        if plr.Character then
-            for _, i in pairs(plr.Character:GetChildren()) do
-                if i:IsA("Tool") then
-                    txt = txt .. i.Name .. ", "
-                end
-            end
-        end
-    end
-    
-    if txt ~= "" then 
-        txt = txt:sub(1, -3) 
-    else 
-        txt = "ไม่มีของ" 
-    end
-    return txt
+if not WindUI then
+	warn("Failed to load WindUI")
+	return
 end
 
--- Optimización de Texturas (Reducción de carga gráfica)
-local function ApplyBoostFPS()
-    for _, o in pairs(WS:GetDescendants()) do
-        if o:IsA("BasePart") and o.Parent ~= P.Character then
-            o.Material = Enum.Material.Plastic
-            o.Color = Color3.fromRGB(50, 50, 50)
-            o.CastShadow = false
-        end
-    end
-end
+-- Job Data & Utils
+local JobData = require(ReplicatedStorage.Modules.Game.Jobs.JobData)
+local JobUtil = require(ReplicatedStorage.Modules.Game.Jobs.JobUtil)
+local JobApp = require(ReplicatedStorage.Modules.Game.Jobs.JobApplication)
 
--- Conexiones de Renderizado en bucle
-RS.Heartbeat:Connect(function()
-    if BoostFPS then 
-        ApplyBoostFPS() 
-    end
+-- UI Initialization
+local Main = WindUI:CreateWindow("Farming & Tools", 800, 450)
+
+-- Tab: FARM
+local FarmTab = Main:AddTab("FARM", "🚜")
+
+-- --- SWIPER SECTION ---
+local SwiperGroup = FarmTab:AddGroup("Swiper:")
+
+local SwiperAfk = SwiperGroup:AddToggle("Afk Checker", false, "If your character stays idle for more than 5 minutes, it will automatically rejoin.")
+local SwiperVehicle = SwiperGroup:AddDropdown("Vehicle Type", {"Bike", "Car", "Truck"})
+local SwiperTool = SwiperGroup:AddDropdown("HackTools", {"Smart Select", "HackToolBasic", "HackToolPro", "HackToolUltimate", "HackToolQuantum"})
+local SwiperQty = SwiperGroup:AddSlider("HackTools Quantity", 5, 1, 100)
+
+-- --- FISHING SECTION ---
+local FishingGroup = FarmTab:AddGroup("Fishing:")
+
+local FishingAfk = FishingGroup:AddToggle("Afk Checker", false, "If your character stays idle for more than 5 minutes, it will automatically rejoin.")
+local FishingVehicle = FishingGroup:AddDropdown("Vehicle Type", {"Bike", "Car"})
+local FishingRod = FishingGroup:AddDropdown("Rod", {"Smart Select", "FishingRodRegular", "FishingRodPro", "FishingRodAdvanced", "FishingRodUltimate"})
+local FishingBait = FishingGroup:AddDropdown("Bait", {"Smart Select", "WormtecRegular", "WormtecPro", "WormtecUltimate", "PrawntecRegular", "PrawntecPro"})
+local FishingBaitQty = FishingGroup:AddSlider("Bait Quantity", 10, 1, 50)
+local FishingAmount = FishingGroup:AddSlider("Fish Amount", 10, 1, 100)
+
+-- Tab: GENERAL
+local GeneralTab = Main:AddTab("General", "👤")
+
+local GeneralHideName = GeneralTab:AddToggle("Hide Name", false, "Just hide only client side.")
+local GeneralAntiKill = GeneralTab:AddToggle("Anti Kill", false, "Prevent kill when you has been downed.")
+local GeneralAntiRagdoll = GeneralTab:AddToggle("Anti Ragdoll", false, "Anti stunned when you got hit or bumped by car.")
+local GeneralAutoRespawn = GeneralTab:AddToggle("Auto Respawn", false, "Automatic respawn when you death.")
+
+-- Tab: SERVER
+local ServerTab = Main:AddTab("Server", "🖥️")
+
+local ServerInfoBox = ServerTab:AddBox("Server Information:")
+ServerInfoBox:AddLabel("PlaceId", tostring(game.PlaceId))
+ServerInfoBox:AddLabel("Players", tostring(Players:GetPlayers() | #Players:GetPlayers()))
+ServerInfoBox:AddLabel("Ping", tostring(game:GetService("NetworkService"):GetServerPing()))
+
+local JobIdInput = ServerTab:AddInput("JobId", "Enter JobId here...")
+local CopyJobIdBtn = ServerTab:AddButton("Copy JobId", "Click to copy this server's JobId")
+local TeleportBtn = ServerTab:AddButton("Teleport", "Teleport to target jobid.")
+local RejoinBtn = ServerTab:AddButton("Rejoin", "Rejoin in same server.")
+
+-- Tab: CONFIG
+local ConfigTab = Main:AddTab("Config", "⚙️")
+
+local SaveConfigBtn = ConfigTab:AddButton("Save Config", "Save current config.")
+local ResetConfigBtn = ConfigTab:AddButton("Reset Config", "Wipe all config.")
+local WipeWorkspaceBtn = ConfigTab:AddButton("Wipe Workspace", "Delete all file in workspace.")
+
+-- --- LOGIC & REMOTES ---
+
+-- Remote Hook
+local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+
+-- Swiper Logic
+SwiperVehicle.OnSelected:Connect(function(selected)
+	-- Logic to select vehicle
+	warn("Vehicle selected:", selected)
 end)
 
-RS.RenderStepped:Connect(function()
-    for _, plr in pairs(game.Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local HRP = plr.Character.HumanoidRootPart
-            
-            -- Actualización de Nombres
-            if ShowNames and plr ~= P then
-                if not HRP:FindFirstChild("ESP_Name") then
-                    CreateESP(HRP, plr.Name, Color3.new(1, 0, 0), "ESP_Name", Vector3.new(0, 2, 0))
-                else
-                    HRP.ESP_Name.TextLabel.Text = plr.Name
-                end
-            elseif HRP:FindFirstChild("ESP_Name") then
-                HRP.ESP_Name:Destroy()
-            end
-            
-            -- Actualización de Ítems visibles
-            if ShowItems and plr ~= P then
-                local inv = GetInventory(plr)
-                if not HRP:FindFirstChild("ESP_Items") then
-                    CreateESP(HRP, inv, Color3.new(0, 1, 0), "ESP_Items", Vector3.new(0, -2, 0))
-                else
-                    HRP.ESP_Items.TextLabel.Text = inv
-                end
-            elseif HRP:FindFirstChild("ESP_Items") then
-                HRP.ESP_Items:Destroy()
-            end
-        end
-    end
+SwiperTool.OnSelected:Connect(function(selected)
+	warn("HackTool selected:", selected)
 end)
 
--- ============================================================================
--- PESTAÑA 3: PVP (Combate)
--- ============================================================================
-local PV = W:Tab({ Title = "PVP", Icon = "sword" })
-PV:Section({ Title = "Combat Features" })
+-- Fishing Logic
+FishingRod.OnSelected:Connect(function(selected)
+	warn("Rod selected:", selected)
+end)
 
-PV:Toggle({
-    Title = "Silent Aim",
-    Value = false,
-    Callback = function(en)
-        if en then
-            getgenv().khen = {
-                ['Silent'] = {
-                    Normal = { Enabled = true, HitPart = "Head", Prediction = 0.1657724, AirPrediction = 0.149 },
-                    FOV = { FOVSize = 250, ShowFOV = true },
-                    Resolver = { Enabled = true }
-                }
-            }
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/khenn791/script-khen/refs/heads/main/SilentAim", true))()
-        else
-            if getgenv().khen and getgenv().khen.Silent then
-                getgenv().khen.Silent.Normal.Enabled = false
-            end
-        end
-    end
-})
+FishingBait.OnSelected:Connect(function(selected)
+	warn("Bait selected:", selected)
+end)
 
--- ============================================================================
--- PESTAÑA 4: SERVER (Buscador de Servidores y Datos)
--- ============================================================================
-local ST = W:Tab({ Title = "Server", Icon = "server" })
-ST:Section({ Title = "Server Features" })
+-- General Logic
+GeneralAntiKill.OnToggled:Connect(function(isOn)
+	-- Logic for Anti Kill
+	if isOn then
+		warn("Anti Kill Enabled")
+	else
+		warn("Anti Kill Disabled")
+	end
+end)
 
--- Saltador de servidores optimizado (Server Hop)
-ST:Button({
-    Title = "เปลี่ยนเซิร์ฟ",
-    Callback = function()
-        local PID = game.PlaceId
-        local c = ""
-        local fs
-        
-        repeat
-            local ok, res = pcall(function()
-                return HS:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PID .. "/servers/Public?sortOrder=Asc&limit=100" .. (c ~= "" and "&cursor=" .. c or "")))
-            end)
-            
-            if ok and res and res.data then
-                for _, s in pairs(res.data) do
-                    if s.playing < s.maxPlayers and s.id ~= game.JobId then
-                        fs = s.id
-                        break
-                    end
-                end
-                c = res.nextPageCursor or ""
-            else
-                break
-            end
-        until fs or c == ""
-        
-        if fs then
-            TS:TeleportToPlaceInstance(PID, fs, P)
-        else
-            W:Notify({
-                Title = "ไม่พบ Server",
-                Desc = "ไม่มี Server ว่าง",
-                Time = 4
-            })
-        end
-    end
-})
+GeneralAntiRagdoll.OnToggled:Connect(function(isOn)
+	-- Logic for Anti Ragdoll
+	if isOn then
+		warn("Anti Ragdoll Enabled")
+	else
+		warn("Anti Ragdoll Disabled")
+	end
+end)
 
--- Notificador de Información interna
-ST:Button({
-    Title = "Server Info",
-    Callback = function()
-        W:Notify({
-            Title = "Server Info",
-            Desc = "PlaceId:" .. game.PlaceId .. "\nJobId:" .. game.JobId,
-            Time = 4
-        })
-    end
-})
+-- Server Logic
+CopyJobIdBtn.OnClick:Connect(function()
+	local jobId = game:GetService("TeleportService"):GetJobId()
+	clipboard.set(jobId)
+	warn("JobId Copied!")
+end)
 
--- ============================================================================
--- PESTAÑA 5: UI (Opciones de Ventana)
--- ============================================================================
-local UT = W:Tab({ Title = "UI", Icon = "desktop" })
-UT:Section({ Title = "UI Controls" })
-
-UT:Toggle({
-    Title = "UI Toggle",
-    Value = true,
-    Callback = function(v)
-        W.Enabled = v
-    end
-})
-
-UT:Toggle({
-    Title = "Lock UI",
-    Value = false,
-    Callback = function(v)
-        W.Draggable = not v
-    end
-})
-
--- Lanzar Alerta de Éxito al finalizar
-W:Notify({
-    Title = "MONA HUB v1.2",
-    Desc = "Loaded!",
-    Time = 4
-})
+TeleportBtn.OnClick:Connect(function()
+	local targetJobId = JobIdInput.Text
+	if targetJobId and targetJobId ~= "" then
+		-- Teleport logic using TeleportService
+		local success, err = pcall(function()
+			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, targetJobId, LocalPlayer)
+		end)
+		if not success then
+			warn("Teleport failed:", err)
+		end
+	else
+		warn("Please enter a valid JobId")
+	end
+end)
